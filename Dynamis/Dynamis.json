@@ -1,0 +1,14 @@
+{
+  "Author": "Ny",
+  "Name": "Dynamis",
+  "InternalName": "Dynamis",
+  "Punchline": "Developer/debugging/RE tool and experiment workbench.",
+  "Description": "This plugin contains various tools to help reverse engineering the game through dynamic analysis, and prototyping things.",
+  "ApplicableVersion": "any",
+  "Tags": [
+    "reverse-engineering",
+    "developer-tools"
+  ],
+  "IconUrl": "https://raw.githubusercontent.com/Exter-N/Dynamis/main/Dynamis/Resources/Dynamis128.png",
+  "RepoUrl": "https://github.com/Exter-N/Dynamis"
+}

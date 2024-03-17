@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+    <Import Project="Dalamud.Plugin.Bootstrap.targets"/>
+
+    <PropertyGroup>
+        <Authors></Authors>
+        <Company></Company>
+        <Version>9.0.0.1</Version>
+        <Description>A sample plugin.</Description>
+        <Copyright></Copyright>
+        <PackageProjectUrl>https://github.com/Exter-N/Dynamis</PackageProjectUrl>
+        <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
+        <IsPackable>false</IsPackable>
+        <ImplicitUsings>true</ImplicitUsings>
+    </PropertyGroup>
+    
+    <ItemGroup>
+        <Reference Include="CheapLoc">
+            <HintPath>$(DalamudLibPath)CheapLoc.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0"/>
+        <PackageReference Include="YamlDotNet" Version="15.1.2" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Localization\" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="Resources\Dynamis.png" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="Resources\Dynamis64.png" />
+      <EmbeddedResource Include="Resources\Dynamis64.png" />
+      <None Remove="Resources\Dynamis128.png" />
+      <EmbeddedResource Include="Resources\Dynamis128.png" />
+    </ItemGroup>
+</Project>
