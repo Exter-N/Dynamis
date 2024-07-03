@@ -1,5 +1,5 @@
 using Dalamud.Interface;
-using Dalamud.Interface.Internal;
+using Dalamud.Interface.Textures.TextureWraps;
 using Dalamud.Plugin.Services;
 using Dynamis.Messaging;
 using Dynamis.Resources;
@@ -11,16 +11,16 @@ namespace Dynamis.UI;
 public sealed class LaunchButton : IHostedService
 {
     private readonly MessageHub       _messageHub;
-    private readonly UiBuilder        _uiBuilder;
+    private readonly IUiBuilder       _uiBuilder;
     private readonly ITitleScreenMenu _titleScreenMenu;
     private readonly ResourceProvider _resourceProvider;
 
-    private readonly object                     _syncRoot = new();
-    private          bool                       _createPending;
-    private          Task<IDalamudTextureWrap>? _icon;
-    private          TitleScreenMenuEntry?      _entry;
+    private readonly object                         _syncRoot = new();
+    private          bool                           _createPending;
+    private          Task<IDalamudTextureWrap>?     _icon;
+    private          IReadOnlyTitleScreenMenuEntry? _entry;
 
-    public LaunchButton(MessageHub messageHub, UiBuilder uiBuilder, ITitleScreenMenu titleScreenMenu, ResourceProvider resourceProvider)
+    public LaunchButton(MessageHub messageHub, IUiBuilder uiBuilder, ITitleScreenMenu titleScreenMenu, ResourceProvider resourceProvider)
     {
         _messageHub = messageHub;
         _uiBuilder = uiBuilder;

@@ -16,7 +16,7 @@ public sealed class SigScannerWindow : Window, IMessageObserver<OpenWindowMessag
 
     private readonly MessageHub                _messageHub;
     private readonly ILogger<SigScannerWindow> _logger;
-    private readonly UiBuilder                 _uiBuilder;
+    private readonly IUiBuilder                _uiBuilder;
     private readonly ISigScanner               _sigScanner;
     private readonly ImGuiComponents           _imGuiComponents;
 
@@ -24,7 +24,7 @@ public sealed class SigScannerWindow : Window, IMessageObserver<OpenWindowMessag
     private          int              _vmOffset    = 0;
     private readonly List<ScanResult> _vmResults   = new();
 
-    public SigScannerWindow(MessageHub messageHub, ILogger<SigScannerWindow> logger, UiBuilder uiBuilder,
+    public SigScannerWindow(MessageHub messageHub, ILogger<SigScannerWindow> logger, IUiBuilder uiBuilder,
         ISigScanner sigScanner, ImGuiComponents imGuiComponents) : base("Dynamis - Signature Scanner", 0)
     {
         _messageHub = messageHub;

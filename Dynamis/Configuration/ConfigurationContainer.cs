@@ -7,14 +7,14 @@ namespace Dynamis.Configuration;
 
 public sealed class ConfigurationContainer : IDalamudLoggingConfiguration
 {
-    private readonly MessageHub             _messageHub;
-    private readonly DalamudPluginInterface _pluginInterface;
-    private readonly Lazy<Configuration>    _configuration;
+    private readonly MessageHub              _messageHub;
+    private readonly IDalamudPluginInterface _pluginInterface;
+    private readonly Lazy<Configuration>     _configuration;
 
     public Configuration Configuration
         => _configuration.Value;
 
-    public ConfigurationContainer(MessageHub messageHub, DalamudPluginInterface pi)
+    public ConfigurationContainer(MessageHub messageHub, IDalamudPluginInterface pi)
     {
         _messageHub = messageHub;
         _pluginInterface = pi;

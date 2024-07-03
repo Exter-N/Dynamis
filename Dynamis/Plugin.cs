@@ -27,7 +27,8 @@ public sealed class Plugin : IDalamudPlugin
     private readonly Task                    _hostBuilderRunTask;
 
     public Plugin(
-        DalamudPluginInterface pluginInterface,
+        IDalamudPluginInterface pluginInterface,
+        ITextureProvider textureProvider,
         ICommandManager commandManager,
         IPluginLog pluginLog,
         ISigScanner sigScanner,
@@ -49,6 +50,7 @@ public sealed class Plugin : IDalamudPlugin
                     collection =>
                     {
                         collection.AddSingleton(pluginInterface);
+                        collection.AddSingleton(textureProvider);
                         collection.AddSingleton(commandManager);
                         collection.AddSingleton(pluginLog);
                         collection.AddSingleton(sigScanner);

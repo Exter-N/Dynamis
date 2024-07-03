@@ -10,12 +10,12 @@ namespace Dynamis.UI;
 public sealed class WindowManager : IHostedService
 {
     private readonly MessageHub                _messageHub;
-    private readonly UiBuilder                 _uiBuilder;
+    private readonly IUiBuilder                _uiBuilder;
     private readonly WindowSystem              _windowSystem;
     private readonly FileDialogManager         _fileDialogManager;
     private readonly IEnumerable<Lazy<Window>> _windows;
 
-    public WindowManager(MessageHub messageHub, UiBuilder uiBuilder, WindowSystem windowSystem, FileDialogManager fileDialogManager, IEnumerable<Lazy<Window>> windows)
+    public WindowManager(MessageHub messageHub, IUiBuilder uiBuilder, WindowSystem windowSystem, FileDialogManager fileDialogManager, IEnumerable<Lazy<Window>> windows)
     {
         _messageHub = messageHub;
         _uiBuilder = uiBuilder;
