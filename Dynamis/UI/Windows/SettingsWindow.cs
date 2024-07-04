@@ -2,6 +2,7 @@
 using Dalamud.Interface.Windowing;
 using Dynamis.Configuration;
 using Dynamis.Messaging;
+using Dynamis.Utility;
 using ImGuiNET;
 using Microsoft.Extensions.Logging;
 
@@ -14,8 +15,7 @@ public sealed class SettingsWindow : Window, IMessageObserver<OpenWindowMessage<
 
     public SettingsWindow(ConfigurationContainer configuration, ImGuiComponents imGuiComponents) : base(
         "Dynamis Settings",
-        ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoScrollbar |
-        ImGuiWindowFlags.NoScrollWithMouse | ImGuiWindowFlags.NoDocking
+        ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoDocking
     )
     {
         _configuration = configuration;
@@ -28,6 +28,17 @@ public sealed class SettingsWindow : Window, IMessageObserver<OpenWindowMessage<
     }
 
     public override void Draw()
+    {
+        if (ImGui.CollapsingHeader("Options", ImGuiTreeNodeFlags.DefaultOpen)) {
+            DrawOptions();
+        }
+
+        if (ImGui.CollapsingHeader("Colors")) {
+            DrawColors();
+        }
+    }
+
+    private void DrawOptions()
     {
         var inputWidth = ImGui.GetContentRegionAvail().X * (2.0f / 3.0f);
         var configuration = _configuration.Configuration;
@@ -48,6 +59,22 @@ public sealed class SettingsWindow : Window, IMessageObserver<OpenWindowMessage<
                 _configuration.Save(nameof(_configuration.Configuration.DataYamlPath));
             }
         );
+    }
+
+    private void DrawColors()
+    {
+        var inputWidth = ImGui.GetContentRegionAvail().X * (2.0f / 3.0f);
+        var configuration = _configuration.Configuration;
+
+        var hexViewerPalette = configuration.GetHexViewerPalette();
+        for (var i = 0; i < hexViewerPalette.Length; ++i) {
+            var color = hexViewerPalette[i].ToVector3();
+            ImGui.SetNextItemWidth(inputWidth);
+            if (ImGui.ColorEdit3(((HexViewerColor)i).ToString(), ref color)) {
+                hexViewerPalette[i] = color.ToUInt32();
+                _configuration.Save(nameof(_configuration.Configuration.HexViewerPalette));
+            }
+        }
     }
 
     public void HandleMessage(OpenWindowMessage<SettingsWindow> _)

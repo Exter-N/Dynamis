@@ -13,4 +13,9 @@ public sealed class ClassInfo
     public uint  EstimatedSize         { get; set; }
     public uint? SizeFromDtor          { get; set; }
     public uint? SizeFromClientStructs { get; set; }
+
+    public FieldInfo[] Fields { get; set; } = [];
+
+    public bool Known
+        => Name.Length > 0 && !Name.StartsWith("Cls_");
 }

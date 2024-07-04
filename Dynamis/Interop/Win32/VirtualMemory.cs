@@ -1,11 +1,12 @@
 using System.Runtime.InteropServices;
+using Dalamud.Memory;
 
 namespace Dynamis.Interop.Win32;
 
 public static unsafe partial class VirtualMemory
 {
-    public static bool CanRead(nint address)
-        => TryQuery(address, out var info) && info.State.HasFlag(MemoryState.Commit) && info.Protect.CanRead();
+    public static MemoryProtection GetProtection(nint address)
+        => TryQuery(address, out var info) && info.State.HasFlag(MemoryState.Commit) ? info.Protect : 0;
 
     public static MemoryBasicInformation Query(nint address)
     {

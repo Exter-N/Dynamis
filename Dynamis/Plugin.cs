@@ -33,7 +33,9 @@ public sealed class Plugin : IDalamudPlugin
         IPluginLog pluginLog,
         ISigScanner sigScanner,
         IGameInteropProvider gameInteropProvider,
-        ITitleScreenMenu titleScreenMenu)
+        ITitleScreenMenu titleScreenMenu,
+        IFramework framework,
+        IObjectTable objectTable)
     {
         _hostBuilderRunTask =
             new HostBuilder()
@@ -56,6 +58,8 @@ public sealed class Plugin : IDalamudPlugin
                         collection.AddSingleton(sigScanner);
                         collection.AddSingleton(gameInteropProvider);
                         collection.AddSingleton(titleScreenMenu);
+                        collection.AddSingleton(framework);
+                        collection.AddSingleton(objectTable);
 
                         collection.AddSingleton(pluginInterface.UiBuilder);
 
@@ -80,6 +84,7 @@ public sealed class Plugin : IDalamudPlugin
                         collection.AddSingleton<HomeWindow>();
                         collection.AddSingleton<SettingsWindow>();
                         collection.AddSingleton<SigScannerWindow>();
+                        collection.AddSingleton<ObjectTableWindow>();
                         collection.AddSingleton<ObjectInspectorWindowFactory>();
 
                         collection.AddSingleton<CommandHandler>();

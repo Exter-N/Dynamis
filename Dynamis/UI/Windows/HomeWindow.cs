@@ -11,11 +11,11 @@ namespace Dynamis.UI.Windows;
 
 public sealed partial class HomeWindow : Window, IMessageObserver<OpenWindowMessage<HomeWindow>>
 {
-    private readonly MessageHub                _messageHub;
-    private readonly ILogger<HomeWindow>       _logger;
-    private readonly ConfigurationContainer    _configuration;
-    private readonly ISigScanner               _sigScanner;
-    private readonly MemoryHeuristics        _memoryHeuristics;
+    private readonly MessageHub             _messageHub;
+    private readonly ILogger<HomeWindow>    _logger;
+    private readonly ConfigurationContainer _configuration;
+    private readonly ISigScanner            _sigScanner;
+    private readonly MemoryHeuristics       _memoryHeuristics;
 
     public HomeWindow(MessageHub messageHub, ILogger<HomeWindow> logger, ConfigurationContainer configuration,
         ISigScanner sigScanner, MemoryHeuristics memoryHeuristics, ImGuiComponents imGuiComponents) : base(
@@ -38,6 +38,10 @@ public sealed partial class HomeWindow : Window, IMessageObserver<OpenWindowMess
     {
         if (ImGui.Button("Open Signature Scanner")) {
             _messageHub.Publish<OpenWindowMessage<SigScannerWindow>>();
+        }
+
+        if (ImGui.Button("Open Object Table")) {
+            _messageHub.Publish<OpenWindowMessage<ObjectTableWindow>>();
         }
 
         if (ImGui.Button("Open Object Inspector")) {

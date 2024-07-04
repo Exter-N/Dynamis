@@ -1,27 +1,35 @@
+using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Dynamis.ClientStructs;
 using Dynamis.Interop.Win32;
 using Dynamis.Messaging;
+using Dynamis.UI;
+using Dynamis.Utility;
+using FFXIVClientStructs.FFXIV.Client.System.String;
 using FFXIVClientStructs.STD;
+using Microsoft.Extensions.Logging;
 
 namespace Dynamis.Interop;
 
 public sealed class ObjectInspector : IMessageObserver<ConfigurationChangedMessage>
 {
-    private readonly DataYamlContainer _dataYamlContainer;
-    private readonly MemoryHeuristics  _memoryHeuristics;
+    private readonly DataYamlContainer        _dataYamlContainer;
+    private readonly MemoryHeuristics         _memoryHeuristics;
+    private readonly ILogger<ObjectInspector> _logger;
 
     private readonly Dictionary<string, ClassInfo> _classCache = new();
 
-    public ObjectInspector(DataYamlContainer dataYamlContainer, MemoryHeuristics memoryHeuristics)
+    public ObjectInspector(DataYamlContainer dataYamlContainer, MemoryHeuristics memoryHeuristics, ILogger<ObjectInspector> logger)
     {
         _dataYamlContainer = dataYamlContainer;
         _memoryHeuristics = memoryHeuristics;
+        _logger = logger;
     }
 
     public unsafe ClassInfo DetermineClass(nint objectAddress)
     {
-        if (!VirtualMemory.CanRead(objectAddress)) {
+        if (!VirtualMemory.GetProtection(objectAddress).CanRead()) {
             return new ClassInfo();
         }
 
@@ -54,6 +62,59 @@ public sealed class ObjectInspector : IMessageObserver<ConfigurationChangedMessa
         return classInfo;
     }
 
+    public unsafe (AddressType Type, string Name) IdentifyAddress(nint address)
+    {
+        if (_dataYamlContainer.Data is not null) {
+            if (_dataYamlContainer.ClassesByInstance!.TryGetValue(address, out var className)) {
+                return (AddressType.Instance, className);
+            }
+
+            if (_dataYamlContainer.ClassesByVtbl!.TryGetValue(address, out className)) {
+                return (AddressType.Vtbl, className);
+            }
+
+            foreach (var (pointer, clsName) in _dataYamlContainer.ClassesByInstancePointer!) {
+                if (*(nint*)pointer.ToPointer() == address) {
+                    return (AddressType.Instance, clsName);
+                }
+            }
+        }
+
+        return (AddressType.None, string.Empty);
+    }
+
+    public ClassInfo FromClientStructs(Type type)
+    {
+        var typeName = type.FullName;
+        if (typeName is null || !typeName.StartsWith("FFXIVClientStructs.FFXIV.")) {
+            throw new ArgumentException($"Invalid type {type}");
+        }
+
+        var className = typeName.Substring(25).Replace(".", "::");
+        if (_classCache.TryGetValue(className, out var classInfo)) {
+            return classInfo;
+        }
+
+        classInfo = new ClassInfo
+        {
+            Name = className,
+            ClientStructsType = type,
+        };
+
+        if (_dataYamlContainer.Data?.Classes?.TryGetValue(className, out var dataClass) ?? false) {
+            var vtbl = dataClass?.Vtbls?[0]?.Ea.Value;
+            if (vtbl.HasValue) {
+                PopulateFromVtbl(classInfo, vtbl.Value);
+            }
+        }
+
+        PopulateFromClientStructs(classInfo);
+        PopulateAggregates(classInfo, (uint)Environment.SystemPageSize);
+
+        _classCache.Add(className, classInfo);
+        return classInfo;
+    }
+
     private unsafe string DetermineClassName(nint objectAddress, nint vtbl)
     {
         if (_dataYamlContainer.Data is not null) {
@@ -72,9 +133,103 @@ public sealed class ObjectInspector : IMessageObserver<ConfigurationChangedMessa
         return $"Cls_{vtbl:X}";
     }
 
+    public void Highlight(ReadOnlySpan<byte> objectBytes, ClassInfo classInfo, Span<byte> byteColors, bool nested = false)
+    {
+        foreach (var fieldInfo in classInfo.Fields) {
+            switch (fieldInfo.Type) {
+                case FieldType.Byte:
+                case FieldType.SByte:
+                case FieldType.UInt16:
+                case FieldType.Int16:
+                case FieldType.UInt32:
+                case FieldType.Int32:
+                case FieldType.UInt64:
+                case FieldType.Int64:
+                    byteColors[(int)fieldInfo.Offset..(int)(fieldInfo.Offset + fieldInfo.Size)].Fill((byte)HexViewerColor.Integer);
+                    break;
+                case FieldType.Half:
+                case FieldType.Single:
+                case FieldType.Double:
+                    byteColors[(int)fieldInfo.Offset..(int)(fieldInfo.Offset + fieldInfo.Size)].Fill((byte)HexViewerColor.Float);
+                    break;
+                case FieldType.ByteString:
+                    for (var i = 0u; i < fieldInfo.Size; ++i) {
+                        byteColors[(int)(fieldInfo.Offset + i)] = (byte)(objectBytes[(int)(fieldInfo.Offset + i)] == 0 ? HexViewerColor.Null : HexViewerColor.Text);
+                    }
+                    break;
+                case FieldType.Char:
+                case FieldType.CharString:
+                    for (var i = 0u; i < fieldInfo.Size; i += 2) {
+                        var color = (byte)(objectBytes[(int)(fieldInfo.Offset + i)] == 0
+                                        && objectBytes[(int)(fieldInfo.Offset + i + 1)] == 0
+                            ? HexViewerColor.Null
+                            : HexViewerColor.Text);
+                        byteColors[(int)(fieldInfo.Offset + i)] = color;
+                        byteColors[(int)(fieldInfo.Offset + i + 1)] = color;
+                    }
+                    byteColors[(int)fieldInfo.Offset..(int)(fieldInfo.Offset + fieldInfo.Size)].Fill((byte)HexViewerColor.Text);
+                    break;
+                case FieldType.Pointer:
+                    for (var i = 0u; i < fieldInfo.Size; i += (uint)nint.Size) {
+                        var value = MemoryMarshal.Cast<byte, nint>(objectBytes[(int)(fieldInfo.Offset + i)..(int)(fieldInfo.Offset + i + nint.Size)])[0];
+                        byte color;
+                        if (value == 0) {
+                            color = (byte)HexViewerColor.Null;
+                        } else {
+                            var protect = VirtualMemory.GetProtection(value);
+                            if (protect.CanExecute()) {
+                                color = (byte)HexViewerColor.CodePointer;
+                            } else if (!protect.CanRead()) {
+                                color = (byte)HexViewerColor.BadPointer;
+                            } else {
+                                color = (byte)(DetermineClass(value).Known ? HexViewerColor.ObjectPointer : HexViewerColor.Pointer);
+                            }
+                        }
+                        byteColors[(int)(fieldInfo.Offset + i)..(int)(fieldInfo.Offset + i + nint.Size)].Fill(color);
+                    }
+                    break;
+            }
+
+            if (fieldInfo.ElementClass is not null) {
+                for (var elOffset = 0u; elOffset < fieldInfo.Size; elOffset += fieldInfo.ElementClass.EstimatedSize) {
+                    Highlight(
+                        objectBytes[
+                            (int)(fieldInfo.Offset + elOffset)..(int)(fieldInfo.Offset + elOffset
+                              + fieldInfo.ElementClass.EstimatedSize)], fieldInfo.ElementClass,
+                        byteColors[
+                            (int)(fieldInfo.Offset + elOffset)..(int)(fieldInfo.Offset + elOffset
+                              + fieldInfo.ElementClass.EstimatedSize)], true
+                    );
+                }
+            }
+        }
+
+        if (!nested) {
+            for (var i = 0; i + nint.Size - 1 < objectBytes.Length; i += nint.Size) {
+                if (MemoryMarshal.Cast<byte, nint>(byteColors[i..(i + nint.Size)])[0] == 0) {
+                    var value = MemoryMarshal.Cast<byte, nint>(objectBytes[i..(i + nint.Size)])[0];
+                    byte color;
+                    if (value == 0) {
+                        color = (byte)HexViewerColor.Null;
+                    } else {
+                        var protect = VirtualMemory.GetProtection(value);
+                        if (protect.CanExecute()) {
+                            color = (byte)HexViewerColor.CodePointer;
+                        } else if (!protect.CanRead()) {
+                            color = (byte)HexViewerColor.Default;
+                        } else {
+                            color = (byte)(DetermineClass(value).Known ? HexViewerColor.ObjectPointer : HexViewerColor.Pointer);
+                        }
+                    }
+                    byteColors[i..(i + nint.Size)].Fill(color);
+                }
+            }
+        }
+    }
+
     private unsafe void PopulateFromVtbl(ClassInfo classInfo, nint vtbl)
     {
-        var dtor = VirtualMemory.CanRead(vtbl) ? *(nint*)vtbl.ToPointer() : 0;
+        var dtor = VirtualMemory.GetProtection(vtbl).CanRead() ? *(nint*)vtbl.ToPointer() : 0;
         classInfo.SizeFromDtor = _memoryHeuristics.EstimateSizeFromDtor(dtor);
 
         if ((_dataYamlContainer.Data?.Classes?.TryGetValue(classInfo.Name, out var @class) ?? false)
@@ -102,16 +257,99 @@ public sealed class ObjectInspector : IMessageObserver<ConfigurationChangedMessa
             classInfo.DataYamlClass = _dataYamlContainer.Data.Classes?.GetValueOrDefault(classInfo.Name);
         }
 
-        var csType =
+        classInfo.ClientStructsType ??=
             typeof(StdString).Assembly.GetType("FFXIVClientStructs.FFXIV." + classInfo.Name.Replace("::", "."));
-        classInfo.ClientStructsType = csType;
-        if (csType is not null) {
+        if (classInfo.ClientStructsType is not null) {
             // Cannot use Marshal.SizeOf as it fails on certain types.
-            classInfo.SizeFromClientStructs = (uint)(int)typeof(Unsafe).GetMethod(nameof(Unsafe.SizeOf))!
-                                                                       .MakeGenericMethod(csType)
-                                                                       .Invoke(null, null)!;
+            classInfo.SizeFromClientStructs = (uint)UnsafeSizeOf(classInfo.ClientStructsType);
+            classInfo.Fields = GetFieldsFromClientStructs(classInfo.ClientStructsType).ToArray();
+            Array.Sort(classInfo.Fields);
         }
     }
+
+    private IEnumerable<FieldInfo> GetFieldsFromClientStructs(Type type, uint offset = 0, string prefix = "", bool isInherited = false)
+    {
+        var inherited = GetCustomAttributes(type, "InheritsAttribute`1")
+                       .Select(attr => attr.GetType().GetGenericArguments()[0].FullName)
+                       .OfType<string>()
+                       .ToArray();
+        foreach (var reflField in type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)) {
+            if (GetCustomAttribute(reflField, "CExportIgnoreAttribute") is not null) {
+                continue;
+            }
+
+            if (GetCustomAttribute(reflField, "FixedSizeArrayAttribute") is {} fsaAttribute) {
+                var typeName = reflField.FieldType.Name;
+                if (typeName.StartsWith("FixedSizeArray") && reflField.FieldType.IsGenericType) {
+                    var elementType = reflField.FieldType.GetGenericArguments()[0];
+                    var isString = (bool)((dynamic)fsaAttribute).IsString;
+                    var elementFieldType = elementType.ToFieldType(isString);
+                    if (elementFieldType.HasValue) {
+                        yield return new FieldInfo
+                        {
+                            Name = prefix + reflField.Name,
+                            Offset = offset + (uint)Marshal.OffsetOf(type, reflField.Name),
+                            Size = (uint)UnsafeSizeOf(reflField.FieldType),
+                            Type = elementFieldType.Value,
+                            EnumType = elementType.IsEnum ? elementType : null,
+                        };
+                    } else {
+                        yield return new FieldInfo
+                        {
+                            Name = prefix + reflField.Name,
+                            Offset = offset + (uint)Marshal.OffsetOf(type, reflField.Name),
+                            Size = (uint)UnsafeSizeOf(reflField.FieldType),
+                            Type = FieldType.ObjectArray,
+                            ElementClass = FromClientStructs(elementType),
+                        };
+                    }
+
+                    continue;
+                }
+            }
+
+            var fieldType = reflField.FieldType.ToFieldType();
+            if (fieldType.HasValue) {
+                if (!isInherited) {
+                    yield return new FieldInfo
+                    {
+                        Name = prefix + reflField.Name,
+                        Offset = offset + (uint)Marshal.OffsetOf(type, reflField.Name),
+                        Size = (uint)(reflField.FieldType.IsPointer ? nint.Size : UnsafeSizeOf(reflField.FieldType)),
+                        Type = fieldType.Value,
+                        EnumType = reflField.FieldType.IsEnum ? reflField.FieldType : null,
+                    };
+                }
+
+                continue;
+            }
+
+            if (reflField.FieldType.IsValueType) {
+                var inheritanceField = IsInheritedField(reflField.FieldType, reflField.Name, type, inherited);
+                if (!isInherited || inheritanceField) {
+                    foreach (var field in GetFieldsFromClientStructs(
+                                 reflField.FieldType, offset + (uint)Marshal.OffsetOf(type, reflField.Name),
+                                 $"{prefix}{reflField.Name}.",
+                                 inheritanceField
+                             )) {
+                        yield return field;
+                    }
+                }
+            }
+        }
+    }
+
+    private static bool IsInheritedField(Type fieldType, string fieldName, Type declaringType, string[] inheritedTypeNames)
+        => Array.IndexOf(inheritedTypeNames, fieldType.FullName) >= 0 && fieldName == (fieldType.Name == declaringType.Name ? $"{fieldType.Name}Base" : fieldType.Name);
+
+    private static int UnsafeSizeOf(Type type)
+        => (int)typeof(Unsafe).GetMethod(nameof(Unsafe.SizeOf))!.MakeGenericMethod(type).Invoke(null, null)!;
+
+    private static Attribute? GetCustomAttribute(MemberInfo member, string attributeName)
+        => member.GetCustomAttributes().FirstOrDefault(attribute => attribute.GetType().Name == attributeName);
+
+    private static IEnumerable<Attribute> GetCustomAttributes(MemberInfo member, string attributeName)
+        => member.GetCustomAttributes().Where(attribute => attribute.GetType().Name == attributeName);
 
     private void PopulateAggregates(ClassInfo classInfo, uint restOfPageSize)
     {

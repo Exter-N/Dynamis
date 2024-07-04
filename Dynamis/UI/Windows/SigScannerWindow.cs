@@ -14,9 +14,7 @@ public sealed class SigScannerWindow : Window, IMessageObserver<OpenWindowMessag
 {
     private const int MaxResultHistorySize = 32;
 
-    private readonly MessageHub                _messageHub;
     private readonly ILogger<SigScannerWindow> _logger;
-    private readonly IUiBuilder                _uiBuilder;
     private readonly ISigScanner               _sigScanner;
     private readonly ImGuiComponents           _imGuiComponents;
 
@@ -24,12 +22,10 @@ public sealed class SigScannerWindow : Window, IMessageObserver<OpenWindowMessag
     private          int              _vmOffset    = 0;
     private readonly List<ScanResult> _vmResults   = new();
 
-    public SigScannerWindow(MessageHub messageHub, ILogger<SigScannerWindow> logger, IUiBuilder uiBuilder,
-        ISigScanner sigScanner, ImGuiComponents imGuiComponents) : base("Dynamis - Signature Scanner", 0)
+    public SigScannerWindow(ILogger<SigScannerWindow> logger, ISigScanner sigScanner,
+        ImGuiComponents imGuiComponents) : base("Dynamis - Signature Scanner", 0)
     {
-        _messageHub = messageHub;
         _logger = logger;
-        _uiBuilder = uiBuilder;
         _sigScanner = sigScanner;
         _imGuiComponents = imGuiComponents;
 
@@ -96,19 +92,7 @@ public sealed class SigScannerWindow : Window, IMessageObserver<OpenWindowMessag
         ImGui.TableHeadersRow();
         foreach (var result in _vmResults) {
             ImGui.TableNextColumn();
-            using (ImRaii.PushFont(UiBuilder.MonoFont)) {
-                if (ImGui.Selectable(result.Signature)) {
-                    ImGui.SetClipboardText(result.Signature);
-                }
-            }
-
-            if (ImGui.IsItemHovered()) {
-                using var _ = ImRaii.Tooltip();
-                using (ImRaii.PushFont(UiBuilder.MonoFont)) {
-                    ImGui.TextUnformatted(result.Signature);
-                }
-                ImGui.TextUnformatted("Click to copy to clipboard.");
-            }
+            ImGuiComponents.DrawCopyable(result.Signature, true);
 
             ImGui.TableNextColumn();
             ImGui.TextUnformatted(result.Type.ToString().InsertSpacesBetweenWords());
@@ -120,16 +104,7 @@ public sealed class SigScannerWindow : Window, IMessageObserver<OpenWindowMessag
 
             ImGui.TableNextColumn();
             if (result.Success) {
-                using (ImRaii.PushFont(UiBuilder.MonoFont)) {
-                    if (ImGui.Selectable($"0x{result.Address:X}")) {
-                        ImGui.SetClipboardText(result.Address.ToString("X"));
-                    }
-                }
-
-                if (ImGui.IsItemHovered()) {
-                    using var _ = ImRaii.Tooltip();
-                    ImGui.TextUnformatted("Click to copy to clipboard.");
-                }
+                _imGuiComponents.DrawPointer(result.Address, null);
             } else {
                 using (ImRaii.PushColor(ImGuiCol.Text, StyleModel.GetFromCurrent().BuiltInColors!.DalamudRed!.Value)) {
                     if (result.Exception is not null) {
