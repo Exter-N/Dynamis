@@ -98,7 +98,7 @@ partial class ImGuiComponents
                         using (var color = ImRaii.PushColor(ImGuiCol.Text, byteColor, byteColor != 0)) {
                             ImGuiNative.igTextUnformatted(packStart, packEnd);
                         }
-                        if (onHover is not null && ImGui.IsItemHovered()) {
+                        if (onHover is not null && i < numBytes && ImGui.IsItemHovered()) {
                             imFont.Pop();
                             onHover(rowStart + i, false);
                             imFont.Push(font);
@@ -115,7 +115,7 @@ partial class ImGuiComponents
                         using (var color = ImRaii.PushColor(ImGuiCol.Text, byteColor, byteColor != 0)) {
                             ImGuiNative.igTextUnformatted(packStart, packEnd);
                         }
-                        if (onHover is not null && ImGui.IsItemHovered()) {
+                        if (onHover is not null && i < numBytes && ImGui.IsItemHovered()) {
                             imFont.Pop();
                             onHover(rowStart + i, true);
                             imFont.Push(font);

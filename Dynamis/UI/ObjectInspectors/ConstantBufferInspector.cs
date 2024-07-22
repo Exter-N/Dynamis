@@ -1,0 +1,48 @@
+using Dynamis.Interop;
+using Dynamis.UI.Windows;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Kernel;
+using ImGuiNET;
+
+namespace Dynamis.UI.ObjectInspectors;
+
+public sealed unsafe class ConstantBufferInspector(ImGuiComponents imGuiComponents) : IObjectInspector<ConstantBuffer>
+{
+    public void DrawAdditionalTooltipDetails(ConstantBuffer* pointer)
+    {
+        ImGui.TextUnformatted($"Constant Buffer Size: {pointer->ByteSize} bytes ({pointer->ByteSize >> 4} vectors)");
+    }
+
+    public void DrawAdditionalHeaderDetails(ConstantBuffer* pointer, ObjectInspectorWindow window)
+    {
+        DrawAdditionalTooltipDetails(pointer);
+        var sourcePtr = pointer->TryGetSourcePointer();
+        if (sourcePtr == null) {
+            return;
+        }
+
+        ImGui.TextUnformatted("Constant Buffer Contents: ");
+        ImGui.SameLine(0.0f, ImGui.GetStyle().ItemInnerSpacing.X);
+        imGuiComponents.DrawPointer(
+            (nint)sourcePtr, () => new ClassInfo
+            {
+                Name = "<Constant Buffer Contents>",
+                EstimatedSize = (uint)pointer->ByteSize,
+                SizeFromOuterContext = (uint)pointer->ByteSize,
+                Fields =
+                [
+                    new FieldInfo
+                    {
+                        Name = "Data",
+                        Offset = 0,
+                        Size = (uint)pointer->ByteSize,
+                        Type = FieldType.Single,
+                    },
+                ],
+            }
+        );
+    }
+
+    public void DrawAdditionalTabs(ConstantBuffer* pointer, ObjectInspectorWindow window)
+    {
+    }
+}

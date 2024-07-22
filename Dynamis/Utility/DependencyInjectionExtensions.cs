@@ -39,6 +39,15 @@ internal static class DependencyInjectionExtensions
         }
     }
 
+    public static void AddImplementationSingletons<T>(this IServiceCollection collection, Assembly assembly) where T : class
+    {
+        var t = typeof(T);
+        foreach (var type in assembly.GetTypes()
+                                     .Where(type => type.IsClass && !type.IsAbstract && t.IsAssignableFrom(type))) {
+            collection.AddSingleton(type);
+        }
+    }
+
     private static Func<IServiceProvider, T> MakeServiceFactory<T>(Type t) where T : notnull
         => (Func<IServiceProvider, T>)typeof(DependencyInjectionExtensions).GetMethod(nameof(ServiceFactory), BindingFlags.NonPublic | BindingFlags.Static)!
            .MakeGenericMethod(t)

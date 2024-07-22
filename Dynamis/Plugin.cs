@@ -10,6 +10,7 @@ using Dynamis.Logging;
 using Dynamis.Messaging;
 using Dynamis.Resources;
 using Dynamis.UI;
+using Dynamis.UI.ObjectInspectors;
 using Dynamis.UI.Windows;
 using Dynamis.Utility;
 using Microsoft.Extensions.DependencyInjection;
@@ -87,6 +88,10 @@ public sealed class Plugin : IDalamudPlugin
                         collection.AddSingleton<ObjectTableWindow>();
                         collection.AddSingleton<ObjectInspectorWindowFactory>();
 
+                        collection.AddImplementationSingletons<IObjectInspector>(typeof(Plugin).Assembly);
+                        collection.AddImplementationAliases<IObjectInspector>();
+                        collection.AddSingleton<ObjectInspectorDispatcher>();
+
                         collection.AddSingleton<CommandHandler>();
                         collection.AddSingleton<LaunchButton>();
                         collection.AddSingleton<WindowManager>();
@@ -95,6 +100,7 @@ public sealed class Plugin : IDalamudPlugin
 
                         collection.AddLazyImplementationAliases<Window>();
                         collection.AddLazyImplementationAliases<IMessageObserver>();
+                        collection.AddLazyImplementationAliases<ObjectInspectorDispatcher>();
                         collection.AddImplementationAliases<IHostedService>();
                     }
                 )

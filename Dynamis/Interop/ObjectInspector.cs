@@ -255,17 +255,49 @@ public sealed class ObjectInspector : IMessageObserver<ConfigurationChangedMessa
     {
         if (_dataYamlContainer.Data is not null) {
             classInfo.DataYamlClass = _dataYamlContainer.Data.Classes?.GetValueOrDefault(classInfo.Name);
+            var parents = new List<(string, DataYaml.Class)>();
+            var currentClass = classInfo.DataYamlClass;
+            for (;;) {
+                if (currentClass?.Vtbls is null || currentClass.Vtbls.Count == 0) {
+                    break;
+                }
+
+                var parentName = currentClass.Vtbls[0]?.Base;
+                if (parentName is null) {
+                    break;
+                }
+
+                currentClass = _dataYamlContainer.Data.Classes!.GetValueOrDefault(parentName);
+                if (currentClass is null) {
+                    break;
+                }
+
+                parents.Add((parentName, currentClass));
+            }
+
+            classInfo.DataYamlParents = parents.ToArray();
         }
 
-        classInfo.ClientStructsType ??=
-            typeof(StdString).Assembly.GetType("FFXIVClientStructs.FFXIV." + classInfo.Name.Replace("::", "."));
+        classInfo.ClientStructsType ??= ResolveClientStructsType(classInfo.Name);
         if (classInfo.ClientStructsType is not null) {
             // Cannot use Marshal.SizeOf as it fails on certain types.
             classInfo.SizeFromClientStructs = (uint)UnsafeSizeOf(classInfo.ClientStructsType);
             classInfo.Fields = GetFieldsFromClientStructs(classInfo.ClientStructsType).ToArray();
             Array.Sort(classInfo.Fields);
         }
+
+        classInfo.ClientStructsParents = classInfo.DataYamlParents
+                                                  .Select(yamlClass => ResolveClientStructsType(yamlClass.Name))
+                                                  .OfType<Type>()
+                                                  .ToArray();
+        if (classInfo.ClientStructsType is null && classInfo.ClientStructsParents.Length > 0) {
+            classInfo.Fields = GetFieldsFromClientStructs(classInfo.ClientStructsParents[0]).ToArray();
+            Array.Sort(classInfo.Fields);
+        }
     }
+
+    private Type? ResolveClientStructsType(string className)
+        => typeof(StdString).Assembly.GetType("FFXIVClientStructs.FFXIV." + className.Replace("::", "."));
 
     private IEnumerable<FieldInfo> GetFieldsFromClientStructs(Type type, uint offset = 0, string prefix = "", bool isInherited = false)
     {

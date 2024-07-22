@@ -5,12 +5,13 @@ using Dalamud.Interface.Windowing;
 using Dynamis.Interop;
 using Dynamis.Interop.Win32;
 using Dynamis.Messaging;
+using Dynamis.UI.ObjectInspectors;
 using Dynamis.UI.Windows;
 using ImGuiNET;
 
 namespace Dynamis.UI;
 
-public sealed partial class ImGuiComponents(MessageHub messageHub, FileDialogManager fileDialogManager, ObjectInspector objectInspector)
+public sealed partial class ImGuiComponents(MessageHub messageHub, FileDialogManager fileDialogManager, ObjectInspector objectInspector, Lazy<ObjectInspectorDispatcher> objectInspectorDispatcher)
 {
     public void AddTitleBarButtons(Window window)
     {
@@ -66,11 +67,11 @@ public sealed partial class ImGuiComponents(MessageHub messageHub, FileDialogMan
         }
     }
 
-    public void DrawPointer(nint pointer, ClassInfo? @class)
+    public void DrawPointer(nint pointer, Func<ClassInfo?>? @class)
     {
         using (ImRaii.PushFont(UiBuilder.MonoFont, pointer != 0)) {
             if (ImGui.Selectable(pointer == 0 ? "nullptr" : $"0x{pointer:X}") && pointer != 0) {
-                messageHub.Publish(new InspectObjectMessage(pointer, @class));
+                messageHub.Publish(new InspectObjectMessage(pointer, @class?.Invoke()));
             }
         }
 
@@ -87,7 +88,7 @@ public sealed partial class ImGuiComponents(MessageHub messageHub, FileDialogMan
             }
 
             if (pointer != 0) {
-                DrawPointerTooltipDetails(pointer, @class);
+                DrawPointerTooltipDetails(pointer, @class?.Invoke());
                 ImGui.TextUnformatted("Click to inspect.");
             }
 
@@ -117,6 +118,10 @@ public sealed partial class ImGuiComponents(MessageHub messageHub, FileDialogMan
             ImGui.TextUnformatted($"Class Name: {@class.Name}");
         }
 
-        ImGui.TextUnformatted($"Estimated Size: {@class.EstimatedSize} (0x{@class.EstimatedSize:X})");
+        ImGui.TextUnformatted($"Estimated Size: {@class.EstimatedSize} (0x{@class.EstimatedSize:X}) bytes");
+
+        foreach (var inspector in objectInspectorDispatcher.Value.GetInspectors(@class)) {
+            inspector.DrawAdditionalTooltipDetails(pointer);
+        }
     }
 }

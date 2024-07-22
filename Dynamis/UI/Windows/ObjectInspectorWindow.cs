@@ -1,3 +1,4 @@
+using System.Numerics;
 using System.Runtime.InteropServices;
 using Dalamud.Interface.Style;
 using Dalamud.Interface.Utility.Raii;
@@ -6,6 +7,7 @@ using Dynamis.Configuration;
 using Dynamis.Interop;
 using Dynamis.Interop.Win32;
 using Dynamis.Messaging;
+using Dynamis.UI.ObjectInspectors;
 using Dynamis.Utility;
 using ImGuiNET;
 using Microsoft.Extensions.Logging;
@@ -20,6 +22,9 @@ public sealed class ObjectInspectorWindow : Window
     private readonly ObjectInspector                       _objectInspector;
     private readonly ConfigurationContainer                _configuration;
     private readonly MessageHub                            _messageHub;
+    private readonly Lazy<ObjectInspectorDispatcher>       _objectInspectorDispatcher;
+
+    private readonly Dictionary<Type, object> _vmCustomState = [];
 
     private nint       _vmAddress = 0;
     private int        _vmStatus  = 0;
@@ -29,7 +34,7 @@ public sealed class ObjectInspectorWindow : Window
 
     public ObjectInspectorWindow(ILogger<ObjectInspectorWindowFactory> logger, WindowSystem windowSystem,
         ImGuiComponents imGuiComponents, ObjectInspector objectInspector, ConfigurationContainer configuration,
-        MessageHub messageHub, int index) : base(
+        MessageHub messageHub, Lazy<ObjectInspectorDispatcher> objectInspectorDispatcher, int index) : base(
         $"Dynamis - Object Inspector##{index}", 0
     )
     {
@@ -39,6 +44,7 @@ public sealed class ObjectInspectorWindow : Window
         _objectInspector = objectInspector;
         _configuration = configuration;
         _messageHub = messageHub;
+        _objectInspectorDispatcher = objectInspectorDispatcher;
 
         SizeConstraints = new WindowSizeConstraints
         {
@@ -53,6 +59,18 @@ public sealed class ObjectInspectorWindow : Window
     {
         _vmAddress = address;
         RunInspection(@class);
+    }
+
+    public T GetCustomState<T>() where T : class, new()
+    {
+        if (_vmCustomState.TryGetValue(typeof(T), out var customState) && customState is T state) {
+            return state;
+        }
+
+        state = new T();
+        _vmCustomState.Add(typeof(T), state);
+
+        return state;
     }
 
     private void RunInspection(ClassInfo? @class)
@@ -93,13 +111,26 @@ public sealed class ObjectInspectorWindow : Window
     private void DrawSnapshot()
     {
         ImGui.TextUnformatted($"Class Name: {_vmClass!.Name}");
+        using (var indent = ImRaii.PushIndent()) {
+            foreach (var parent in _vmClass.DataYamlParents) {
+                ImGui.TextUnformatted($"Parent: {parent.Name}");
+                indent.Push();
+            }
+        }
         ImGui.TextUnformatted($"In ClientStructs: {_vmClass.ClientStructsType != null}");
-        ImGui.TextUnformatted($"Estimated Size: {_vmClass.EstimatedSize} (0x{_vmClass.EstimatedSize:X})");
+        ImGui.TextUnformatted($"Estimated Size: {_vmClass.EstimatedSize} (0x{_vmClass.EstimatedSize:X}) bytes");
         var sizeIsFromDtor = _vmClass.SizeFromDtor.HasValue
                           && _vmClass.SizeFromDtor.Value == _vmClass.EstimatedSize;
         var sizeIsFromCs = _vmClass.SizeFromClientStructs.HasValue
                         && _vmClass.SizeFromClientStructs.Value == _vmClass.EstimatedSize;
-        if (sizeIsFromDtor && sizeIsFromCs) {
+        var sizeIsFromCtx = _vmClass.SizeFromOuterContext.HasValue
+                         && _vmClass.SizeFromOuterContext.Value == _vmClass.EstimatedSize;
+        if (sizeIsFromCtx) {
+            ImGui.SameLine();
+            using (ImRaii.PushColor(ImGuiCol.Text, StyleModel.GetFromCurrent().BuiltInColors!.ParsedBlue!.Value)) {
+                ImGui.TextUnformatted("(from outer context)");
+            }
+        } else if (sizeIsFromDtor && sizeIsFromCs) {
             ImGui.SameLine();
             using (ImRaii.PushColor(ImGuiCol.Text, StyleModel.GetFromCurrent().BuiltInColors!.ParsedGreen!.Value)) {
                 ImGui.TextUnformatted("(from both ClientStructs and dtor)");
@@ -138,9 +169,29 @@ public sealed class ObjectInspectorWindow : Window
             }
         }
 
-        ImGuiComponents.DrawHexViewer(
-            _vmSnapshot, _vmColors, _configuration.Configuration.GetHexViewerPalette(), OnSnapshotHover
-        );
+        var inspectors = _objectInspectorDispatcher.Value.GetInspectors(_vmClass).ToList();
+
+        foreach (var inspector in inspectors) {
+            inspector.DrawAdditionalHeaderDetails(_vmAddress, this);
+        }
+
+        using var tabs = ImRaii.TabBar("###inspectorTabs");
+        if (!tabs) {
+            return;
+        }
+
+        using (var tab = ImRaii.TabItem("Memory View")) {
+            if (tab) {
+                using var _ = ImRaii.Child("###memoryView", -Vector2.One);
+                ImGuiComponents.DrawHexViewer(
+                    _vmSnapshot, _vmColors, _configuration.Configuration.GetHexViewerPalette(), OnSnapshotHover
+                );
+            }
+        }
+
+        foreach (var inspector in inspectors) {
+            inspector.DrawAdditionalTabs(_vmAddress, this);
+        }
     }
 
     private void OnSnapshotHover(int offset, bool printable)

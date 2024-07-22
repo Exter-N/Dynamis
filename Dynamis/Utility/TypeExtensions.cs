@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Text;
 using Dynamis.Interop;
+using FFXIVClientStructs.Interop;
 
 namespace Dynamis.Utility;
 
@@ -8,7 +9,7 @@ internal static class TypeExtensions
 {
     public static FieldType? ToFieldType(this Type t, bool isString = false)
     {
-        if (t.IsPointer || t.IsGenericType && t.GetGenericTypeDefinition().FullName == "FFXIVClientStructs.Interop.Pointer`1") {
+        if (t.IsPointer || t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Pointer<>)) {
             return FieldType.Pointer;
         }
 

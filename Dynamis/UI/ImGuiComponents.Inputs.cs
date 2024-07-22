@@ -33,8 +33,10 @@ partial class ImGuiComponents
             );
         }
 
-        ImGui.SameLine(0.0f, innerSpacing);
-        ImGui.TextUnformatted(label);
+        if (!label.StartsWith("###")) {
+            ImGui.SameLine(0.0f, innerSpacing);
+            ImGui.TextUnformatted(label);
+        }
     }
 
     public static bool ComboEnum<T>(string label, ref T value, ImGuiComboFlags flags = ImGuiComboFlags.None) where T : struct, Enum

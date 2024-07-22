@@ -1,4 +1,6 @@
 ﻿using System.Numerics;
+using Dalamud.Interface;
+using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dynamis.Configuration;
 using Dynamis.Messaging;
@@ -12,14 +14,16 @@ public sealed class SettingsWindow : Window, IMessageObserver<OpenWindowMessage<
 {
     private readonly ConfigurationContainer _configuration;
     private readonly ImGuiComponents        _imGuiComponents;
+    private readonly MessageHub             _messageHub;
 
-    public SettingsWindow(ConfigurationContainer configuration, ImGuiComponents imGuiComponents) : base(
+    public SettingsWindow(ConfigurationContainer configuration, ImGuiComponents imGuiComponents, MessageHub messageHub) : base(
         "Dynamis Settings",
         ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoDocking
     )
     {
         _configuration = configuration;
         _imGuiComponents = imGuiComponents;
+        _messageHub = messageHub;
 
         Size = new Vector2(512, 288);
         SizeCondition = ImGuiCond.Always;
@@ -41,6 +45,7 @@ public sealed class SettingsWindow : Window, IMessageObserver<OpenWindowMessage<
     private void DrawOptions()
     {
         var inputWidth = ImGui.GetContentRegionAvail().X * (2.0f / 3.0f);
+        var innerSpacing = ImGui.GetStyle().ItemInnerSpacing.X;
         var configuration = _configuration.Configuration;
 
         ImGui.SetNextItemWidth(inputWidth);
@@ -50,15 +55,28 @@ public sealed class SettingsWindow : Window, IMessageObserver<OpenWindowMessage<
             _configuration.Save(nameof(configuration.MinimumLogLevel));
         }
 
-        ImGui.SetNextItemWidth(inputWidth);
+        ImGui.SetNextItemWidth(inputWidth - innerSpacing - ImGuiComponents.NormalizedIconButtonSize(FontAwesomeIcon.Sync).X);
         _imGuiComponents.InputFile(
-            "ClientStructs' data.yml", "data.yml{.yml,.yaml}", configuration.DataYamlPath,
+            "###dataYamlPath", "data.yml{.yml,.yaml}", configuration.DataYamlPath,
             newPath =>
             {
                 _configuration.Configuration.DataYamlPath = newPath;
                 _configuration.Save(nameof(_configuration.Configuration.DataYamlPath));
             }
         );
+
+        ImGui.SameLine(0.0f, innerSpacing);
+        if (ImGuiComponents.NormalizedIconButton(FontAwesomeIcon.Sync)) {
+            _messageHub.Publish(new ConfigurationChangedMessage(nameof(_configuration.Configuration.DataYamlPath)));
+        }
+
+        if (ImGui.IsItemHovered()) {
+            using var _ = ImRaii.Tooltip();
+            ImGui.TextUnformatted("Refresh the file");
+        }
+
+        ImGui.SameLine(0.0f, innerSpacing);
+        ImGui.TextUnformatted("ClientStructs' data.yml");
     }
 
     private void DrawColors()

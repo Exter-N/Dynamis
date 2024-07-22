@@ -35,7 +35,7 @@ public sealed class DataYaml
 
         public string? Name { get; set; }
 
-        public bool Pointer { get; set; }
+        public bool Pointer { get; set; } = true;
     }
 
     [Serializable]
