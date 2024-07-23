@@ -6,7 +6,6 @@ using Dynamis.Interop.Win32;
 using Dynamis.Messaging;
 using Dynamis.UI;
 using Dynamis.Utility;
-using FFXIVClientStructs.FFXIV.Client.System.String;
 using FFXIVClientStructs.STD;
 using Microsoft.Extensions.Logging;
 
@@ -316,25 +315,27 @@ public sealed class ObjectInspector : IMessageObserver<ConfigurationChangedMessa
                     var elementType = reflField.FieldType.GetGenericArguments()[0];
                     var isString = (bool)((dynamic)fsaAttribute).IsString;
                     var elementFieldType = elementType.ToFieldType(isString);
-                    if (elementFieldType.HasValue) {
-                        yield return new FieldInfo
+                    FieldInfo field;
+                    try {
+                        field = new FieldInfo
                         {
                             Name = prefix + reflField.Name,
-                            Offset = offset + (uint)Marshal.OffsetOf(type, reflField.Name),
+                            Offset = offset + (uint)OffsetOf(reflField),
                             Size = (uint)UnsafeSizeOf(reflField.FieldType),
-                            Type = elementFieldType.Value,
-                            EnumType = elementType.IsEnum ? elementType : null,
                         };
-                    } else {
-                        yield return new FieldInfo
-                        {
-                            Name = prefix + reflField.Name,
-                            Offset = offset + (uint)Marshal.OffsetOf(type, reflField.Name),
-                            Size = (uint)UnsafeSizeOf(reflField.FieldType),
-                            Type = FieldType.ObjectArray,
-                            ElementClass = FromClientStructs(elementType),
-                        };
+                        if (elementFieldType.HasValue) {
+                            field.Type = elementFieldType.Value;
+                            field.EnumType = elementType.IsEnum ? elementType : null;
+                        } else {
+                            field.Type = FieldType.ObjectArray;
+                            field.ElementClass = FromClientStructs(elementType);
+                        }
+                    } catch (Exception e) {
+                        _logger.LogError(e, "Error while analyzing field {Field} of class {Class}", reflField.Name, type);
+                        continue;
                     }
+
+                    yield return field;
 
                     continue;
                 }
@@ -343,14 +344,23 @@ public sealed class ObjectInspector : IMessageObserver<ConfigurationChangedMessa
             var fieldType = reflField.FieldType.ToFieldType();
             if (fieldType.HasValue) {
                 if (!isInherited) {
-                    yield return new FieldInfo
-                    {
-                        Name = prefix + reflField.Name,
-                        Offset = offset + (uint)Marshal.OffsetOf(type, reflField.Name),
-                        Size = (uint)(reflField.FieldType.IsPointer ? nint.Size : UnsafeSizeOf(reflField.FieldType)),
-                        Type = fieldType.Value,
-                        EnumType = reflField.FieldType.IsEnum ? reflField.FieldType : null,
-                    };
+                    FieldInfo field;
+                    try {
+                        field = new FieldInfo
+                        {
+                            Name = prefix + reflField.Name,
+                            Offset = offset + (uint)OffsetOf(reflField),
+                            Size =
+                                (uint)(reflField.FieldType.IsPointer ? nint.Size : UnsafeSizeOf(reflField.FieldType)),
+                            Type = fieldType.Value,
+                            EnumType = reflField.FieldType.IsEnum ? reflField.FieldType : null,
+                        };
+                    } catch (Exception e) {
+                        _logger.LogError(e, "Error while analyzing field {Field} of class {Class}", reflField.Name, type);
+                        continue;
+                    }
+
+                    yield return field;
                 }
 
                 continue;
@@ -359,11 +369,19 @@ public sealed class ObjectInspector : IMessageObserver<ConfigurationChangedMessa
             if (reflField.FieldType.IsValueType) {
                 var inheritanceField = IsInheritedField(reflField.FieldType, reflField.Name, type, inherited);
                 if (!isInherited || inheritanceField) {
-                    foreach (var field in GetFieldsFromClientStructs(
-                                 reflField.FieldType, offset + (uint)Marshal.OffsetOf(type, reflField.Name),
-                                 $"{prefix}{reflField.Name}.",
-                                 inheritanceField
-                             )) {
+                    IEnumerable<FieldInfo> fields;
+                    try {
+                        fields = GetFieldsFromClientStructs(
+                            reflField.FieldType, offset + (uint)OffsetOf(reflField),
+                            $"{prefix}{reflField.Name}.",
+                            inheritanceField
+                        );
+                    } catch (Exception e) {
+                        _logger.LogError(e, "Error while analyzing field {Field} of class {Class}", reflField.Name, type);
+                        continue;
+                    }
+
+                    foreach (var field in fields) {
                         yield return field;
                     }
                 }
@@ -376,6 +394,22 @@ public sealed class ObjectInspector : IMessageObserver<ConfigurationChangedMessa
 
     private static int UnsafeSizeOf(Type type)
         => (int)typeof(Unsafe).GetMethod(nameof(Unsafe.SizeOf))!.MakeGenericMethod(type).Invoke(null, null)!;
+
+    private static nint OffsetOf(System.Reflection.FieldInfo field)
+    {
+        try {
+            return Marshal.OffsetOf(field.ReflectedType!, field.Name);
+        } catch (ArgumentException) {
+            if (field.ReflectedType is not null && field.ReflectedType.IsExplicitLayout) {
+                var fieldOffset = field.GetCustomAttribute<FieldOffsetAttribute>();
+                if (fieldOffset is not null) {
+                    return fieldOffset.Value;
+                }
+            }
+
+            throw;
+        }
+    }
 
     private static Attribute? GetCustomAttribute(MemberInfo member, string attributeName)
         => member.GetCustomAttributes().FirstOrDefault(attribute => attribute.GetType().Name == attributeName);
