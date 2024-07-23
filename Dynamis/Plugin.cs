@@ -75,6 +75,7 @@ public sealed class Plugin : IDalamudPlugin
 
                         collection.AddSingleton<FileDialogManager>();
                         collection.AddSingleton<MessageHub>();
+                        collection.AddSingleton<IpcProvider>();
                         collection.AddSingleton<ResourceProvider>();
                         collection.AddSingleton<ConfigurationContainer>();
                         collection.AddSingleton<DataYamlContainer>();

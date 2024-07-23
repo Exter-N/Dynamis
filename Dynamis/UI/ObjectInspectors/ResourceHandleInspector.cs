@@ -40,12 +40,10 @@ public sealed unsafe class ResourceHandleInspector : IObjectInspector<ResourceHa
         ImGui.TextUnformatted("Resource Contents:");
         ImGui.SameLine(0.0f, ImGui.GetStyle().ItemInnerSpacing.X);
         _imGuiComponents.DrawPointer(
-            (nint)data, () => new ClassInfo
-            {
-                Name = $"<Resource Contents> {pointer->FileName}",
-                EstimatedSize = (uint)length,
-                SizeFromOuterContext = (uint)length,
-            }
+            (nint)data,
+            () => PseudoClasses.Generate(
+                $"<Resource Contents> {pointer->FileName}", (uint)length, PseudoClasses.Template.None
+            )
         );
 
         if (ImGui.Button("Save to File")) {

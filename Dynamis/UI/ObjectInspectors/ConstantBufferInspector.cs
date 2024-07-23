@@ -23,22 +23,10 @@ public sealed unsafe class ConstantBufferInspector(ImGuiComponents imGuiComponen
         ImGui.TextUnformatted("Constant Buffer Contents: ");
         ImGui.SameLine(0.0f, ImGui.GetStyle().ItemInnerSpacing.X);
         imGuiComponents.DrawPointer(
-            (nint)sourcePtr, () => new ClassInfo
-            {
-                Name = "<Constant Buffer Contents>",
-                EstimatedSize = (uint)pointer->ByteSize,
-                SizeFromOuterContext = (uint)pointer->ByteSize,
-                Fields =
-                [
-                    new FieldInfo
-                    {
-                        Name = "Data",
-                        Offset = 0,
-                        Size = (uint)pointer->ByteSize,
-                        Type = FieldType.Single,
-                    },
-                ],
-            }
+            (nint)sourcePtr,
+            () => PseudoClasses.Generate(
+                "<Constant Buffer Contents>", (uint)pointer->ByteSize, PseudoClasses.Template.SingleArray
+            )
         );
     }
 
