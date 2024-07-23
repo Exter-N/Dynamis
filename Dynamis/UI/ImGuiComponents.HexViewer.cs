@@ -11,16 +11,19 @@ partial class ImGuiComponents
     private static ReadOnlySpan<byte> HexBytes
         => "0123456789ABCDEF"u8;
 
-    public static unsafe void DrawHexViewer(ReadOnlySpan<byte> data, ReadOnlySpan<byte> colors, ReadOnlySpan<uint> palette, Action<int, bool>? onHover = null)
+    public static unsafe (int, bool)? DrawHexViewer(string id, ReadOnlySpan<byte> data, ReadOnlySpan<byte> colors, ReadOnlySpan<uint> palette, Action<int, bool, bool>? onHover = null)
     {
         if (data.Length == 0) {
-            return;
+            return null;
         }
+
+        using var raiiId = ImRaii.PushId(id);
 
         var font = UiBuilder.MonoFont;
         using var imFont = ImRaii.PushFont(font);
         var emWidth = font.GetCharAdvance('m');
         var spacing = ImGui.GetStyle().ItemInnerSpacing.X;
+        (int, bool)? clickedItem = null;
 
         // Get the required number of digits for the byte offset.
         var addressDigitCount = 8 - (BitOperations.LeadingZeroCount((uint)data.Length - 1) >> 2);
@@ -52,7 +55,7 @@ partial class ImGuiComponents
             while (clipper.Step()) {
                 for (var actualRow = clipper.DisplayStart; actualRow < clipper.DisplayEnd; actualRow++) {
                     if (actualRow >= numRows) {
-                        return;
+                        return clickedItem;
                     }
 
                     if (actualRow < 0) {
@@ -98,10 +101,22 @@ partial class ImGuiComponents
                         using (var color = ImRaii.PushColor(ImGuiCol.Text, byteColor, byteColor != 0)) {
                             ImGuiNative.igTextUnformatted(packStart, packEnd);
                         }
-                        if (onHover is not null && i < numBytes && ImGui.IsItemHovered()) {
-                            imFont.Pop();
-                            onHover(rowStart + i, false);
-                            imFont.Push(font);
+
+                        var min = ImGui.GetItemRectMin();
+                        var max = ImGui.GetItemRectMax();
+                        if (onHover is not null && i < numBytes && ImGui.IsMouseHoveringRect(min, max)) {
+                            ImGui.SameLine(0, 0);
+                            ImGui.SetCursorScreenPos(min);
+                            var clicked = ImGui.InvisibleButton($"###H{rowStart + i:X}", max - min);
+                            if (clicked) {
+                                clickedItem = (rowStart + i, false);
+                            }
+
+                            if (ImGui.IsItemHovered()) {
+                                imFont.Pop();
+                                onHover(rowStart + i, false, clicked);
+                                imFont.Push(font);
+                            }
                         }
                         ImGui.SameLine(0, 0);
                         packStart = packEnd;
@@ -115,10 +130,21 @@ partial class ImGuiComponents
                         using (var color = ImRaii.PushColor(ImGuiCol.Text, byteColor, byteColor != 0)) {
                             ImGuiNative.igTextUnformatted(packStart, packEnd);
                         }
-                        if (onHover is not null && i < numBytes && ImGui.IsItemHovered()) {
-                            imFont.Pop();
-                            onHover(rowStart + i, true);
-                            imFont.Push(font);
+                        var min = ImGui.GetItemRectMin();
+                        var max = ImGui.GetItemRectMax();
+                        if (onHover is not null && i < numBytes && ImGui.IsMouseHoveringRect(min, max)) {
+                            ImGui.SameLine(0, 0);
+                            ImGui.SetCursorScreenPos(min);
+                            var clicked = ImGui.InvisibleButton($"###P{rowStart + i:X}", max - min);
+                            if (clicked) {
+                                clickedItem = (rowStart + i, true);
+                            }
+
+                            if (ImGui.IsItemHovered()) {
+                                imFont.Pop();
+                                onHover(rowStart + i, true, clicked);
+                                imFont.Push(font);
+                            }
                         }
                         ImGui.SameLine(0, 0);
                         packStart = packEnd;
@@ -131,5 +157,7 @@ partial class ImGuiComponents
             clipper.End();
             clipper.Destroy();
         }
+
+        return clickedItem;
     }
 }

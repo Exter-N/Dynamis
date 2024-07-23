@@ -225,6 +225,7 @@ public sealed class ObjectInspectorWindow : Window
             if (tab) {
                 using var _ = ImRaii.Child("###memoryView", -Vector2.One);
                 ImGuiComponents.DrawHexViewer(
+                    "snapshot",
                     _vmSnapshot, _vmColors, _configuration.Configuration.GetHexViewerPalette(), OnSnapshotHover
                 );
             }
@@ -235,15 +236,14 @@ public sealed class ObjectInspectorWindow : Window
         }
     }
 
-    private void OnSnapshotHover(int offset, bool printable)
+    private void OnSnapshotHover(int offset, bool printable, bool clicked)
     {
-        var clicked = ImGui.IsItemClicked();
         var rightClicked = ImGui.IsItemClicked(ImGuiMouseButton.Right);
 
         var path = GetValuePath(_vmClass, (uint)offset);
         if (path.Path.Length == 0) {
             var ptrOffset = offset & -nint.Size;
-            var pointer = MemoryMarshal.Cast<byte, nint>(_vmSnapshot[ptrOffset..(ptrOffset + nint.Size)])[0];
+            var pointer = MemoryMarshal.Cast<byte, nint>(_vmSnapshot.AsSpan(ptrOffset..(ptrOffset + nint.Size)))[0];
             if (VirtualMemory.GetProtection(pointer).CanRead()) {
                 path = ((uint)ptrOffset, (uint)nint.Size, $"Unk_{ptrOffset:X}", FieldType.Pointer, null);
             }
