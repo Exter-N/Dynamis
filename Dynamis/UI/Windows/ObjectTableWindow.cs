@@ -100,7 +100,10 @@ public sealed class ObjectTableWindow : Window, IMessageObserver<OpenWindowMessa
         => _objectTable.Select(TableEntry.FromGameObject).ToArray();
 
     public void HandleMessage(OpenWindowMessage<ObjectTableWindow> _)
-        => IsOpen = true;
+    {
+        IsOpen = true;
+        BringToFront();
+    }
 
     private readonly record struct TableEntry(
         ushort ObjectIndex,

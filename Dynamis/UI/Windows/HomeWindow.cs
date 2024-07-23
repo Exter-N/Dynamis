@@ -54,5 +54,8 @@ public sealed partial class HomeWindow : Window, IMessageObserver<OpenWindowMess
     }
 
     public void HandleMessage(OpenWindowMessage<HomeWindow> _)
-        => IsOpen = true;
+    {
+        IsOpen = true;
+        BringToFront();
+    }
 }

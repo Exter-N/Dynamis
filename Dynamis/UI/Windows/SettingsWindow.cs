@@ -96,5 +96,8 @@ public sealed class SettingsWindow : Window, IMessageObserver<OpenWindowMessage<
     }
 
     public void HandleMessage(OpenWindowMessage<SettingsWindow> _)
-        => IsOpen = true;
+    {
+        IsOpen = true;
+        BringToFront();
+    }
 }

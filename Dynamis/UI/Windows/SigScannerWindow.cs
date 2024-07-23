@@ -152,7 +152,10 @@ public sealed class SigScannerWindow : Window, IMessageObserver<OpenWindowMessag
     }
 
     public void HandleMessage(OpenWindowMessage<SigScannerWindow> _)
-        => IsOpen = true;
+    {
+        IsOpen = true;
+        BringToFront();
+    }
 
     private enum ScanType
     {
