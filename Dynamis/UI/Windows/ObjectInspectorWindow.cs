@@ -1,5 +1,6 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
+using Dalamud.Interface;
 using Dalamud.Interface.Style;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
@@ -24,6 +25,9 @@ public sealed class ObjectInspectorWindow : Window
     private readonly MessageHub                            _messageHub;
     private readonly Lazy<ObjectInspectorDispatcher>       _objectInspectorDispatcher;
 
+    private readonly int _index;
+
+    private          bool                     _vmShowParents = false;
     private readonly Dictionary<Type, object> _vmCustomState = [];
 
     private nint       _vmAddress = 0;
@@ -31,6 +35,17 @@ public sealed class ObjectInspectorWindow : Window
     private ClassInfo? _vmClass;
     private byte[]     _vmSnapshot = [];
     private byte[]     _vmColors   = [];
+
+    public int Index
+        => _index;
+
+    public nint ObjectAddress
+        => _vmAddress;
+
+    public ClassInfo? Class
+        => _vmClass;
+
+    public event EventHandler? Close;
 
     public ObjectInspectorWindow(ILogger<ObjectInspectorWindowFactory> logger, WindowSystem windowSystem,
         ImGuiComponents imGuiComponents, ObjectInspector objectInspector, ConfigurationContainer configuration,
@@ -45,6 +60,8 @@ public sealed class ObjectInspectorWindow : Window
         _configuration = configuration;
         _messageHub = messageHub;
         _objectInspectorDispatcher = objectInspectorDispatcher;
+
+        _index = index;
 
         SizeConstraints = new WindowSizeConstraints
         {
@@ -98,6 +115,18 @@ public sealed class ObjectInspectorWindow : Window
             RunInspection(null);
         }
 
+        if (_vmStatus != 0) {
+            ImGui.SameLine(0.0f, ImGui.GetStyle().ItemInnerSpacing.X);
+            if (ImGuiComponents.NormalizedIconButton(FontAwesomeIcon.Sync)) {
+                RunInspection(_vmClass);
+            }
+
+            if (ImGui.IsItemHovered()) {
+                using var _ = ImRaii.Tooltip();
+                ImGui.TextUnformatted("Refresh the object");
+            }
+        }
+
         switch (_vmStatus) {
             case 1:
                 DrawSnapshot();
@@ -110,14 +139,26 @@ public sealed class ObjectInspectorWindow : Window
 
     private void DrawSnapshot()
     {
-        ImGui.TextUnformatted($"Class Name: {_vmClass!.Name}");
-        using (var indent = ImRaii.PushIndent()) {
+        if (_vmClass!.DataYamlParents.Length > 0) {
+            if (ImGuiComponents.NormalizedIconButton(
+                    _vmShowParents ? FontAwesomeIcon.CaretDown : FontAwesomeIcon.CaretRight
+                )) {
+                _vmShowParents = !_vmShowParents;
+            }
+
+            ImGui.SameLine(0.0f, ImGui.GetStyle().ItemInnerSpacing.X);
+        }
+
+        ImGui.TextUnformatted($"Class Name: {_vmClass.Name}");
+        if (_vmClass.DataYamlParents.Length > 0 && _vmShowParents) {
+            using var indent = ImRaii.PushIndent(2);
             foreach (var parent in _vmClass.DataYamlParents) {
                 ImGui.TextUnformatted($"Parent: {parent.Name}");
                 indent.Push();
             }
         }
-        ImGui.TextUnformatted($"In ClientStructs: {_vmClass.ClientStructsType != null}");
+
+        ImGui.TextUnformatted($"In ClientStructs: {_vmClass.ClientStructsType is not null}");
         ImGui.TextUnformatted($"Estimated Size: {_vmClass.EstimatedSize} (0x{_vmClass.EstimatedSize:X}) bytes");
         var sizeIsFromDtor = _vmClass.SizeFromDtor.HasValue
                           && _vmClass.SizeFromDtor.Value == _vmClass.EstimatedSize;
@@ -285,5 +326,6 @@ public sealed class ObjectInspectorWindow : Window
     public override void OnClose()
     {
         _windowSystem.RemoveWindow(this);
+        Close?.Invoke(this, EventArgs.Empty);
     }
 }

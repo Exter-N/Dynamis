@@ -18,7 +18,7 @@ partial class ImGuiComponents
         var buttonSizeY = ImGui.GetFrameHeight();
         var iconExtraSpacing = isInPopup ? padding.X * 2 : 0;
 
-        if (width == null || width <= 0) {
+        if (width is null or <= 0) {
             var buttonSizeX = iconData.NormalizedIconScale.X + (padding.X * 3) + iconExtraSpacing + textSize.X;
             return new(buttonSizeX, buttonSizeY);
         } else {

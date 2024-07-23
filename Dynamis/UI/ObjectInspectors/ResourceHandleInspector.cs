@@ -33,7 +33,7 @@ public sealed unsafe class ResourceHandleInspector : IObjectInspector<ResourceHa
         DrawAdditionalTooltipDetails(pointer);
         var data = pointer->GetData();
         var length = pointer->GetLength();
-        if (data == null || length <= 0) {
+        if (data is null || length <= 0) {
             return;
         }
 

@@ -16,7 +16,7 @@ public sealed unsafe class ConstantBufferInspector(ImGuiComponents imGuiComponen
     {
         DrawAdditionalTooltipDetails(pointer);
         var sourcePtr = pointer->TryGetSourcePointer();
-        if (sourcePtr == null) {
+        if (sourcePtr is null) {
             return;
         }
 

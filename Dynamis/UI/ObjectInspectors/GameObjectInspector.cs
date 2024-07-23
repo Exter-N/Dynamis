@@ -15,7 +15,7 @@ public sealed unsafe class GameObjectInspector(ImGuiComponents imGuiComponents) 
     {
         DrawAdditionalTooltipDetails(pointer);
         var drawObject = pointer->GetDrawObject();
-        if (drawObject != null) {
+        if (drawObject is not null) {
             ImGui.TextUnformatted("Draw Object: ");
             ImGui.SameLine(0.0f, ImGui.GetStyle().ItemInnerSpacing.X);
             imGuiComponents.DrawPointer((nint)drawObject, null);
