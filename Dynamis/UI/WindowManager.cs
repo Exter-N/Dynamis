@@ -1,6 +1,7 @@
 using Dalamud.Interface;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
+using Dynamis.Interop;
 using Dynamis.Messaging;
 using Dynamis.UI.Windows;
 using Microsoft.Extensions.Hosting;
@@ -13,14 +14,16 @@ public sealed class WindowManager : IHostedService
     private readonly IUiBuilder                _uiBuilder;
     private readonly WindowSystem              _windowSystem;
     private readonly FileDialogManager         _fileDialogManager;
+    private readonly TextureArraySlicer        _textureArraySlicer;
     private readonly IEnumerable<Lazy<Window>> _windows;
 
-    public WindowManager(MessageHub messageHub, IUiBuilder uiBuilder, WindowSystem windowSystem, FileDialogManager fileDialogManager, IEnumerable<Lazy<Window>> windows)
+    public WindowManager(MessageHub messageHub, IUiBuilder uiBuilder, WindowSystem windowSystem, FileDialogManager fileDialogManager, TextureArraySlicer textureArraySlicer, IEnumerable<Lazy<Window>> windows)
     {
         _messageHub = messageHub;
         _uiBuilder = uiBuilder;
         _windowSystem = windowSystem;
         _fileDialogManager = fileDialogManager;
+        _textureArraySlicer = textureArraySlicer;
         _windows = windows;
     }
 
@@ -50,6 +53,7 @@ public sealed class WindowManager : IHostedService
     {
         _windowSystem.Draw();
         _fileDialogManager.Draw();
+        _textureArraySlicer.Tick();
     }
 
     private void OpenMainUi()

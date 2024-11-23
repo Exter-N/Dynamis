@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Dynamis.UI.Windows;
 
-public sealed class SettingsWindow : Window, IMessageObserver<OpenWindowMessage<SettingsWindow>>
+public sealed class SettingsWindow : Window, ISingletonWindow
 {
     private readonly ConfigurationContainer _configuration;
     private readonly ImGuiComponents        _imGuiComponents;
@@ -93,11 +93,5 @@ public sealed class SettingsWindow : Window, IMessageObserver<OpenWindowMessage<
                 _configuration.Save(nameof(_configuration.Configuration.HexViewerPalette));
             }
         }
-    }
-
-    public void HandleMessage(OpenWindowMessage<SettingsWindow> _)
-    {
-        IsOpen = true;
-        BringToFront();
     }
 }

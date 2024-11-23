@@ -181,7 +181,7 @@ public sealed class ObjectInspector : IMessageObserver<ConfigurationChangedMessa
                             } else if (!protect.CanRead()) {
                                 color = (byte)HexViewerColor.BadPointer;
                             } else {
-                                color = (byte)(DetermineClass(value).Known ? HexViewerColor.ObjectPointer : HexViewerColor.Pointer);
+                                color = (byte)(DetermineClass(value).IsClass ? HexViewerColor.ObjectPointer : HexViewerColor.Pointer);
                             }
                         }
                         byteColors[(int)(fieldInfo.Offset + i)..(int)(fieldInfo.Offset + i + nint.Size)].Fill(color);
@@ -217,7 +217,7 @@ public sealed class ObjectInspector : IMessageObserver<ConfigurationChangedMessa
                         } else if (!protect.CanRead()) {
                             color = (byte)HexViewerColor.Default;
                         } else {
-                            color = (byte)(DetermineClass(value).Known ? HexViewerColor.ObjectPointer : HexViewerColor.Pointer);
+                            color = (byte)(DetermineClass(value).IsClass ? HexViewerColor.ObjectPointer : HexViewerColor.Pointer);
                         }
                     }
                     byteColors[i..(i + nint.Size)].Fill(color);

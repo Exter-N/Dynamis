@@ -1,14 +1,16 @@
 using Dynamis.Configuration;
 using Dynamis.Messaging;
 using Dynamis.Utility;
+using Microsoft.Extensions.Logging;
 using YamlDotNet.Serialization;
 
 namespace Dynamis.ClientStructs;
 
 public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMessage>
 {
-    private readonly ConfigurationContainer _configuration;
-    private readonly IDeserializer          _yamlDeserializer;
+    private readonly ConfigurationContainer     _configuration;
+    private readonly IDeserializer              _yamlDeserializer;
+    private readonly ILogger<DataYamlContainer> _logger;
 
     private Lazy<DataYaml?>?                             _data;
     private Lazy<Dictionary<string, DataYaml.Address>?>? _globalsInverse;
@@ -35,10 +37,12 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
     public Dictionary<nint, string>? ClassesByVtbl
         => _classesByVtbl!.Value;
 
-    public DataYamlContainer(ConfigurationContainer configuration, IDeserializer yamlDeserializer)
+    public DataYamlContainer(ConfigurationContainer configuration, IDeserializer yamlDeserializer,
+        ILogger<DataYamlContainer> logger)
     {
         _configuration = configuration;
         _yamlDeserializer = yamlDeserializer;
+        _logger = logger;
         Refresh();
     }
 
@@ -67,11 +71,17 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
         }
 
         if (!File.Exists(path)) {
+            _logger.LogError("Provided data.yml path {Path} does not exist", path);
             return null;
         }
 
-        using var reader = File.OpenText(path);
-        return _yamlDeserializer.Deserialize<DataYaml>(reader);
+        try {
+            using var reader = File.OpenText(path);
+            return _yamlDeserializer.Deserialize<DataYaml>(reader);
+        } catch (Exception e) {
+            _logger.LogError(e, "Could not deserialize {Path}", path);
+            return null;
+        }
     }
 
     private T? MapData<T>(Func<DataYaml, T?> function) where T : class

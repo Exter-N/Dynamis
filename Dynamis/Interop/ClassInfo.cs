@@ -23,4 +23,7 @@ public sealed class ClassInfo
 
     public bool Known
         => Name.Length > 0 && !Name.StartsWith("Cls_");
+
+    public bool IsClass
+        => Known || SizeFromDtor.HasValue;
 }

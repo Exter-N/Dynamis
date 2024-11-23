@@ -3,14 +3,13 @@ using Dalamud.Interface;
 using Dalamud.Interface.Style;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
-using Dynamis.Messaging;
 using Dynamis.Utility;
 using ImGuiNET;
 using Microsoft.Extensions.Logging;
 
 namespace Dynamis.UI.Windows;
 
-public sealed class SigScannerWindow : Window, IMessageObserver<OpenWindowMessage<SigScannerWindow>>
+public sealed class SigScannerWindow : Window, ISingletonWindow
 {
     private const int MaxResultHistorySize = 32;
 
@@ -20,7 +19,7 @@ public sealed class SigScannerWindow : Window, IMessageObserver<OpenWindowMessag
 
     private          string           _vmSignature = string.Empty;
     private          int              _vmOffset    = 0;
-    private readonly List<ScanResult> _vmResults   = new();
+    private readonly List<ScanResult> _vmResults   = [];
 
     public SigScannerWindow(ILogger<SigScannerWindow> logger, ISigScanner sigScanner,
         ImGuiComponents imGuiComponents) : base("Dynamis - Signature Scanner", 0)
@@ -149,12 +148,6 @@ public sealed class SigScannerWindow : Window, IMessageObserver<OpenWindowMessag
         if (_vmResults.Count > MaxResultHistorySize) {
             _vmResults.RemoveAt(_vmResults.Count - 1);
         }
-    }
-
-    public void HandleMessage(OpenWindowMessage<SigScannerWindow> _)
-    {
-        IsOpen = true;
-        BringToFront();
     }
 
     private enum ScanType

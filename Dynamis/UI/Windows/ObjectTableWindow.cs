@@ -4,28 +4,23 @@ using Dalamud.Interface.Style;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
-using Dynamis.Messaging;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using ImGuiNET;
-using Microsoft.Extensions.Logging;
 
 namespace Dynamis.UI.Windows;
 
-public sealed class ObjectTableWindow : Window, IMessageObserver<OpenWindowMessage<ObjectTableWindow>>
+public sealed class ObjectTableWindow : Window, ISingletonWindow
 {
-    private readonly MessageHub                 _messageHub;
-    private readonly ILogger<ObjectTableWindow> _logger;
     private readonly ImGuiComponents            _imGuiComponents;
     private readonly IFramework                 _framework;
     private readonly IObjectTable               _objectTable;
 
     private Task<TableEntry[]>? _vmTable;
 
-    public ObjectTableWindow(MessageHub messageHub, ILogger<ObjectTableWindow> logger, ImGuiComponents imGuiComponents,
-        IFramework framework, IObjectTable objectTable) : base("Dynamis - Object Table", 0)
+    public ObjectTableWindow(ImGuiComponents imGuiComponents, IFramework framework, IObjectTable objectTable) : base(
+        "Dynamis - Object Table", 0
+    )
     {
-        _messageHub = messageHub;
-        _logger = logger;
         _imGuiComponents = imGuiComponents;
         _framework = framework;
         _objectTable = objectTable;
@@ -98,12 +93,6 @@ public sealed class ObjectTableWindow : Window, IMessageObserver<OpenWindowMessa
 
     private TableEntry[] TakeSnapshot()
         => _objectTable.Select(TableEntry.FromGameObject).ToArray();
-
-    public void HandleMessage(OpenWindowMessage<ObjectTableWindow> _)
-    {
-        IsOpen = true;
-        BringToFront();
-    }
 
     private readonly record struct TableEntry(
         ushort ObjectIndex,

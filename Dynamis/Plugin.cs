@@ -81,17 +81,16 @@ public sealed class Plugin : IDalamudPlugin
                         collection.AddSingleton<DataYamlContainer>();
                         collection.AddSingleton<MemoryHeuristics>();
                         collection.AddSingleton<ObjectInspector>();
+                        collection.AddSingleton<TextureArraySlicer>();
                         collection.AddSingleton<ImGuiComponents>();
 
-                        collection.AddSingleton<HomeWindow>();
-                        collection.AddSingleton<SettingsWindow>();
-                        collection.AddSingleton<SigScannerWindow>();
-                        collection.AddSingleton<ObjectTableWindow>();
                         collection.AddSingleton<ObjectInspectorWindowFactory>();
 
                         collection.AddImplementationSingletons<IObjectInspector>(typeof(Plugin).Assembly);
                         collection.AddImplementationAliases<IObjectInspector>();
                         collection.AddSingleton<ObjectInspectorDispatcher>();
+
+                        collection.AddImplementationSingletons<ISingletonWindow>(typeof(Plugin).Assembly);
 
                         collection.AddSingleton<CommandHandler>();
                         collection.AddSingleton<LaunchButton>();
@@ -100,6 +99,8 @@ public sealed class Plugin : IDalamudPlugin
                         collection.AddLazySingletonAlias<IDalamudLoggingConfiguration, ConfigurationContainer>();
 
                         collection.AddLazyImplementationAliases<Window>();
+                        collection.AddLazyImplementationAliases<ISingletonWindow>();
+                        collection.AddSingletonWindowOpeners();
                         collection.AddLazyImplementationAliases<IMessageObserver>();
                         collection.AddLazyImplementationAliases<ObjectInspectorDispatcher>();
                         collection.AddImplementationAliases<IHostedService>();

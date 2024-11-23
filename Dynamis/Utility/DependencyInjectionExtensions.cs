@@ -1,4 +1,7 @@
 using System.Reflection;
+using Dalamud.Interface.Windowing;
+using Dynamis.Messaging;
+using Dynamis.UI.Windows;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Dynamis.Utility;
@@ -48,6 +51,22 @@ internal static class DependencyInjectionExtensions
         }
     }
 
+    public static void AddSingletonWindowOpeners(this IServiceCollection collection)
+    {
+        var openers = (
+            from descriptor in collection
+            let type = descriptor.ServiceType
+            where descriptor.ImplementationType == type && typeof(Window).IsAssignableFrom(type)
+                                                        && typeof(ISingletonWindow).IsAssignableFrom(type)
+            let swoType = typeof(SingletonWindowOpener<>).MakeGenericType(type)
+            select new ServiceDescriptor(swoType, swoType, descriptor.Lifetime)
+        ).ToList();
+
+        foreach (var opener in openers) {
+            collection.Add(opener);
+        }
+    }
+
     private static Func<IServiceProvider, T> MakeServiceFactory<T>(Type t) where T : notnull
         => (Func<IServiceProvider, T>)typeof(DependencyInjectionExtensions).GetMethod(nameof(ServiceFactory), BindingFlags.NonPublic | BindingFlags.Static)!
            .MakeGenericMethod(t)
@@ -63,4 +82,13 @@ internal static class DependencyInjectionExtensions
 
     private static Lazy<TService> LazyServiceFactory<TService, TImplementation>(IServiceProvider provider) where TService : notnull where TImplementation : TService
         => new(() => provider.GetRequiredService<TImplementation>());
+
+    private sealed class SingletonWindowOpener<T>(T window) : IMessageObserver<OpenWindowMessage<T>> where T : Window, ISingletonWindow
+    {
+        public void HandleMessage(OpenWindowMessage<T> _)
+        {
+            window.IsOpen = true;
+            window.BringToFront();
+        }
+    }
 }
