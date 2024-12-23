@@ -56,4 +56,9 @@
       <None Remove="Resources\Dynamis128.png" />
       <EmbeddedResource Include="Resources\Dynamis128.png" />
     </ItemGroup>
+
+    <ItemGroup>
+        <None Condition="$([MSBuild]::IsOSPlatform('Windows'))" Include="..\ipfd\target\release\dynamis_ipfd.dll" CopyToOutputDirectory="Always" />
+        <None Condition="!$([MSBuild]::IsOSPlatform('Windows'))" Include="..\ipfd\target\x86_64-pc-windows-gnu\release\dynamis_ipfd.dll" CopyToOutputDirectory="Always" />
+    </ItemGroup>
 </Project>

@@ -1,3 +1,4 @@
+using Dynamis.Interop;
 using Dynamis.UI.Windows;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using ImGuiNET;
@@ -11,9 +12,13 @@ public sealed unsafe class GameObjectInspector(ImGuiComponents imGuiComponents) 
         ImGui.TextUnformatted($"Name: {pointer->NameString}");
     }
 
-    public void DrawAdditionalHeaderDetails(GameObject* pointer, ObjectInspectorWindow window)
+    public void DrawAdditionalHeaderDetails(GameObject* pointer, ObjectSnapshot snapshot, bool live, ObjectInspectorWindow window)
     {
         DrawAdditionalTooltipDetails(pointer);
+        if (!live) {
+            return;
+        }
+
         var drawObject = pointer->GetDrawObject();
         if (drawObject is not null) {
             ImGui.TextUnformatted("Draw Object: ");
@@ -22,7 +27,7 @@ public sealed unsafe class GameObjectInspector(ImGuiComponents imGuiComponents) 
         }
     }
 
-    public void DrawAdditionalTabs(GameObject* pointer, ObjectInspectorWindow window)
+    public void DrawAdditionalTabs(GameObject* pointer, ObjectSnapshot snapshot, bool live, ObjectInspectorWindow window)
     {
     }
 }

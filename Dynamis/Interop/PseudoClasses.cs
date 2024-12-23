@@ -2,11 +2,12 @@ namespace Dynamis.Interop;
 
 public static class PseudoClasses
 {
-    public static ClassInfo Generate(string name, uint size, Template template)
+    public static ClassInfo Generate(string name, uint size, Template template, ClassKind kind)
     {
         var classInfo = new ClassInfo()
         {
             Name = name,
+            Kind = kind,
             EstimatedSize = size,
             SizeFromOuterContext = size,
         };

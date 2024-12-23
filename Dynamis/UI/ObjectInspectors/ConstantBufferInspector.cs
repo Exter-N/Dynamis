@@ -12,7 +12,7 @@ public sealed unsafe class ConstantBufferInspector(ImGuiComponents imGuiComponen
         ImGui.TextUnformatted($"Constant Buffer Size: {pointer->ByteSize} bytes ({pointer->ByteSize >> 4} vectors)");
     }
 
-    public void DrawAdditionalHeaderDetails(ConstantBuffer* pointer, ObjectInspectorWindow window)
+    public void DrawAdditionalHeaderDetails(ConstantBuffer* pointer, ObjectSnapshot snapshot, bool live, ObjectInspectorWindow window)
     {
         DrawAdditionalTooltipDetails(pointer);
         var sourcePtr = pointer->TryGetSourcePointer();
@@ -25,12 +25,13 @@ public sealed unsafe class ConstantBufferInspector(ImGuiComponents imGuiComponen
         imGuiComponents.DrawPointer(
             (nint)sourcePtr,
             () => PseudoClasses.Generate(
-                "<Constant Buffer Contents>", (uint)pointer->ByteSize, PseudoClasses.Template.SingleArray
+                "<Constant Buffer Contents>", (uint)pointer->ByteSize, PseudoClasses.Template.SingleArray,
+                ClassKind.ConstantBufferContents
             )
         );
     }
 
-    public void DrawAdditionalTabs(ConstantBuffer* pointer, ObjectInspectorWindow window)
+    public void DrawAdditionalTabs(ConstantBuffer* pointer, ObjectSnapshot snapshot, bool live, ObjectInspectorWindow window)
     {
     }
 }

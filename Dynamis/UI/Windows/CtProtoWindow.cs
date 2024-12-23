@@ -704,7 +704,7 @@ public class CtProtoWindow : Window, ISingletonWindow
                 using var center = ImRaii.PushStyle(ImGuiStyleVar.SelectableTextAlign, new Vector2(0, 0.5f));
                 using var clipper = new ImRaiiListClipper(count, lineHeight);
                 while (clipper.Step()) {
-                    for (var i = clipper.DisplayStart; i < clipper.DisplayEnd && i < count; i++) {
+                    for (var i = clipper.DisplayStart; i < clipper.DisplayEnd && i < count; ++i) {
                         if (ImGui.Selectable($"{i,3}", i == value, 0, new(itemWidth, lineHeight))) {
                             ret = value != i;
                             value = (ushort)i;

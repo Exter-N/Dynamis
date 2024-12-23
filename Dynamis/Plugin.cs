@@ -6,10 +6,12 @@ using Dalamud.Plugin.Services;
 using Dynamis.ClientStructs;
 using Dynamis.Configuration;
 using Dynamis.Interop;
+using Dynamis.Interop.Ipfd;
 using Dynamis.Logging;
 using Dynamis.Messaging;
 using Dynamis.Resources;
 using Dynamis.UI;
+using Dynamis.UI.Components;
 using Dynamis.UI.ObjectInspectors;
 using Dynamis.UI.Windows;
 using Dynamis.Utility;
@@ -17,8 +19,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using YamlDotNet.Serialization;
-using YamlDotNet.Serialization.NamingConventions;
 
 namespace Dynamis;
 
@@ -26,6 +26,8 @@ public sealed class Plugin : IDalamudPlugin
 {
     private readonly CancellationTokenSource _pluginCts = new();
     private readonly Task                    _hostBuilderRunTask;
+
+    public static IPluginLog? Log { get; private set; }
 
     public Plugin(
         IDalamudPluginInterface pluginInterface,
@@ -35,9 +37,12 @@ public sealed class Plugin : IDalamudPlugin
         ISigScanner sigScanner,
         IGameInteropProvider gameInteropProvider,
         ITitleScreenMenu titleScreenMenu,
+        INotificationManager notificationManager,
         IFramework framework,
         IObjectTable objectTable)
     {
+        Log = pluginLog;
+
         _hostBuilderRunTask =
             new HostBuilder()
                .UseContentRoot(pluginInterface.ConfigDirectory.FullName)
@@ -59,16 +64,11 @@ public sealed class Plugin : IDalamudPlugin
                         collection.AddSingleton(sigScanner);
                         collection.AddSingleton(gameInteropProvider);
                         collection.AddSingleton(titleScreenMenu);
+                        collection.AddSingleton(notificationManager);
                         collection.AddSingleton(framework);
                         collection.AddSingleton(objectTable);
 
                         collection.AddSingleton(pluginInterface.UiBuilder);
-
-                        collection.AddSingleton(
-                            new DeserializerBuilder()
-                               .WithNamingConvention(CamelCaseNamingConvention.Instance)
-                               .Build()
-                        );
 
                         collection.AddSingleton(new Dalamud.Localization("Dynamis.Localization.", "", useEmbedded: true));
                         collection.AddSingleton(new WindowSystem("Dynamis"));
@@ -80,17 +80,26 @@ public sealed class Plugin : IDalamudPlugin
                         collection.AddSingleton<ConfigurationContainer>();
                         collection.AddSingleton<DataYamlContainer>();
                         collection.AddSingleton<MemoryHeuristics>();
+                        collection.AddSingleton<ModuleAddressResolver>();
+                        collection.AddSingleton<AddressIdentifier>();
+                        collection.AddSingleton<ClassRegistry>();
                         collection.AddSingleton<ObjectInspector>();
                         collection.AddSingleton<TextureArraySlicer>();
                         collection.AddSingleton<ImGuiComponents>();
+                        collection.AddSingleton<ContextMenu>();
+
+                        collection.AddSingleton<SnapshotViewerFactory>();
 
                         collection.AddSingleton<ObjectInspectorWindowFactory>();
+                        collection.AddSingleton<BreakpointWindowFactory>();
 
                         collection.AddImplementationSingletons<IObjectInspector>(typeof(Plugin).Assembly);
                         collection.AddImplementationAliases<IObjectInspector>();
                         collection.AddSingleton<ObjectInspectorDispatcher>();
 
                         collection.AddImplementationSingletons<ISingletonWindow>(typeof(Plugin).Assembly);
+
+                        collection.AddSingleton<Ipfd>();
 
                         collection.AddSingleton<CommandHandler>();
                         collection.AddSingleton<LaunchButton>();

@@ -1,3 +1,4 @@
+using Dynamis.Interop;
 using Dynamis.UI.Windows;
 
 namespace Dynamis.UI.ObjectInspectors;
@@ -8,7 +9,7 @@ public unsafe interface IObjectInspector<T> : IObjectInspector where T : unmanag
 {
     void DrawAdditionalTooltipDetails(T* pointer);
 
-    void DrawAdditionalHeaderDetails(T* pointer, ObjectInspectorWindow window);
+    void DrawAdditionalHeaderDetails(T* pointer, ObjectSnapshot snapshot, bool live, ObjectInspectorWindow window);
 
-    void DrawAdditionalTabs(T* pointer, ObjectInspectorWindow window);
+    void DrawAdditionalTabs(T* pointer, ObjectSnapshot snapshot, bool live, ObjectInspectorWindow window);
 }

@@ -1,7 +1,8 @@
 using Dalamud.Interface.Windowing;
-using Dynamis.Configuration;
+using Dynamis.ClientStructs;
 using Dynamis.Interop;
 using Dynamis.Messaging;
+using Dynamis.UI.Components;
 using Dynamis.UI.ObjectInspectors;
 using Microsoft.Extensions.Logging;
 
@@ -11,9 +12,9 @@ public sealed class ObjectInspectorWindowFactory(
     ILogger<ObjectInspectorWindowFactory> logger,
     WindowSystem windowSystem,
     ImGuiComponents imGuiComponents,
+    DataYamlContainer dataYamlContainer,
     ObjectInspector objectInspector,
-    ConfigurationContainer configuration,
-    MessageHub messageHub,
+    SnapshotViewerFactory snapshotViewerFactory,
     Lazy<ObjectInspectorDispatcher> objectInspectorDispatcher)
     : IMessageObserver<OpenWindowMessage<ObjectInspectorWindow>>,
         IMessageObserver<InspectObjectMessage>
@@ -35,7 +36,7 @@ public sealed class ObjectInspectorWindowFactory(
     private ObjectInspectorWindow CreateWindow()
     {
         var window = new ObjectInspectorWindow(
-            logger, windowSystem, imGuiComponents, objectInspector, configuration, messageHub,
+            logger, windowSystem, imGuiComponents, dataYamlContainer, objectInspector, snapshotViewerFactory,
             objectInspectorDispatcher, GetFreeIndex()
         );
         window.Close += WindowClose;
@@ -63,14 +64,23 @@ public sealed class ObjectInspectorWindowFactory(
     public void HandleMessage(InspectObjectMessage message)
     {
         var window = _openWindows.FirstOrDefault(
-            window => window.ObjectAddress == message.ObjectAddress
-                   && (message.Class is null || window.Class == message.Class)
+            message.Snapshot is not null
+                ? window => window.Snapshot == message.Snapshot
+                : message.Class is not null
+                    ? window => (window.Snapshot?.Address ?? window.ObjectAddress) == message.ObjectAddress
+                             && window.Snapshot?.Class == message.Class
+                    : window => (window.Snapshot?.Address ?? window.ObjectAddress) == message.ObjectAddress
         );
         if (window is not null) {
             window.BringToFront();
             return;
         }
 
-        CreateWindow().Inspect(message.ObjectAddress, message.Class);
+        window = CreateWindow();
+        if (message.Snapshot is not null) {
+            window.Inspect(message.Snapshot);
+        } else {
+            window.Inspect(message.ObjectAddress, message.Class);
+        }
     }
 }

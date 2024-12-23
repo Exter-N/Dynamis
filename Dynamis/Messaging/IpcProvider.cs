@@ -14,10 +14,10 @@ public sealed class IpcProvider(
     ImGuiComponents imGuiComponents)
     : IHostedService
 {
-    private ICallGateProvider<nint, object?>?                     _inspectObject;
-    private ICallGateProvider<nint, uint, string, uint, object?>? _inspectRegion;
-    private ICallGateProvider<nint, object?>?                     _imGuiDrawPointer;
-    private ICallGateProvider<nint, object?>?                     _imGuiDrawPointerTooltipDetails;
+    private ICallGateProvider<nint, object?>?                           _inspectObject;
+    private ICallGateProvider<nint, uint, string, uint, uint, object?>? _inspectRegion;
+    private ICallGateProvider<nint, object?>?                           _imGuiDrawPointer;
+    private ICallGateProvider<nint, object?>?                           _imGuiDrawPointerTooltipDetails;
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -31,7 +31,7 @@ public sealed class IpcProvider(
 
         try {
             _inspectRegion =
-                pi.GetIpcProvider<nint, uint, string, uint, object?>($"Dynamis.{nameof(InspectRegion)}.V1");
+                pi.GetIpcProvider<nint, uint, string, uint, uint, object?>($"Dynamis.{nameof(InspectRegion)}.V1");
             _inspectRegion.RegisterAction(InspectRegion);
         } catch (Exception e) {
             _inspectRegion = null;
@@ -78,10 +78,10 @@ public sealed class IpcProvider(
     private void InspectObject(nint address)
         => messageHub.Publish(new InspectObjectMessage(address, null));
 
-    private void InspectRegion(nint address, uint size, string typeName, uint typeTemplateId)
+    private void InspectRegion(nint address, uint size, string typeName, uint typeTemplateId, uint classKindId)
         => messageHub.Publish(
             new InspectObjectMessage(
-                address, PseudoClasses.Generate(typeName, size, (PseudoClasses.Template)typeTemplateId)
+                address, PseudoClasses.Generate(typeName, size, (PseudoClasses.Template)typeTemplateId, (ClassKind)classKindId)
             )
         );
 

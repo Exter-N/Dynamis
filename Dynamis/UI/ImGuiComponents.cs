@@ -11,21 +11,27 @@ using ImGuiNET;
 
 namespace Dynamis.UI;
 
-public sealed partial class ImGuiComponents(MessageHub messageHub, FileDialogManager fileDialogManager, ObjectInspector objectInspector, Lazy<ObjectInspectorDispatcher> objectInspectorDispatcher)
+public sealed partial class ImGuiComponents(
+    MessageHub messageHub,
+    FileDialogManager fileDialogManager,
+    AddressIdentifier addressIdentifier,
+    ObjectInspector objectInspector,
+    Lazy<ObjectInspectorDispatcher> objectInspectorDispatcher,
+    ContextMenu contextMenu)
 {
     public void AddTitleBarButtons(Window window)
     {
-        if (window is not HomeWindow) {
+        if (window is not ToolboxWindow) {
             window.TitleBarButtons.Add(
                 new()
                 {
                     Icon = FontAwesomeIcon.Home,
-                    Click = _ => messageHub.Publish<OpenWindowMessage<HomeWindow>>(),
+                    Click = _ => messageHub.Publish<OpenWindowMessage<ToolboxWindow>>(),
                     IconOffset = new(1, 0),
                     ShowTooltip = () =>
                     {
                         using var _ = ImRaii.Tooltip();
-                        ImGui.Text("Open Dynamis Home");
+                        ImGui.Text("Toolbox");
                     }
                 }
             );
@@ -41,42 +47,41 @@ public sealed partial class ImGuiComponents(MessageHub messageHub, FileDialogMan
                     ShowTooltip = () =>
                     {
                         using var _ = ImRaii.Tooltip();
-                        ImGui.Text("Open Dynamis Settings");
+                        ImGui.Text("Settings");
                     }
                 }
             );
         }
     }
 
-    public static void DrawCopyable(string text, bool mono)
+    public static void DrawCopyable(string text, bool mono, Func<string>? copyText = null)
     {
+        bool clicked;
         using (ImRaii.PushFont(UiBuilder.MonoFont, mono)) {
-            ImGui.Selectable(text);
+            clicked = ImGui.Selectable(text);
         }
 
-        if (ImGui.IsItemClicked(ImGuiMouseButton.Right)) {
-            ImGui.SetClipboardText(text);
+        if (clicked) {
+            ImGui.SetClipboardText(copyText?.Invoke() ?? text);
         }
 
         if (ImGui.IsItemHovered()) {
             using var _ = ImRaii.Tooltip();
             using (ImRaii.PushFont(UiBuilder.MonoFont, mono)) {
-                ImGui.TextUnformatted(text);
+                ImGui.TextUnformatted(copyText?.Invoke() ?? text);
             }
-            ImGui.TextUnformatted("Right-click to copy to clipboard.");
+
+            ImGui.Separator();
+            ImGui.TextUnformatted("Click to copy to clipboard.");
         }
     }
 
     public void DrawPointer(nint pointer, Func<ClassInfo?>? @class)
     {
         using (ImRaii.PushFont(UiBuilder.MonoFont, pointer != 0)) {
-            if (ImGui.Selectable(pointer == 0 ? "nullptr" : $"0x{pointer:X}") && pointer != 0) {
-                messageHub.Publish(new InspectObjectMessage(pointer, @class?.Invoke()));
+            if (ImGui.Selectable(pointer == 0 ? "nullptr" : $"0x{pointer:X}")) {
+                contextMenu.Open(new PointerContextMenu(messageHub, pointer, @class));
             }
-        }
-
-        if (ImGui.IsItemClicked(ImGuiMouseButton.Right)) {
-            ImGui.SetClipboardText(pointer.ToString("X"));
         }
 
         if (ImGui.IsItemHovered()) {
@@ -88,11 +93,12 @@ public sealed partial class ImGuiComponents(MessageHub messageHub, FileDialogMan
             }
 
             if (pointer != 0) {
+                ImGui.Separator();
                 DrawPointerTooltipDetails(pointer, @class?.Invoke());
-                ImGui.TextUnformatted("Click to inspect.");
             }
 
-            ImGui.TextUnformatted("Right-click to copy address to clipboard.");
+            ImGui.Separator();
+            ImGui.TextUnformatted("Click for options.");
         }
     }
 
@@ -103,25 +109,40 @@ public sealed partial class ImGuiComponents(MessageHub messageHub, FileDialogMan
             ImGui.TextUnformatted("Function pointer");
         }
 
-        var wellKnown = objectInspector.IdentifyAddress(pointer);
-        switch (wellKnown.Type) {
-            case AddressType.Vtbl:
-                ImGui.TextUnformatted($"Virtual table of class {wellKnown.Name}");
-                break;
-            case AddressType.Instance:
-                ImGui.TextUnformatted($"Well-known instance of class {wellKnown.Name}");
-                break;
+        var wellKnown = addressIdentifier.Identify(pointer);
+        var wellKnownStr = wellKnown.Describe();
+        if (!string.IsNullOrEmpty(wellKnownStr)) {
+            ImGui.TextUnformatted(wellKnownStr);
         }
 
-        @class ??= objectInspector.DetermineClass(pointer);
-        if (@class.Known) {
+        @class ??= objectInspector.DetermineClass(pointer, false);
+        if (@class.Known && @class.Name != wellKnown.ClassName) {
             ImGui.TextUnformatted($"Class Name: {@class.Name}");
         }
 
         ImGui.TextUnformatted($"Estimated Size: {@class.EstimatedSize} (0x{@class.EstimatedSize:X}) bytes");
 
         foreach (var inspector in objectInspectorDispatcher.Value.GetInspectors(@class)) {
-            inspector.DrawAdditionalTooltipDetails(pointer);
+            inspector.DrawAdditionalTooltipDetails(pointer, @class);
+        }
+    }
+
+    private sealed class PointerContextMenu(MessageHub messageHub, nint pointer, Func<ClassInfo?>? @class) : IDrawable
+    {
+        public bool Draw()
+        {
+            var ret = false;
+            if (pointer != 0 && ImGui.Selectable("Inspect object")) {
+                messageHub.Publish(new InspectObjectMessage(pointer, @class?.Invoke()));
+                ret = true;
+            }
+
+            if (ImGui.Selectable("Copy address")) {
+                ImGui.SetClipboardText(pointer.ToString("X"));
+                ret = true;
+            }
+
+            return ret;
         }
     }
 }

@@ -1,3 +1,4 @@
+using Dynamis.Interop;
 using Dynamis.UI.Windows;
 using FFXIVClientStructs.FFXIV.Client.System.Resource.Handle;
 
@@ -8,9 +9,14 @@ public sealed unsafe class TextureResourceHandleInspector(TextureInspector textu
     public void DrawAdditionalTooltipDetails(TextureResourceHandle* pointer)
         => textureInspector.DrawAdditionalTooltipDetails(pointer->Texture);
 
-    public void DrawAdditionalHeaderDetails(TextureResourceHandle* pointer, ObjectInspectorWindow window)
-        => textureInspector.DrawAdditionalHeaderDetails(pointer->Texture, window);
+    public void DrawAdditionalHeaderDetails(TextureResourceHandle* pointer, ObjectSnapshot snapshot, bool live,
+        ObjectInspectorWindow window)
+    {
+        if (live) {
+            textureInspector.DrawAdditionalHeaderDetails(pointer->Texture, snapshot, live, window);
+        }
+    }
 
-    public void DrawAdditionalTabs(TextureResourceHandle* pointer, ObjectInspectorWindow window)
-        => textureInspector.DrawAdditionalTabs(pointer->Texture, window);
+    public void DrawAdditionalTabs(TextureResourceHandle* pointer, ObjectSnapshot snapshot, bool live, ObjectInspectorWindow window)
+        => textureInspector.DrawAdditionalTabs(pointer->Texture, snapshot, live, window);
 }

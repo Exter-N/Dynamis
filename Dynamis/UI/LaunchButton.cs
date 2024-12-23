@@ -85,5 +85,5 @@ public sealed class LaunchButton : IHostedService
     }
 
     private void OnTriggered()
-        => _messageHub.Publish<OpenWindowMessage<HomeWindow>>();
+        => _messageHub.Publish<OpenWindowMessage<ToolboxWindow>>();
 }

@@ -10,7 +10,8 @@ namespace Dynamis.UI.ObjectInspectors;
 
 public sealed class ObjectInspectorDispatcher
 {
-    private readonly Dictionary<Type, Proxy>            _proxies = new();
+    private readonly Dictionary<Type, IDynamicObjectInspector> _typedInspectors   = new();
+    private readonly List<IDynamicObjectInspector>             _dynamicInspectors = [];
 
     public ObjectInspectorDispatcher(ILogger<ObjectInspectorDispatcher> logger, IEnumerable<IObjectInspector> inspectors)
     {
@@ -18,48 +19,62 @@ public sealed class ObjectInspectorDispatcher
             foreach (var @interface in inspector.GetType().GetInterfaces()) {
                 if (@interface.IsConstructedGenericType && @interface.GetGenericTypeDefinition() == typeof(IObjectInspector<>)) {
                     var type = @interface.GetGenericArguments()[0];
-                    _proxies.Add(type, (Proxy)Activator.CreateInstance(typeof(Proxy<>).MakeGenericType(type), logger, inspector)!);
+                    _typedInspectors.Add(type, (IDynamicObjectInspector)Activator.CreateInstance(typeof(TypedInspectorProxy<>).MakeGenericType(type), logger, inspector)!);
                 }
+            }
+
+            if (inspector is IDynamicObjectInspector dynamicInspector) {
+                _dynamicInspectors.Add(dynamicInspector);
             }
         }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Proxy? GetInspector(Type type)
-        => _proxies.GetValueOrDefault(type);
+    public IDynamicObjectInspector? GetTypedInspector(Type type)
+        => _typedInspectors.GetValueOrDefault(type);
 
-    public IEnumerable<Proxy> GetInspectors(ClassInfo @class)
+    public IEnumerable<IDynamicObjectInspector> GetInspectors(ClassInfo @class)
     {
-        Proxy? proxy;
-        for (var i = @class.ClientStructsParents.Length; i-- > 0;) {
-            proxy = GetInspector(@class.ClientStructsParents[i]);
+        IDynamicObjectInspector? proxy;
+        for (var i = @class.ManagedParents.Length; i-- > 0;) {
+            proxy = GetTypedInspector(@class.ManagedParents[i]);
             if (proxy is not null) {
                 yield return proxy;
             }
         }
 
-        if (@class.ClientStructsType is null) {
-            yield break;
+        if (@class.ManagedType is Type type) {
+            proxy = GetTypedInspector(type);
+            if (proxy is not null) {
+                yield return proxy;
+            }
         }
 
-        proxy = GetInspector(@class.ClientStructsType);
-        if (proxy is not null) {
-            yield return proxy;
+        foreach (var inspector in _dynamicInspectors) {
+            if (inspector.CanInspect(@class)) {
+                yield return inspector;
+            }
         }
     }
 
-    public abstract class Proxy
+    private sealed unsafe class TypedInspectorProxy<T>(ILogger logger, IObjectInspector<T> inspector) : IDynamicObjectInspector where T : unmanaged
     {
-        public abstract void DrawAdditionalTooltipDetails(nint pointer);
+        public bool CanInspect(ClassInfo @class)
+        {
+            if (@class.ManagedType is Type type && type.IsAssignableFrom(typeof(T))) {
+                return true;
+            }
 
-        public abstract void DrawAdditionalHeaderDetails(nint pointer, ObjectInspectorWindow window);
+            foreach (var parent in @class.ManagedParents) {
+                if (parent.IsAssignableFrom(typeof(T))) {
+                    return true;
+                }
+            }
 
-        public abstract void DrawAdditionalTabs(nint pointer, ObjectInspectorWindow window);
-    }
+            return false;
+        }
 
-    private sealed unsafe class Proxy<T>(ILogger<ObjectInspectorDispatcher> logger, IObjectInspector<T> inspector) : Proxy where T : unmanaged
-    {
-        public override void DrawAdditionalTooltipDetails(nint pointer)
+        public void DrawAdditionalTooltipDetails(nint pointer, ClassInfo @class)
         {
             try {
                 inspector.DrawAdditionalTooltipDetails((T*)pointer);
@@ -75,10 +90,20 @@ public sealed class ObjectInspectorDispatcher
             }
         }
 
-        public override void DrawAdditionalHeaderDetails(nint pointer, ObjectInspectorWindow window)
+        public void DrawAdditionalHeaderDetails(ObjectSnapshot snapshot, bool live, ObjectInspectorWindow window)
         {
             try {
-                inspector.DrawAdditionalHeaderDetails((T*)pointer, window);
+                if (live && snapshot is
+                    {
+                        Live: true,
+                        Address: not null,
+                    }) {
+                    inspector.DrawAdditionalHeaderDetails((T*)snapshot.Address, snapshot, true, window);
+                } else {
+                    fixed (byte* pointer = snapshot.Data) {
+                        inspector.DrawAdditionalHeaderDetails((T*)pointer, snapshot, false, window);
+                    }
+                }
             } catch (Exception e) {
                 logger.LogError(
                     e,
@@ -91,10 +116,20 @@ public sealed class ObjectInspectorDispatcher
             }
         }
 
-        public override void DrawAdditionalTabs(nint pointer, ObjectInspectorWindow window)
+        public void DrawAdditionalTabs(ObjectSnapshot snapshot, bool live, ObjectInspectorWindow window)
         {
             try {
-                inspector.DrawAdditionalTabs((T*)pointer, window);
+                if (live && snapshot is
+                    {
+                        Live: true,
+                        Address: not null,
+                    }) {
+                    inspector.DrawAdditionalTabs((T*)snapshot.Address, snapshot, true, window);
+                } else {
+                    fixed (byte* pointer = snapshot.Data) {
+                        inspector.DrawAdditionalTabs((T*)pointer, snapshot, false, window);
+                    }
+                }
             } catch (Exception e) {
                 logger.LogError(
                     e,

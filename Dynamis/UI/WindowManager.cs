@@ -8,33 +8,24 @@ using Microsoft.Extensions.Hosting;
 
 namespace Dynamis.UI;
 
-public sealed class WindowManager : IHostedService
+public sealed class WindowManager(
+    MessageHub messageHub,
+    IUiBuilder uiBuilder,
+    WindowSystem windowSystem,
+    FileDialogManager fileDialogManager,
+    ContextMenu contextMenu,
+    TextureArraySlicer textureArraySlicer,
+    IEnumerable<Lazy<Window>> windows)
+    : IHostedService
 {
-    private readonly MessageHub                _messageHub;
-    private readonly IUiBuilder                _uiBuilder;
-    private readonly WindowSystem              _windowSystem;
-    private readonly FileDialogManager         _fileDialogManager;
-    private readonly TextureArraySlicer        _textureArraySlicer;
-    private readonly IEnumerable<Lazy<Window>> _windows;
-
-    public WindowManager(MessageHub messageHub, IUiBuilder uiBuilder, WindowSystem windowSystem, FileDialogManager fileDialogManager, TextureArraySlicer textureArraySlicer, IEnumerable<Lazy<Window>> windows)
-    {
-        _messageHub = messageHub;
-        _uiBuilder = uiBuilder;
-        _windowSystem = windowSystem;
-        _fileDialogManager = fileDialogManager;
-        _textureArraySlicer = textureArraySlicer;
-        _windows = windows;
-    }
-
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        _uiBuilder.Draw += Draw;
-        _uiBuilder.OpenMainUi += OpenMainUi;
-        _uiBuilder.OpenConfigUi += OpenConfigUi;
+        uiBuilder.Draw += Draw;
+        uiBuilder.OpenMainUi += OpenMainUi;
+        uiBuilder.OpenConfigUi += OpenConfigUi;
 
-        foreach (var window in _windows) {
-            _windowSystem.AddWindow(window.Value);
+        foreach (var window in windows) {
+            windowSystem.AddWindow(window.Value);
         }
 
         return Task.CompletedTask;
@@ -42,23 +33,24 @@ public sealed class WindowManager : IHostedService
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
-        _windowSystem.RemoveAllWindows();
-        _uiBuilder.OpenConfigUi -= OpenConfigUi;
-        _uiBuilder.OpenMainUi -= OpenMainUi;
-        _uiBuilder.Draw -= Draw;
+        windowSystem.RemoveAllWindows();
+        uiBuilder.OpenConfigUi -= OpenConfigUi;
+        uiBuilder.OpenMainUi -= OpenMainUi;
+        uiBuilder.Draw -= Draw;
         return Task.CompletedTask;
     }
 
     private void Draw()
     {
-        _windowSystem.Draw();
-        _fileDialogManager.Draw();
-        _textureArraySlicer.Tick();
+        windowSystem.Draw();
+        fileDialogManager.Draw();
+        contextMenu.Draw();
+        textureArraySlicer.Tick();
     }
 
     private void OpenMainUi()
-        => _messageHub.Publish<OpenWindowMessage<HomeWindow>>();
+        => messageHub.Publish<OpenWindowMessage<ToolboxWindow>>();
 
     private void OpenConfigUi()
-        => _messageHub.Publish<OpenWindowMessage<SettingsWindow>>();
+        => messageHub.Publish<OpenWindowMessage<SettingsWindow>>();
 }

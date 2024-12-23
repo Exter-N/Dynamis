@@ -11,4 +11,5 @@ public enum HexViewerColor : byte
     Float,
     Text,
     BadPointer,
+    VirtualTablePointer,
 }

@@ -77,6 +77,12 @@ public sealed class SettingsWindow : Window, ISingletonWindow
 
         ImGui.SameLine(0.0f, innerSpacing);
         ImGui.TextUnformatted("ClientStructs' data.yml");
+
+        var enableIpfd = configuration.EnableIpfd;
+        if (ImGui.Checkbox("Enable IPFD (In-Process Faux Debugger)", ref enableIpfd)) {
+            configuration.EnableIpfd = enableIpfd;
+            _configuration.Save(nameof(configuration.EnableIpfd));
+        }
     }
 
     private void DrawColors()

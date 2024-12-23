@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Dynamis.Interop;
 using FFXIVClientStructs.Interop;
+using ImGuiNET;
 
 namespace Dynamis.Utility;
 
@@ -60,6 +61,22 @@ internal static class TypeExtensions
             FieldType.ByteString => typeof(byte),
             FieldType.CharString => typeof(char),
             _                    => throw new ArgumentException($"Unrecognized FieldType {t}"),
+        };
+
+    public static bool IsInteger(this FieldType t)
+        => t switch
+        {
+            FieldType.Byte    => true,
+            FieldType.SByte   => true,
+            FieldType.UInt16  => true,
+            FieldType.Int16   => true,
+            FieldType.UInt32  => true,
+            FieldType.Int32   => true,
+            FieldType.UInt64  => true,
+            FieldType.Int64   => true,
+            FieldType.UIntPtr => true,
+            FieldType.IntPtr  => true,
+            _                 => false,
         };
 
     public static string Description(this FieldType t)
@@ -132,5 +149,39 @@ internal static class TypeExtensions
             FieldType.ByteString => Encoding.UTF8.GetString(bytes),
             FieldType.CharString => new string(MemoryMarshal.Cast<byte, char>(bytes)),
             _                    => throw new ArgumentException($"Unrecognized FieldType {t}"),
+        };
+    public static (ImGuiDataType DataType, string CFormat) ToImGui(this FieldType type, bool hexIntegers)
+        => type switch
+        {
+            FieldType.Byte    => (ImGuiDataType.U8, hexIntegers ? "%02X" : "%u"),
+            FieldType.SByte   => (ImGuiDataType.S8, hexIntegers ? "%02X" : "%d"),
+            FieldType.UInt16  => (ImGuiDataType.U16, hexIntegers ? "%04X" : "%u"),
+            FieldType.Int16   => (ImGuiDataType.S16, hexIntegers ? "%04X" : "%d"),
+            FieldType.UInt32  => (ImGuiDataType.U32, hexIntegers ? "%08X" : "%u"),
+            FieldType.Int32   => (ImGuiDataType.S32, hexIntegers ? "%08X" : "%d"),
+            FieldType.UInt64  => (ImGuiDataType.U64, hexIntegers ? "%016llX" : "%llu"),
+            FieldType.Int64   => (ImGuiDataType.S64, hexIntegers ? "%016llX" : "%lld"),
+            FieldType.UIntPtr => UIntPtrToImGui(hexIntegers),
+            FieldType.IntPtr  => IntPtrToImGui(hexIntegers),
+            FieldType.Single  => (ImGuiDataType.Float, "%.6f"),
+            FieldType.Double  => (ImGuiDataType.Double, "%.6f"),
+            FieldType.Pointer => UIntPtrToImGui(true),
+            _                 => throw new ArgumentException($"Unsupported FieldType {type}", nameof(type)),
+        };
+
+    private static (ImGuiDataType DataType, string CFormat) UIntPtrToImGui(bool hex)
+        => nint.Size switch
+        {
+            4 => (ImGuiDataType.U32, hex ? "%08X" : "%u"),
+            8 => (ImGuiDataType.U64, hex ? "%016llX" : "%llu"),
+            _ => throw new NotSupportedException("Only 32-bit and 64-bit pointers are supported"),
+        };
+
+    private static (ImGuiDataType DataType, string CFormat) IntPtrToImGui(bool hex)
+        => nint.Size switch
+        {
+            4 => (ImGuiDataType.S32, hex ? "%08X" : "%d"),
+            8 => (ImGuiDataType.S64, hex ? "%016llX" : "%lld"),
+            _ => throw new NotSupportedException("Only 32-bit and 64-bit pointers are supported"),
         };
 }

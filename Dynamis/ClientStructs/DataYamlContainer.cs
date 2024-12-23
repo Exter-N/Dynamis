@@ -1,49 +1,171 @@
 using Dynamis.Configuration;
+using Dynamis.Interop;
 using Dynamis.Messaging;
 using Dynamis.Utility;
 using Microsoft.Extensions.Logging;
-using YamlDotNet.Serialization;
+using YamlDotNet.RepresentationModel;
 
 namespace Dynamis.ClientStructs;
 
 public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMessage>
 {
     private readonly ConfigurationContainer     _configuration;
-    private readonly IDeserializer              _yamlDeserializer;
     private readonly ILogger<DataYamlContainer> _logger;
 
     private Lazy<DataYaml?>?                             _data;
-    private Lazy<Dictionary<string, DataYaml.Address>?>? _globalsInverse;
-    private Lazy<Dictionary<string, DataYaml.Address>?>? _functionsInverse;
-    private Lazy<Dictionary<nint, string>?>?             _classesByInstance;
-    private Lazy<Dictionary<nint, string>?>?             _classesByInstancePtr;
+    private Lazy<Dictionary<string, Address>?>?          _globalsInverse;
+    private Lazy<Dictionary<string, Address>?>?          _functionsInverse;
+    private Lazy<Dictionary<nint, InstanceName>?>?       _classesByInstance;
+    private Lazy<Dictionary<nint, InstanceName>?>?       _classesByInstancePtr;
     private Lazy<Dictionary<nint, string>?>?             _classesByVtbl;
+    private Lazy<Dictionary<nint, MemberFunctionName>?>? _memberFunctions;
+    private Lazy<Dictionary<nint, MemberFunctionName>?>? _virtualFunctions;
 
     public DataYaml? Data
         => _data!.Value;
 
-    public Dictionary<string, DataYaml.Address>? GlobalsInverse
+    public Dictionary<string, Address>? GlobalsInverse
         => _globalsInverse!.Value;
 
-    public Dictionary<string, DataYaml.Address>? FunctionsInverse
+    public Dictionary<string, Address>? FunctionsInverse
         => _functionsInverse!.Value;
 
-    public Dictionary<nint, string>? ClassesByInstance
+    public Dictionary<nint, InstanceName>? ClassesByInstance
         => _classesByInstance!.Value;
 
-    public Dictionary<nint, string>? ClassesByInstancePointer
+    public Dictionary<nint, InstanceName>? ClassesByInstancePointer
         => _classesByInstancePtr!.Value;
 
     public Dictionary<nint, string>? ClassesByVtbl
         => _classesByVtbl!.Value;
 
-    public DataYamlContainer(ConfigurationContainer configuration, IDeserializer yamlDeserializer,
-        ILogger<DataYamlContainer> logger)
+    public Dictionary<nint, MemberFunctionName>? MemberFunctions
+        => _memberFunctions!.Value;
+
+    public Dictionary<nint, MemberFunctionName>? VirtualFunctions
+        => _virtualFunctions!.Value;
+
+    public DataYamlContainer(ConfigurationContainer configuration, ILogger<DataYamlContainer> logger)
     {
         _configuration = configuration;
-        _yamlDeserializer = yamlDeserializer;
         _logger = logger;
         Refresh();
+    }
+
+    public unsafe AddressIdentification IdentifyAddress(nint address, AddressType typeHint = AddressType.All)
+    {
+        if (Data is null) {
+            return AddressIdentification.Default;
+        }
+
+        if (typeHint.HasFlag(AddressType.Instance)
+         && (ClassesByInstance?.TryGetValue(address, out var name) ?? false)) {
+            return new(AddressType.Instance, name.ClassName, name.Name);
+        }
+
+        if (typeHint.HasFlag(AddressType.VirtualTable)
+         && (ClassesByVtbl?.TryGetValue(address, out var clsName) ?? false)) {
+            return new(AddressType.VirtualTable, clsName, null);
+        }
+
+        if (typeHint.HasFlag(AddressType.Function)
+         && (Data.Functions?.TryGetValue(address, out var fnName) ?? false)) {
+            return new(AddressType.Function, string.Empty, fnName);
+        }
+
+        if (typeHint.HasFlag(AddressType.Function)
+         && (MemberFunctions?.TryGetValue(address, out var mfName) ?? false)) {
+            return new(AddressType.Function, mfName.ClassName, mfName.FunctionName);
+        }
+
+        if (typeHint.HasFlag(AddressType.Function)
+         && (Data.Globals?.TryGetValue(address, out var gName) ?? false)) {
+            return new(AddressType.Global, string.Empty, gName);
+        }
+
+        if (address != 0) {
+            if (typeHint.HasFlag(AddressType.Instance) && ClassesByInstancePointer is not null) {
+                foreach (var (pointer, name2) in ClassesByInstancePointer) {
+                    if (*(nint*)pointer == address) {
+                        return new(AddressType.Instance, name2.ClassName, name2.Name);
+                    }
+                }
+            }
+
+            if (typeHint.HasFlag(AddressType.Function) && VirtualFunctions is not null) {
+                foreach (var (pointer, vfName) in VirtualFunctions) {
+                    if (*(nint*)pointer == address) {
+                        return new(AddressType.Function, vfName.ClassName, vfName.FunctionName);
+                    }
+                }
+            }
+        }
+
+        return AddressIdentification.Default;
+    }
+
+    public IEnumerable<KeyValuePair<nint, AddressIdentification>> GetWellKnownAddresses(AddressType types)
+    {
+        static unsafe nint Resolve(DataYaml.Instance instance)
+            => instance.Pointer ? *(nint*)instance.Ea.Value : instance.Ea.Value;
+
+        static unsafe nint ReadVfuncAddress(nint vtbl, uint index)
+            => ((nint*)vtbl)[index];
+
+        if (Data is null) {
+            yield break;
+        }
+
+        if (types.HasFlag(AddressType.Global) && Data.Globals is not null) {
+            foreach (var (ea, name) in Data.Globals) {
+                yield return new(ea, new(AddressType.Global, string.Empty, name));
+            }
+        }
+
+        if (types.HasFlag(AddressType.Function) && Data.Functions is not null) {
+            foreach (var (ea, name) in Data.Functions) {
+                yield return new(ea, new(AddressType.Function, string.Empty, name));
+            }
+        }
+
+        if (Data.Classes is null) {
+            yield break;
+        }
+
+        foreach (var (className, @class) in Data.Classes) {
+            if (types.HasFlag(AddressType.Instance) && @class.Instances is not null) {
+                foreach (var instance in @class.Instances) {
+                    var ea = Resolve(instance);
+                    if (ea != 0) {
+                        yield return new(ea, new(AddressType.Instance, className, instance.Name));
+                    }
+                }
+            }
+
+            if (types.HasFlag(AddressType.VirtualTable) && @class.Vtbls is not null) {
+                foreach (var vtbl in @class.Vtbls) {
+                    yield return new(vtbl.Ea, new(AddressType.VirtualTable, className, null));
+                }
+            }
+
+            if (types.HasFlag(AddressType.Function)) {
+                if (@class.Funcs is not null) {
+                    foreach (var (ea, name) in @class.Funcs) {
+                        yield return new(ea.Value, new(AddressType.Function, className, name));
+                    }
+                }
+
+                var vtbl0 = @class.Vtbls?[0];
+                if (vtbl0 is not null && @class.Vfuncs is not null) {
+                    foreach (var (index, name) in @class.Vfuncs) {
+                        var ea = ReadVfuncAddress(vtbl0.Ea.Value, index);
+                        if (ea != 0) {
+                            yield return new(ea, new(AddressType.Function, className, name));
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private void Refresh()
@@ -54,6 +176,8 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
         _classesByInstance = new(() => MapData(data => CalculateClassesByInstance(data,    false)));
         _classesByInstancePtr = new(() => MapData(data => CalculateClassesByInstance(data, true)));
         _classesByVtbl = new(() => MapData(CalculateClassesByVtbl));
+        _memberFunctions = new(() => MapData(CalculateMemberFunctions));
+        _virtualFunctions = new(() => MapData(CalculateVirtualFunctions));
     }
 
     public void HandleMessage(ConfigurationChangedMessage message)
@@ -77,9 +201,11 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
 
         try {
             using var reader = File.OpenText(path);
-            return _yamlDeserializer.Deserialize<DataYaml>(reader);
+            var yamlStream = new YamlStream();
+            yamlStream.Load(reader);
+            return DataYaml.Parse(yamlStream.Documents[0].RootNode, _logger);
         } catch (Exception e) {
-            _logger.LogError(e, "Could not deserialize {Path}", path);
+            _logger.LogError(e, "Could not parse {Path}", path);
             return null;
         }
     }
@@ -90,22 +216,18 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
         return data is null ? null : function(data);
     }
 
-    private static Dictionary<nint, string> CalculateClassesByInstance(DataYaml data, bool pointer)
+    private static Dictionary<nint, InstanceName> CalculateClassesByInstance(DataYaml data, bool pointer)
     {
-        var classesByInstance = new Dictionary<nint, string>();
+        var classesByInstance = new Dictionary<nint, InstanceName>();
         if (data.Classes is not null) {
-            foreach (var (name, @class) in data.Classes) {
-                if (@class?.Instances is null) {
+            foreach (var (className, @class) in data.Classes) {
+                if (@class.Instances is null) {
                     continue;
                 }
 
                 foreach (var instance in @class.Instances) {
-                    if (instance is null) {
-                        continue;
-                    }
-
                     if (instance.Pointer == pointer) {
-                        classesByInstance.Add(instance.Ea, name);
+                        classesByInstance.Add(instance.Ea, new(className, instance.Name));
                     }
                 }
             }
@@ -119,15 +241,11 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
         var classesByInstance = new Dictionary<nint, string>();
         if (data.Classes is not null) {
             foreach (var (name, @class) in data.Classes) {
-                if (@class?.Vtbls is null) {
+                if (@class.Vtbls is null) {
                     continue;
                 }
 
                 foreach (var vtbl in @class.Vtbls) {
-                    if (vtbl is null) {
-                        continue;
-                    }
-
                     classesByInstance.Add(vtbl.Ea, name);
                 }
             }
@@ -135,4 +253,49 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
 
         return classesByInstance;
     }
+
+    private static Dictionary<nint, MemberFunctionName> CalculateMemberFunctions(DataYaml data)
+    {
+        var memberFunctions = new Dictionary<nint, MemberFunctionName>();
+        if (data.Classes is not null) {
+            foreach (var (name, @class) in data.Classes) {
+                if (@class.Funcs is null) {
+                    continue;
+                }
+
+                foreach (var (address, fName) in @class.Funcs) {
+                    memberFunctions.Add(address, new(name, fName));
+                }
+            }
+        }
+
+        return memberFunctions;
+    }
+
+    private static unsafe Dictionary<nint, MemberFunctionName> CalculateVirtualFunctions(DataYaml data)
+    {
+        var virtualFunctions = new Dictionary<nint, MemberFunctionName>();
+        if (data.Classes is not null) {
+            foreach (var (name, @class) in data.Classes) {
+                if (@class.Vfuncs is null) {
+                    continue;
+                }
+
+                var vtbl = @class.Vtbls?.FirstOrDefault();
+                if (vtbl is null) {
+                    continue;
+                }
+
+                var vtblEa = vtbl.Ea.Value;
+                foreach (var (index, fName) in @class.Vfuncs) {
+                    virtualFunctions.Add(vtblEa + (nint)index * sizeof(nint), new(name, fName));
+                }
+            }
+        }
+
+        return virtualFunctions;
+    }
+
+    public record struct InstanceName(string ClassName, string? Name);
+    public record struct MemberFunctionName(string ClassName, string FunctionName);
 }

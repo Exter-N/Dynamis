@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Dalamud.Plugin.Services;
 using Dalamud.Utility.Signatures;
 using Dynamis.Interop.Win32;
@@ -7,13 +7,16 @@ namespace Dynamis.Interop;
 
 public sealed class MemoryHeuristics
 {
+    private readonly Ipfd.Ipfd _ipfd;
+
     [Signature("E8 ?? ?? ?? ?? 48 C7 04")] private nint _freeMemory = 0;
 
     [Signature("E8 ?? ?? ?? ?? 48 8B C3 48 83 C4 ?? 5F 5D")]
     private nint _freeMemory2 = 0;
 
-    public MemoryHeuristics(IGameInteropProvider gameInteropProvider)
+    public MemoryHeuristics(Ipfd.Ipfd ipfd, IGameInteropProvider gameInteropProvider)
     {
+        _ipfd = ipfd;
         gameInteropProvider.InitializeFromAttributes(this);
     }
 
@@ -47,7 +50,9 @@ public sealed class MemoryHeuristics
 
         var endOfPage = (dtor + pageSize) & ~(pageSize - 1);
         var searchPtr = (byte*)dtor.ToPointer();
-        var restOfPage = new ReadOnlySpan<byte>(searchPtr, (endOfPage - dtor).ToInt32());
+        var pageSnapshot = new byte[(endOfPage - dtor).ToInt32()];
+        _ipfd.Copy<byte>((nint)searchPtr, pageSnapshot.Length, pageSnapshot);
+        var restOfPage = (ReadOnlySpan<byte>)pageSnapshot;
         int candidatePos;
         while (restOfPage.Length >= 10 && (candidatePos = restOfPage.IndexOf((byte)0xBA)) >= 0) {
             searchPtr += candidatePos + 1;
@@ -58,15 +63,15 @@ public sealed class MemoryHeuristics
 
             nint calledFunction;
             if (restOfPage[4] == 0xE8) {
-                calledFunction = new(searchPtr + 9 + Unsafe.ReadUnaligned<int>(searchPtr + 5));
+                calledFunction = new(searchPtr + 9 + MemoryMarshal.Read<int>(restOfPage[5..]));
             } else if (IsMovToRcx(restOfPage[4..7]) && restOfPage[7] == 0xE8 && restOfPage.Length >= 12) {
-                calledFunction = new(searchPtr + 12 + Unsafe.ReadUnaligned<int>(searchPtr + 8));
+                calledFunction = new(searchPtr + 12 + MemoryMarshal.Read<int>(restOfPage[8..]));
             } else {
                 continue;
             }
 
             if (_freeMemory != 0 && calledFunction == _freeMemory || _freeMemory2 != 0 && calledFunction == _freeMemory2) {
-                return Unsafe.ReadUnaligned<uint>(searchPtr);
+                return MemoryMarshal.Read<uint>(restOfPage);
             }
         }
 

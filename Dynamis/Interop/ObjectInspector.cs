@@ -1,35 +1,99 @@
-using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Dynamis.ClientStructs;
 using Dynamis.Interop.Win32;
-using Dynamis.Messaging;
 using Dynamis.UI;
-using Dynamis.Utility;
-using FFXIVClientStructs.STD;
-using Microsoft.Extensions.Logging;
 
 namespace Dynamis.Interop;
 
-public sealed class ObjectInspector : IMessageObserver<ConfigurationChangedMessage>
+public sealed class ObjectInspector(
+    DataYamlContainer dataYamlContainer,
+    MemoryHeuristics memoryHeuristics,
+    AddressIdentifier addressIdentifier,
+    ClassRegistry classRegistry,
+    Ipfd.Ipfd ipfd)
 {
-    private readonly DataYamlContainer        _dataYamlContainer;
-    private readonly MemoryHeuristics         _memoryHeuristics;
-    private readonly ILogger<ObjectInspector> _logger;
+    private unsafe T Read<T>(nint address, bool safe) where T : unmanaged
+        => safe ? ipfd.Read<T>(address) : *(T*)address;
 
-    private readonly Dictionary<string, ClassInfo> _classCache = new();
-
-    public ObjectInspector(DataYamlContainer dataYamlContainer, MemoryHeuristics memoryHeuristics, ILogger<ObjectInspector> logger)
+    public ObjectSnapshot TakeSnapshot(nint objectAddress, ClassInfo? @class = null, string? name = null,
+        bool safeReads = true)
     {
-        _dataYamlContainer = dataYamlContainer;
-        _memoryHeuristics = memoryHeuristics;
-        _logger = logger;
+        var snapshot = TakeMinimalSnapshot(objectAddress, @class, safeReads);
+        snapshot.Name = name;
+        CompleteSnapshot(snapshot, safeReads);
+        return snapshot;
     }
 
-    public unsafe ClassInfo DetermineClass(nint objectAddress)
+    public unsafe ObjectSnapshot TakeMinimalSnapshot(nint objectAddress, ClassInfo? @class = null, bool safeReads = true)
     {
-        if (!VirtualMemory.GetProtection(objectAddress).CanRead()) {
+        @class ??= DetermineClass(objectAddress, safeReads);
+        var data = new byte[@class.EstimatedSize];
+        if (safeReads) {
+            ipfd.Copy<byte>(objectAddress, data.Length, data);
+        } else {
+            new ReadOnlySpan<byte>((void*)objectAddress, data.Length).CopyTo(data);
+        }
+
+        return new(data)
+        {
+            Address = objectAddress,
+            Class = @class,
+        };
+    }
+
+    public void CompleteSnapshot(ObjectSnapshot snapshot, bool safeReads = true)
+    {
+        var colors = new byte[snapshot.Data.Length];
+        Highlight(snapshot.Data, snapshot.Class, colors, safeReads);
+        if (snapshot.Address is
+            {
+            } objectAddress) {
+            snapshot.Name ??= addressIdentifier.Identify(objectAddress).Describe();
+        }
+
+        snapshot.HighlightColors = colors;
+    }
+
+    public unsafe (uint ThreadId, ObjectSnapshot Context) TakeThreadStateSnapshot(ExceptionPointers* exceptionInfo)
+    {
+        var threadId = ProcessThreadApi.GetCurrentThreadId();
+        var context = TakeMinimalSnapshot(
+            (nint)exceptionInfo->ContextRecord, classRegistry.FromManagedType(typeof(Context)), false
+        );
+        context.Name = $"Context of thread {threadId}";
+        context.Live = false;
+
+        var stackPointer = unchecked((nint)exceptionInfo->ContextRecord->Rsp & -8);
+        ProcessThreadApi.GetCurrentThreadStackLimits(out var stackLowLimit, out var stackHighLimit);
+        var stack = TakeMinimalSnapshot(
+            stackPointer,
+            PseudoClasses.Generate(
+                "<Thread Stack>",
+                stackPointer >= stackLowLimit && stackPointer <= stackHighLimit
+                    ? (uint)(stackHighLimit - stackPointer).ToInt32()
+                    : (uint)(MemoryHeuristics.NextPage(stackPointer) - stackPointer).ToInt32(),
+                PseudoClasses.Template.None,
+                ClassKind.ThreadStack
+            ),
+            false
+        );
+        stack.Name = $"Stack of thread {threadId}";
+        stack.Live = false;
+
+        context.AssociatedSnapshot = stack;
+
+        return (threadId, context);
+    }
+
+    public ClassInfo DetermineClass(nint objectAddress, bool safeReads = true)
+    {
+        var protection = VirtualMemory.GetProtection(objectAddress);
+        if (!protection.CanRead()) {
             return new ClassInfo();
+        }
+
+        if (protection.CanExecute()) {
+            return classRegistry.GetFunctionClass(objectAddress, safeReads);
         }
 
         var restOfPageSize = (uint)(MemoryHeuristics.NextPage(objectAddress) - objectAddress).ToInt32();
@@ -42,97 +106,53 @@ public sealed class ObjectInspector : IMessageObserver<ConfigurationChangedMessa
             };
         }
 
-        var vtbl = *(nint*)objectAddress.ToPointer();
-        var className = DetermineClassName(objectAddress, vtbl);
-        if (_classCache.TryGetValue(className, out var classInfo)) {
-            return classInfo;
+        var vtbl = Read<nint>(objectAddress, safeReads);
+        if ((vtbl & (nint.Size - 1)) == 0 && VirtualMemory.GetProtection(vtbl).CanExecute()
+                                          && memoryHeuristics.EstimateSizeFromDtor(vtbl) is
+                                             {
+                                             } ownerSize) {
+            // objectAddress is actually a vtbl and vtbl is actually a dtor
+            return classRegistry.GetVirtualTableClass(
+                DetermineClassName(0, objectAddress).ClassName, objectAddress, ownerSize, safeReads
+            );
         }
 
-        classInfo = new ClassInfo
-        {
-            Name = className,
-        };
-
-        PopulateFromVtbl(classInfo, vtbl);
-        PopulateFromClientStructs(classInfo);
-        PopulateAggregates(classInfo, restOfPageSize);
-
-        _classCache.Add(className, classInfo);
-        return classInfo;
+        return classRegistry.GetClass(DetermineClassName(objectAddress, vtbl).ClassName, vtbl, restOfPageSize);
     }
 
-    public unsafe (AddressType Type, string Name) IdentifyAddress(nint address)
+    private unsafe DataYamlContainer.InstanceName DetermineClassName(nint objectAddress, nint vtbl)
     {
-        if (_dataYamlContainer.Data is not null) {
-            if (_dataYamlContainer.ClassesByInstance!.TryGetValue(address, out var className)) {
-                return (AddressType.Instance, className);
+        if (dataYamlContainer.Data is not null) {
+            if (objectAddress != 0 && dataYamlContainer.ClassesByInstance!.TryGetValue(objectAddress, out var name)) {
+                return name;
             }
 
-            if (_dataYamlContainer.ClassesByVtbl!.TryGetValue(address, out className)) {
-                return (AddressType.Vtbl, className);
+            if (vtbl != 0 && dataYamlContainer.ClassesByVtbl!.TryGetValue(vtbl, out var className)) {
+                return new(className, null);
             }
 
-            foreach (var (pointer, clsName) in _dataYamlContainer.ClassesByInstancePointer!) {
-                if (*(nint*)pointer.ToPointer() == address) {
-                    return (AddressType.Instance, clsName);
+            if (objectAddress != 0) {
+                foreach (var (pointer, name2) in dataYamlContainer.ClassesByInstancePointer!) {
+                    if (*(nint*)pointer == objectAddress) {
+                        return name2;
+                    }
                 }
             }
         }
 
-        return (AddressType.None, string.Empty);
+        return new($"Cls_{vtbl:X}", null);
     }
 
-    public ClassInfo FromClientStructs(Type type)
+    private void Highlight(ReadOnlySpan<byte> objectBytes, ClassInfo? classInfo, Span<byte> byteColors, bool safeReads = true)
     {
-        var typeName = type.FullName;
-        if (typeName is null || !typeName.StartsWith("FFXIVClientStructs.FFXIV.")) {
-            throw new ArgumentException($"Invalid type {type}");
+        if (classInfo is not null) {
+            HighlightInstance(objectBytes, classInfo, byteColors, safeReads);
         }
 
-        var className = typeName.Substring(25).Replace(".", "::");
-        if (_classCache.TryGetValue(className, out var classInfo)) {
-            return classInfo;
-        }
-
-        classInfo = new ClassInfo
-        {
-            Name = className,
-            ClientStructsType = type,
-        };
-
-        if (_dataYamlContainer.Data?.Classes?.TryGetValue(className, out var dataClass) ?? false) {
-            var vtbl = dataClass?.Vtbls?[0]?.Ea.Value;
-            if (vtbl.HasValue) {
-                PopulateFromVtbl(classInfo, vtbl.Value);
-            }
-        }
-
-        PopulateFromClientStructs(classInfo);
-        PopulateAggregates(classInfo, (uint)Environment.SystemPageSize);
-
-        _classCache.Add(className, classInfo);
-        return classInfo;
+        HighlightPointers(objectBytes, byteColors, safeReads);
     }
 
-    private unsafe string DetermineClassName(nint objectAddress, nint vtbl)
-    {
-        if (_dataYamlContainer.Data is not null) {
-            if (_dataYamlContainer.ClassesByInstance!.TryGetValue(objectAddress, out var className)
-             || _dataYamlContainer.ClassesByVtbl!.TryGetValue(vtbl, out className)) {
-                return className;
-            }
-
-            foreach (var (pointer, clsName) in _dataYamlContainer.ClassesByInstancePointer!) {
-                if (*(nint*)pointer.ToPointer() == objectAddress) {
-                    return clsName;
-                }
-            }
-        }
-
-        return $"Cls_{vtbl:X}";
-    }
-
-    public void Highlight(ReadOnlySpan<byte> objectBytes, ClassInfo classInfo, Span<byte> byteColors, bool nested = false)
+    private void HighlightInstance(ReadOnlySpan<byte> objectBytes, ClassInfo classInfo, Span<byte> byteColors, bool safeReads)
     {
         foreach (var fieldInfo in classInfo.Fields) {
             switch (fieldInfo.Type) {
@@ -144,17 +164,22 @@ public sealed class ObjectInspector : IMessageObserver<ConfigurationChangedMessa
                 case FieldType.Int32:
                 case FieldType.UInt64:
                 case FieldType.Int64:
-                    byteColors[(int)fieldInfo.Offset..(int)(fieldInfo.Offset + fieldInfo.Size)].Fill((byte)HexViewerColor.Integer);
+                    byteColors[(int)fieldInfo.Offset..(int)(fieldInfo.Offset + fieldInfo.Size)]
+                       .Fill((byte)HexViewerColor.Integer);
                     break;
                 case FieldType.Half:
                 case FieldType.Single:
                 case FieldType.Double:
-                    byteColors[(int)fieldInfo.Offset..(int)(fieldInfo.Offset + fieldInfo.Size)].Fill((byte)HexViewerColor.Float);
+                    byteColors[(int)fieldInfo.Offset..(int)(fieldInfo.Offset + fieldInfo.Size)]
+                       .Fill((byte)HexViewerColor.Float);
                     break;
                 case FieldType.ByteString:
                     for (var i = 0u; i < fieldInfo.Size; ++i) {
-                        byteColors[(int)(fieldInfo.Offset + i)] = (byte)(objectBytes[(int)(fieldInfo.Offset + i)] == 0 ? HexViewerColor.Null : HexViewerColor.Text);
+                        byteColors[(int)(fieldInfo.Offset + i)] = (byte)(objectBytes[(int)(fieldInfo.Offset + i)] == 0
+                            ? HexViewerColor.Null
+                            : HexViewerColor.Text);
                     }
+
                     break;
                 case FieldType.Char:
                 case FieldType.CharString:
@@ -166,11 +191,13 @@ public sealed class ObjectInspector : IMessageObserver<ConfigurationChangedMessa
                         byteColors[(int)(fieldInfo.Offset + i)] = color;
                         byteColors[(int)(fieldInfo.Offset + i + 1)] = color;
                     }
-                    byteColors[(int)fieldInfo.Offset..(int)(fieldInfo.Offset + fieldInfo.Size)].Fill((byte)HexViewerColor.Text);
+
                     break;
                 case FieldType.Pointer:
                     for (var i = 0u; i < fieldInfo.Size; i += (uint)nint.Size) {
-                        var value = MemoryMarshal.Cast<byte, nint>(objectBytes[(int)(fieldInfo.Offset + i)..(int)(fieldInfo.Offset + i + nint.Size)])[0];
+                        var value = MemoryMarshal.Cast<byte, nint>(
+                            objectBytes[(int)(fieldInfo.Offset + i)..(int)(fieldInfo.Offset + i + nint.Size)]
+                        )[0];
                         byte color;
                         if (value == 0) {
                             color = (byte)HexViewerColor.Null;
@@ -181,255 +208,62 @@ public sealed class ObjectInspector : IMessageObserver<ConfigurationChangedMessa
                             } else if (!protect.CanRead()) {
                                 color = (byte)HexViewerColor.BadPointer;
                             } else {
-                                color = (byte)(DetermineClass(value).IsClass ? HexViewerColor.ObjectPointer : HexViewerColor.Pointer);
+                                color = (byte)GetClassColor(DetermineClass(value, safeReads));
                             }
                         }
+
                         byteColors[(int)(fieldInfo.Offset + i)..(int)(fieldInfo.Offset + i + nint.Size)].Fill(color);
                     }
+
                     break;
             }
 
             if (fieldInfo.ElementClass is not null) {
                 for (var elOffset = 0u; elOffset < fieldInfo.Size; elOffset += fieldInfo.ElementClass.EstimatedSize) {
-                    Highlight(
+                    HighlightInstance(
                         objectBytes[
                             (int)(fieldInfo.Offset + elOffset)..(int)(fieldInfo.Offset + elOffset
                               + fieldInfo.ElementClass.EstimatedSize)], fieldInfo.ElementClass,
                         byteColors[
                             (int)(fieldInfo.Offset + elOffset)..(int)(fieldInfo.Offset + elOffset
-                              + fieldInfo.ElementClass.EstimatedSize)], true
+                              + fieldInfo.ElementClass.EstimatedSize)], safeReads
                     );
                 }
             }
         }
-
-        if (!nested) {
-            for (var i = 0; i + nint.Size - 1 < objectBytes.Length; i += nint.Size) {
-                if (MemoryMarshal.Cast<byte, nint>(byteColors[i..(i + nint.Size)])[0] == 0) {
-                    var value = MemoryMarshal.Cast<byte, nint>(objectBytes[i..(i + nint.Size)])[0];
-                    byte color;
-                    if (value == 0) {
-                        color = (byte)HexViewerColor.Null;
-                    } else {
-                        var protect = VirtualMemory.GetProtection(value);
-                        if (protect.CanExecute()) {
-                            color = (byte)HexViewerColor.CodePointer;
-                        } else if (!protect.CanRead()) {
-                            color = (byte)HexViewerColor.Default;
-                        } else {
-                            color = (byte)(DetermineClass(value).IsClass ? HexViewerColor.ObjectPointer : HexViewerColor.Pointer);
-                        }
-                    }
-                    byteColors[i..(i + nint.Size)].Fill(color);
-                }
-            }
-        }
     }
 
-    private unsafe void PopulateFromVtbl(ClassInfo classInfo, nint vtbl)
+    private void HighlightPointers(ReadOnlySpan<byte> objectBytes, Span<byte> byteColors, bool safeReads)
     {
-        var dtor = VirtualMemory.GetProtection(vtbl).CanRead() ? *(nint*)vtbl.ToPointer() : 0;
-        classInfo.SizeFromDtor = _memoryHeuristics.EstimateSizeFromDtor(dtor);
-
-        if ((_dataYamlContainer.Data?.Classes?.TryGetValue(classInfo.Name, out var @class) ?? false)
-         && @class?.Vtbls is not null) {
-            foreach (var vt in @class.Vtbls) {
-                if (vt is null) {
-                    continue;
-                }
-
-                if (vt.Ea != vtbl) {
-                    dtor = *(nint*)vt.Ea.Value.ToPointer();
-                    var sizeFromDtor = _memoryHeuristics.EstimateSizeFromDtor(dtor);
-                    if (sizeFromDtor.HasValue && (!classInfo.SizeFromDtor.HasValue
-                                               || classInfo.SizeFromDtor.Value < sizeFromDtor.Value)) {
-                        classInfo.SizeFromDtor = sizeFromDtor;
-                    }
-                }
-            }
-        }
-    }
-
-    private void PopulateFromClientStructs(ClassInfo classInfo)
-    {
-        if (_dataYamlContainer.Data is not null) {
-            classInfo.DataYamlClass = _dataYamlContainer.Data.Classes?.GetValueOrDefault(classInfo.Name);
-            var parents = new List<(string, DataYaml.Class)>();
-            var currentClass = classInfo.DataYamlClass;
-            for (;;) {
-                if (currentClass?.Vtbls is null || currentClass.Vtbls.Count == 0) {
-                    break;
-                }
-
-                var parentName = currentClass.Vtbls[0]?.Base;
-                if (parentName is null) {
-                    break;
-                }
-
-                currentClass = _dataYamlContainer.Data.Classes!.GetValueOrDefault(parentName);
-                if (currentClass is null) {
-                    break;
-                }
-
-                parents.Add((parentName, currentClass));
-            }
-
-            classInfo.DataYamlParents = parents.ToArray();
-        }
-
-        classInfo.ClientStructsType ??= ResolveClientStructsType(classInfo.Name);
-        if (classInfo.ClientStructsType is not null) {
-            // Cannot use Marshal.SizeOf as it fails on certain types.
-            classInfo.SizeFromClientStructs = (uint)UnsafeSizeOf(classInfo.ClientStructsType);
-            classInfo.Fields = GetFieldsFromClientStructs(classInfo.ClientStructsType).ToArray();
-            Array.Sort(classInfo.Fields);
-        }
-
-        classInfo.ClientStructsParents = classInfo.DataYamlParents
-                                                  .Select(yamlClass => ResolveClientStructsType(yamlClass.Name))
-                                                  .OfType<Type>()
-                                                  .ToArray();
-        if (classInfo.ClientStructsType is null && classInfo.ClientStructsParents.Length > 0) {
-            classInfo.Fields = GetFieldsFromClientStructs(classInfo.ClientStructsParents[0]).ToArray();
-            Array.Sort(classInfo.Fields);
-        }
-    }
-
-    private Type? ResolveClientStructsType(string className)
-        => typeof(StdString).Assembly.GetType("FFXIVClientStructs.FFXIV." + className.Replace("::", "."));
-
-    private IEnumerable<FieldInfo> GetFieldsFromClientStructs(Type type, uint offset = 0, string prefix = "", bool isInherited = false)
-    {
-        var inherited = GetCustomAttributes(type, "InheritsAttribute`1")
-                       .Select(attr => attr.GetType().GetGenericArguments()[0].FullName)
-                       .OfType<string>()
-                       .ToArray();
-        foreach (var reflField in type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)) {
-            if (GetCustomAttribute(reflField, "CExportIgnoreAttribute") is not null) {
+        for (var i = 0; i + nint.Size - 1 < objectBytes.Length; i += nint.Size) {
+            if (MemoryMarshal.Cast<byte, nint>(byteColors[i..(i + nint.Size)])[0] != 0) {
                 continue;
             }
 
-            if (GetCustomAttribute(reflField, "FixedSizeArrayAttribute") is {} fsaAttribute) {
-                var typeName = reflField.FieldType.Name;
-                if (typeName.StartsWith("FixedSizeArray") && reflField.FieldType.IsGenericType) {
-                    var elementType = reflField.FieldType.GetGenericArguments()[0];
-                    var isString = (bool)((dynamic)fsaAttribute).IsString;
-                    var elementFieldType = elementType.ToFieldType(isString);
-                    FieldInfo field;
-                    try {
-                        field = new FieldInfo
-                        {
-                            Name = prefix + reflField.Name,
-                            Offset = offset + (uint)OffsetOf(reflField),
-                            Size = (uint)UnsafeSizeOf(reflField.FieldType),
-                        };
-                        if (elementFieldType.HasValue) {
-                            field.Type = elementFieldType.Value;
-                            field.EnumType = elementType.IsEnum ? elementType : null;
-                        } else {
-                            field.Type = FieldType.ObjectArray;
-                            field.ElementClass = FromClientStructs(elementType);
-                        }
-                    } catch (Exception e) {
-                        _logger.LogError(e, "Error while analyzing field {Field} of class {Class}", reflField.Name, type);
-                        continue;
-                    }
-
-                    yield return field;
-
-                    continue;
+            var value = MemoryMarshal.Cast<byte, nint>(objectBytes[i..(i + nint.Size)])[0];
+            byte color;
+            if (value == 0) {
+                color = (byte)HexViewerColor.Null;
+            } else {
+                var protect = VirtualMemory.GetProtection(value);
+                if (protect.CanExecute()) {
+                    color = (byte)HexViewerColor.CodePointer;
+                } else if (!protect.CanRead()) {
+                    color = (byte)HexViewerColor.Default;
+                } else {
+                    color = (byte)GetClassColor(DetermineClass(value, safeReads));
                 }
             }
 
-            var fieldType = reflField.FieldType.ToFieldType();
-            if (fieldType.HasValue) {
-                if (!isInherited) {
-                    FieldInfo field;
-                    try {
-                        field = new FieldInfo
-                        {
-                            Name = prefix + reflField.Name,
-                            Offset = offset + (uint)OffsetOf(reflField),
-                            Size =
-                                (uint)(reflField.FieldType.IsPointer ? nint.Size : UnsafeSizeOf(reflField.FieldType)),
-                            Type = fieldType.Value,
-                            EnumType = reflField.FieldType.IsEnum ? reflField.FieldType : null,
-                        };
-                    } catch (Exception e) {
-                        _logger.LogError(e, "Error while analyzing field {Field} of class {Class}", reflField.Name, type);
-                        continue;
-                    }
-
-                    yield return field;
-                }
-
-                continue;
-            }
-
-            if (reflField.FieldType.IsValueType) {
-                var inheritanceField = IsInheritedField(reflField.FieldType, reflField.Name, type, inherited);
-                if (!isInherited || inheritanceField) {
-                    IEnumerable<FieldInfo> fields;
-                    try {
-                        fields = GetFieldsFromClientStructs(
-                            reflField.FieldType, offset + (uint)OffsetOf(reflField),
-                            $"{prefix}{reflField.Name}.",
-                            inheritanceField
-                        );
-                    } catch (Exception e) {
-                        _logger.LogError(e, "Error while analyzing field {Field} of class {Class}", reflField.Name, type);
-                        continue;
-                    }
-
-                    foreach (var field in fields) {
-                        yield return field;
-                    }
-                }
-            }
+            byteColors[i..(i + nint.Size)].Fill(color);
         }
     }
 
-    private static bool IsInheritedField(Type fieldType, string fieldName, Type declaringType, string[] inheritedTypeNames)
-        => Array.IndexOf(inheritedTypeNames, fieldType.FullName) >= 0 && fieldName == (fieldType.Name == declaringType.Name ? $"{fieldType.Name}Base" : fieldType.Name);
-
-    private static int UnsafeSizeOf(Type type)
-        => (int)typeof(Unsafe).GetMethod(nameof(Unsafe.SizeOf))!.MakeGenericMethod(type).Invoke(null, null)!;
-
-    private static nint OffsetOf(System.Reflection.FieldInfo field)
-    {
-        try {
-            return Marshal.OffsetOf(field.ReflectedType!, field.Name);
-        } catch (ArgumentException) {
-            if (field.ReflectedType is not null && field.ReflectedType.IsExplicitLayout) {
-                var fieldOffset = field.GetCustomAttribute<FieldOffsetAttribute>();
-                if (fieldOffset is not null) {
-                    return fieldOffset.Value;
-                }
-            }
-
-            throw;
-        }
-    }
-
-    private static Attribute? GetCustomAttribute(MemberInfo member, string attributeName)
-        => member.GetCustomAttributes().FirstOrDefault(attribute => attribute.GetType().Name == attributeName);
-
-    private static IEnumerable<Attribute> GetCustomAttributes(MemberInfo member, string attributeName)
-        => member.GetCustomAttributes().Where(attribute => attribute.GetType().Name == attributeName);
-
-    private void PopulateAggregates(ClassInfo classInfo, uint restOfPageSize)
-    {
-        if (classInfo.SizeFromDtor.HasValue || classInfo.SizeFromClientStructs.HasValue) {
-            classInfo.EstimatedSize = Math.Max(classInfo.SizeFromDtor ?? 0, classInfo.SizeFromClientStructs ?? 0);
-        } else {
-            classInfo.EstimatedSize = restOfPageSize;
-        }
-    }
-
-    public void HandleMessage(ConfigurationChangedMessage message)
-    {
-        if (message.IsPropertyChanged(nameof(Configuration.Configuration.DataYamlPath))) {
-            _classCache.Clear();
-        }
-    }
+    private static HexViewerColor GetClassColor(ClassInfo @class)
+        => @class.Kind switch
+        {
+            ClassKind.Function     => HexViewerColor.CodePointer,
+            ClassKind.VirtualTable => HexViewerColor.VirtualTablePointer,
+            _                      => @class.IsClass ? HexViewerColor.ObjectPointer : HexViewerColor.Pointer,
+        };
 }

@@ -28,7 +28,7 @@ public sealed unsafe class ResourceHandleInspector : IObjectInspector<ResourceHa
         }
     }
 
-    public void DrawAdditionalHeaderDetails(ResourceHandle* pointer, ObjectInspectorWindow window)
+    public void DrawAdditionalHeaderDetails(ResourceHandle* pointer, ObjectSnapshot snapshot, bool live, ObjectInspectorWindow window)
     {
         DrawAdditionalTooltipDetails(pointer);
         var data = pointer->GetData();
@@ -42,7 +42,8 @@ public sealed unsafe class ResourceHandleInspector : IObjectInspector<ResourceHa
         _imGuiComponents.DrawPointer(
             (nint)data,
             () => PseudoClasses.Generate(
-                $"<Resource Contents> {pointer->FileName}", (uint)length, PseudoClasses.Template.None
+                $"<Resource Contents> {pointer->FileName}", (uint)length, PseudoClasses.Template.None,
+                ClassKind.ResourceContents
             )
         );
 
@@ -75,7 +76,7 @@ public sealed unsafe class ResourceHandleInspector : IObjectInspector<ResourceHa
         };
     }
 
-    public void DrawAdditionalTabs(ResourceHandle* pointer, ObjectInspectorWindow window)
+    public void DrawAdditionalTabs(ResourceHandle* pointer, ObjectSnapshot snapshot, bool live, ObjectInspectorWindow window)
     {
     }
 }

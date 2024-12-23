@@ -38,7 +38,7 @@ public sealed class CommandHandler : IHostedService, IMessageObserver<OpenDalamu
     }
 
     private void OnCommand(string command, string args)
-        => _messageHub.Publish<OpenWindowMessage<HomeWindow>>();
+        => _messageHub.Publish<OpenWindowMessage<ToolboxWindow>>();
 
     public void HandleMessage(OpenDalamudConsoleMessage _)
         => _commandManager.ProcessCommand("/xllog");

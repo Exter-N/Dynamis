@@ -46,7 +46,10 @@ internal static class DependencyInjectionExtensions
     {
         var t = typeof(T);
         foreach (var type in assembly.GetTypes()
-                                     .Where(type => type.IsClass && !type.IsAbstract && t.IsAssignableFrom(type))) {
+                                     .Where(
+                                          type => type.IsClass && !type.IsAbstract && !type.IsInterface
+                                               && !type.IsGenericTypeDefinition && t.IsAssignableFrom(type)
+                                      )) {
             collection.AddSingleton(type);
         }
     }

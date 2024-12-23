@@ -18,6 +18,7 @@ public sealed class Configuration : IPluginConfiguration
             0xFF80FFFF,
             0xFF8080FF,
             0xFF0000FF,
+            0xFFFF80C0,
         ];
 
     public int Version { get; set; } = 0;
@@ -27,6 +28,8 @@ public sealed class Configuration : IPluginConfiguration
     public string DataYamlPath { get; set; } = string.Empty;
 
     public uint[] HexViewerPalette { get; set; } = [];
+
+    public bool EnableIpfd { get; set; } = false;
 
     public uint[] GetHexViewerPalette()
     {
