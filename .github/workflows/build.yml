@@ -15,7 +15,6 @@ jobs:
           submodules: recursive
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1.10.1
-        working-directory: ./ipfd
       - name: Setup .NET
         uses: actions/setup-dotnet@v1
         with:
@@ -27,9 +26,9 @@ jobs:
           Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/stg/latest.zip -OutFile latest.zip
           Expand-Archive -Force latest.zip "$env:AppData\XIVLauncher\addon\Hooks\dev\"
       - name: Build IPFD
+        working-directory: ipfd
         run: |
           cargo build --release
-        working-directory: ipfd
       - name: Build plugin
         run: |
           dotnet build --no-restore --configuration Release --nologo
