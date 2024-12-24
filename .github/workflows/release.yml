@@ -73,6 +73,7 @@ jobs:
           $ver = '${{ github.ref_name }}'
           $path = './repo.json'
           git fetch origin dalamondieu
+          git reset --hard HEAD
           git checkout dalamondieu
           $json = Get-Content -Raw $path | ConvertFrom-Json
           $json[0].AssemblyVersion = $ver

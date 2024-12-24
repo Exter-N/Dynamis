@@ -74,6 +74,7 @@ jobs:
           $ver = $verT -replace 'testing_'
           $path = './repo.json'
           git fetch origin dalamondieu
+          git reset --hard HEAD
           git checkout dalamondieu
           $json = Get-Content -Raw $path | ConvertFrom-Json
           $json[0].TestingAssemblyVersion = $ver
