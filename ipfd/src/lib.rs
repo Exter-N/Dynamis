@@ -4,8 +4,11 @@ mod message_loop_thread;
 mod thread_control;
 
 use std::{
-    mem::{forget, replace, take},
-    sync::atomic::{AtomicUsize, Ordering},
+    mem::forget,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        RwLock,
+    },
 };
 
 use ipfd_impl::Breakpoint;
@@ -21,7 +24,7 @@ use windows::{
     },
 };
 
-static mut THREAD: Option<IpfdThread> = None;
+static THREAD: RwLock<Option<IpfdThread>> = RwLock::new(None);
 static RC: AtomicUsize = AtomicUsize::new(0);
 
 #[no_mangle]
@@ -40,7 +43,13 @@ pub extern "system" fn DllMain(dll_module: HINSTANCE, call_reason: u32, _: *mut 
 }
 
 fn send(message: IpfdMessage) -> HRESULT {
-    if let Some(thread) = unsafe { &THREAD } {
+    let guard = match THREAD.read() {
+        Ok(guard) => guard,
+        Err(_) => {
+            return ERROR_INVALID_STATE.to_hresult();
+        }
+    };
+    if let Some(thread) = guard.as_ref() {
         thread.send(message);
         S_OK
     } else {
@@ -52,7 +61,13 @@ fn send(message: IpfdMessage) -> HRESULT {
 pub extern "C" fn ipfd_initialize() -> HRESULT {
     match RC.fetch_add(1, Ordering::SeqCst) {
         0 => {
-            forget(replace(unsafe { &mut THREAD }, Some(IpfdThread::new())));
+            let mut guard = match THREAD.write() {
+                Ok(guard) => guard,
+                Err(_) => {
+                    return ERROR_INVALID_STATE.to_hresult();
+                }
+            };
+            forget(guard.replace(IpfdThread::new()));
         }
         usize::MAX => panic!(),
         _ => {}
@@ -65,7 +80,13 @@ pub extern "C" fn ipfd_terminate() -> HRESULT {
     match RC.fetch_sub(1, Ordering::SeqCst) {
         0 => panic!(),
         1 => {
-            drop(take(unsafe { &mut THREAD }));
+            let mut guard = match THREAD.write() {
+                Ok(guard) => guard,
+                Err(_) => {
+                    return ERROR_INVALID_STATE.to_hresult();
+                }
+            };
+            drop(guard.take());
         }
         _ => {}
     }
