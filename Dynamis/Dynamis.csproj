@@ -60,6 +60,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <None Include="Dynamis.json" CopyToOutputDirectory="PreserveNewest" />
         <None Include="..\ipfd\target\x86_64-pc-windows-gnu\release\dynamis_ipfd.dll" CopyToOutputDirectory="Always" />
     </ItemGroup>
 </Project>
