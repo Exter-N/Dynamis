@@ -32,10 +32,8 @@ jobs:
       - name: Build plugin
         run: |
           dotnet build --no-restore --configuration Release --nologo
-      - name: Archive
-        run: Compress-Archive -Path Dynamis/bin/Release/* -DestinationPath Dynamis.zip
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v4
         with:
           path: |
-            ./Dynamis/bin/Release/*
+            ./Dynamis/bin/x64/Release/*
