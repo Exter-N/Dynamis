@@ -1,0 +1,92 @@
+name: Create Release
+
+on:
+  push:
+    tags-ignore:
+      - testing_*
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1.10.1
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: '8.x.x'
+      - name: Restore dependencies
+        run: dotnet restore
+      - name: Download Dalamud
+        run: |
+          Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/latest.zip -OutFile latest.zip
+          Expand-Archive -Force latest.zip "$env:AppData\XIVLauncher\addon\Hooks\dev"
+      - name: Build IPFD
+        working-directory: ipfd
+        run: |
+          cargo build --release
+      - name: Build plugin
+        run: |
+          $ver = '${{ github.ref_name }}'
+          invoke-expression 'dotnet build --no-restore --configuration Release --nologo -p:Version=$ver -p:FileVersion=$ver -p:AssemblyVersion=$ver'
+      - name: Write version into JSON
+        run: |
+          $ver = '${{ github.ref_name }}'
+          $path = './Dynamis/bin/x64/Release/Dynamis.json'
+          $json = Get-Content -Raw $path | ConvertFrom-Json
+          $json.AssemblyVersion = $ver
+          $content = $json | ConvertTo-Json
+          set-content -Path $path -Value $content
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          path: |
+            ./Dynamis/bin/x64/Release/*
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Dynamis ${{ github.ref }}
+          draft: false
+          prerelease: false
+      - name: Archive
+        run: Compress-Archive -Path Dynamis/bin/x64/Release/* -DestinationPath Dynamis.zip
+      - name: Upload Release Asset
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
+          asset_path: ./Dynamis.zip
+          asset_name: Dynamis.zip
+          asset_content_type: application/zip
+
+      - name: Write out repo.json
+        run: |
+          $ver = '${{ github.ref_name }}'
+          $path = './repo.json'
+          git fetch origin dalamondieu
+          git checkout dalamondieu
+          $json = Get-Content -Raw $path | ConvertFrom-Json
+          $json[0].AssemblyVersion = $ver
+          $json[0].TestingAssemblyVersion = $ver
+          $json[0].DownloadLinkInstall = $json.DownloadLinkInstall -replace '[^/]+/Dynamis.zip',"$ver/Dynamis.zip"
+          $json[0].DownloadLinkTesting = $json.DownloadLinkTesting -replace '[^/]+/Dynamis.zip',"$ver/Dynamis.zip"
+          $json[0].DownloadLinkUpdate = $json.DownloadLinkUpdate -replace '[^/]+/Dynamis.zip',"$ver/Dynamis.zip"
+          $content = $json | ConvertTo-Json -AsArray
+          set-content -Path $path -Value $content
+
+      - name: Commit repo.json
+        run: |
+          git config --global user.name "Actions User"
+          git config --global user.email "actions@github.com"
+          git add repo.json
+          git commit -m "[CI] Updating repo.json for ${{ github.ref_name }}" || true
+          git push origin main
