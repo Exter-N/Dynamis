@@ -2,28 +2,37 @@
 using Dalamud.Interface;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
+using Dalamud.Plugin.Services;
 using Dynamis.Configuration;
+using Dynamis.Interop.Ipfd;
 using Dynamis.Messaging;
 using Dynamis.Utility;
 using ImGuiNET;
 using Microsoft.Extensions.Logging;
+using static Dynamis.Utility.ChatGuiUtility;
+using static Dynamis.Utility.SeStringUtility;
 
 namespace Dynamis.UI.Windows;
 
-public sealed class SettingsWindow : Window, ISingletonWindow
+public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<CommandMessage>
 {
     private readonly ConfigurationContainer _configuration;
     private readonly ImGuiComponents        _imGuiComponents;
+    private readonly IChatGui               _chatGui;
     private readonly MessageHub             _messageHub;
+    private readonly Ipfd                   _ipfd;
 
-    public SettingsWindow(ConfigurationContainer configuration, ImGuiComponents imGuiComponents, MessageHub messageHub) : base(
+    public SettingsWindow(ConfigurationContainer configuration, ImGuiComponents imGuiComponents, IChatGui chatGui,
+        MessageHub messageHub, Ipfd ipfd) : base(
         "Dynamis Settings",
         ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoDocking
     )
     {
         _configuration = configuration;
         _imGuiComponents = imGuiComponents;
+        _chatGui = chatGui;
         _messageHub = messageHub;
+        _ipfd = ipfd;
 
         Size = new Vector2(512, 288);
         SizeCondition = ImGuiCond.Always;
@@ -55,7 +64,9 @@ public sealed class SettingsWindow : Window, ISingletonWindow
             _configuration.Save(nameof(configuration.MinimumLogLevel));
         }
 
-        ImGui.SetNextItemWidth(inputWidth - innerSpacing - ImGuiComponents.NormalizedIconButtonSize(FontAwesomeIcon.Sync).X);
+        ImGui.SetNextItemWidth(
+            inputWidth - innerSpacing - ImGuiComponents.NormalizedIconButtonSize(FontAwesomeIcon.Sync).X
+        );
         _imGuiComponents.InputFile(
             "###dataYamlPath", "data.yml{.yml,.yaml}", configuration.DataYamlPath,
             newPath =>
@@ -83,6 +94,13 @@ public sealed class SettingsWindow : Window, ISingletonWindow
             configuration.EnableIpfd = enableIpfd;
             _configuration.Save(nameof(configuration.EnableIpfd));
         }
+
+        ImGui.SameLine();
+        using (ImRaii.Disabled(!_ipfd.Loaded)) {
+            if (ImGui.Button("Force Unload##ipfd")) {
+                _ipfd.Unload();
+            }
+        }
     }
 
     private void DrawColors()
@@ -97,6 +115,172 @@ public sealed class SettingsWindow : Window, ISingletonWindow
             if (ImGui.ColorEdit3(((HexViewerColor)i).ToString(), ref color)) {
                 hexViewerPalette[i] = color.ToUInt32();
                 _configuration.Save(nameof(_configuration.Configuration.HexViewerPalette));
+            }
+        }
+    }
+
+    private void Print(ref SeStringInterpolatedStringHandler handler, string? messageTag = null,
+        ushort? tagColor = null)
+        => _chatGui.Print(BuildSeString(ref handler), messageTag, tagColor);
+
+    private void PrintHelp()
+    {
+        Print($"Valid sub-commands for {UiForeground("/dynamis settings", Gold)}:");
+
+        Print($"    》 {UiForeground("help", Gold)} - Display this help message.");
+
+        Print($"    》 {UiForeground("loglevel", Gold)} - Display the current log level.");
+        Print(
+            $"        》 {UiForeground("loglevel [trace|debug|information|warning|error|critical|none]", Gold)} {UiForeground("[--quiet]", Red)} - Set the log level."
+        );
+
+        Print(
+            $"    》 {UiForeground("datayml refresh", Gold)} {UiForeground("[--quiet]", Red)} - Refresh the ClientStructs' data.yml file."
+        );
+
+        Print($"    》 {UiForeground("ipfd",             Gold)} - Display IPFD status.");
+        Print($"        》 {UiForeground("ipfd enable",  Gold)} {UiForeground("[--quiet]", Red)} - Enable IPFD.");
+        Print($"        》 {UiForeground("ipfd disable", Gold)} {UiForeground("[--quiet]", Red)} - Disable IPFD.");
+        Print(
+            $"        》 {UiForeground("ipfd unload", Gold)} {UiForeground("[--quiet]", Red)} - Force unload IPFD, but doesn't prevent it from being reloaded."
+        );
+    }
+
+    public void HandleMessage(CommandMessage message)
+    {
+        if (!message.IsSubCommand("settings", "config", "st", "c")) {
+            return;
+        }
+
+        if (message.Arguments.Equals(1, null)) {
+            message.SetHandled();
+            IsOpen = true;
+            BringToFront();
+            return;
+        }
+
+        if (message.Arguments.Equals(1, "help", "?")) {
+            message.SetHandled();
+            PrintHelp();
+            return;
+        }
+
+        if (message.Arguments.Equals(1, "loglevel", "loglvl", "log")) {
+            LogLevel level;
+            if (message.Arguments.Equals(2, null, "query", "get", "status", "?")) {
+                message.SetHandled();
+                level = (LogLevel)_configuration.Configuration.MinimumLogLevel;
+                Print(
+                    $"The current log level is {UiForeground(level.ToString(), level == LogLevel.None ? Red : Gold)}.",
+                    "Dynamis", Gold
+                );
+                return;
+            }
+
+            if (message.Arguments.Equals(2, "trace", "verbose", "trce", "vrb", "t", "v", "0")) {
+                level = LogLevel.Trace;
+            } else if (message.Arguments.Equals(2, "debug", "dbug", "dbg", "d", "1")) {
+                level = LogLevel.Debug;
+            } else if (message.Arguments.Equals(2, "information", "info", "inf", "i", "2")) {
+                level = LogLevel.Information;
+            } else if (message.Arguments.Equals(2, "warning", "warn", "wrn", "w", "3")) {
+                level = LogLevel.Warning;
+            } else if (message.Arguments.Equals(2, "error", "fail", "err", "e", "f", "4")) {
+                level = LogLevel.Error;
+            } else if (message.Arguments.Equals(2, "critical", "fatal", "crit", "ftl", "c", "5")) {
+                level = LogLevel.Critical;
+            } else if (message.Arguments.Equals(2, "none", "no", "off", "disable", "dis", "n", "-", "6")) {
+                level = LogLevel.None;
+            } else {
+                return;
+            }
+
+            message.SetHandled();
+            _configuration.Configuration.MinimumLogLevel = (int)level;
+            _configuration.Save(nameof(_configuration.Configuration.MinimumLogLevel));
+            if (!message.Quiet) {
+                Print(
+                    $"Log level set to {UiForeground(level.ToString(), level == LogLevel.None ? Red : Gold)}.",
+                    "Dynamis", Gold
+                );
+            }
+
+            return;
+        }
+
+        if (message.Arguments.Equals(1, "datayml", "datayaml", "data", "yaml", "yml")
+         && message.Arguments.Equals(2, "refresh", "reload",   "r")) {
+            message.SetHandled();
+            _messageHub.Publish(new ConfigurationChangedMessage(nameof(_configuration.Configuration.DataYamlPath)));
+            if (!message.Quiet) {
+                Print(
+                    $"ClientStructs' data.yml {UiForeground("refreshed", Gold)}.",
+                    "Dynamis", Gold
+                );
+            }
+
+            return;
+        }
+
+        if (message.Arguments.Equals(1, "ipfd")) {
+            if (message.Arguments.Equals(2, null, "query", "get", "status", "?")) {
+                message.SetHandled();
+                if (_ipfd.Enabled) {
+                    Print(
+                        $"IPFD is currently {UiForeground(_ipfd.Loaded ? "enabled and loaded" : "enabled but not loaded", Green)}.",
+                        "Dynamis", Gold
+                    );
+                } else {
+                    Print(
+                        $"IPFD is currently {UiForeground("disabled", Red)}.",
+                        "Dynamis", Gold
+                    );
+                }
+
+                return;
+            }
+
+            if (message.Arguments.Equals(2, "enable", "en", "on", "yes", "y", "+", "1")) {
+                message.SetHandled();
+                _configuration.Configuration.EnableIpfd = true;
+                _configuration.Save(nameof(_configuration.Configuration.EnableIpfd));
+                if (!message.Quiet) {
+                    Print(
+                        $"IPFD {UiForeground("enabled", Green)}.",
+                        "Dynamis", Gold
+                    );
+                }
+
+                return;
+            }
+
+            if (message.Arguments.Equals(2, "disable", "dis", "off", "no", "n", "-", "0")) {
+                message.SetHandled();
+                _configuration.Configuration.EnableIpfd = false;
+                _configuration.Save(nameof(_configuration.Configuration.EnableIpfd));
+                if (!message.Quiet) {
+                    Print(
+                        $"IPFD {UiForeground("disabled", Red)}.",
+                        "Dynamis", Gold
+                    );
+                }
+
+                return;
+            }
+
+            if (message.Arguments.Equals(
+                    2, "unload", "forceunload", "terminate", "kill", "term", "un", "fu", "u", "k", "t"
+                )) {
+                message.SetHandled();
+                _ipfd.Unload();
+                if (!message.Quiet) {
+                    Print(
+                        $"IPFD {UiForeground("force unloaded", Red)}.",
+                        "Dynamis", Gold
+                    );
+                }
+
+                return;
             }
         }
     }

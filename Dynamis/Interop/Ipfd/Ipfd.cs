@@ -1,7 +1,12 @@
+using Dalamud.Game.Gui.Dtr;
+using Dalamud.Plugin.Services;
 using Dynamis.Configuration;
 using Dynamis.Messaging;
 using Dynamis.Resources;
+using Dynamis.UI.Windows;
 using Microsoft.Extensions.Logging;
+using static Dynamis.Utility.ChatGuiUtility;
+using static Dynamis.Utility.SeStringUtility;
 
 namespace Dynamis.Interop.Ipfd;
 
@@ -11,6 +16,7 @@ public sealed class Ipfd : IMessageObserver<ConfigurationChangedMessage>, IDispo
     private readonly ILogger<Ipfd>          _logger;
     private readonly ConfigurationContainer _configuration;
     private readonly MessageHub             _messageHub;
+    private readonly IDtrBarEntry           _dtrEntry;
 
     private          IpfdModule?   _module;
     private readonly Breakpoint?[] _breakpoints;
@@ -22,12 +28,17 @@ public sealed class Ipfd : IMessageObserver<ConfigurationChangedMessage>, IDispo
         => _module is not null;
 
     public Ipfd(ResourceProvider resourceProvider, ILogger<Ipfd> logger, ConfigurationContainer configuration,
-        MessageHub messageHub)
+        IDtrBar dtrBar, MessageHub messageHub)
     {
         _resourceProvider = resourceProvider;
         _logger = logger;
         _configuration = configuration;
         _messageHub = messageHub;
+        _dtrEntry = dtrBar.Get("Dynamis IPFD", BuildSeString($"{UiGlow("IPFD", Gold)} Loaded"));
+        _dtrEntry.Tooltip =
+            BuildSeString($"{UiGlow("Dynamis IPFD", Gold)} is currently loaded.\nClick to open settings.");
+        _dtrEntry.OnClick += messageHub.Publish<OpenWindowMessage<SettingsWindow>>;
+        _dtrEntry.Shown = false;
 
         _breakpoints = new Breakpoint?[4];
     }
@@ -40,7 +51,7 @@ public sealed class Ipfd : IMessageObserver<ConfigurationChangedMessage>, IDispo
         lock (this) {
             var module = GetModule();
             if (module is null) {
-                throw new InvalidOperationException("Cannot use breakpoints when the IPFD is not enabled.");
+                throw new InvalidOperationException("Cannot use breakpoints when IPFD is not enabled.");
             }
 
             for (var i = 0; i < _breakpoints.Length; ++i) {
@@ -60,13 +71,13 @@ public sealed class Ipfd : IMessageObserver<ConfigurationChangedMessage>, IDispo
     private void FreeBreakpoint(byte index, Breakpoint breakpoint)
     {
         lock (this) {
-            if (_breakpoints[index] != breakpoint) {
+            if (index > _breakpoints.Length || _breakpoints[index] != breakpoint) {
                 return;
             }
 
             _breakpoints[index] = null;
 
-            FreeModuleIfUnusedNoLock();
+            FreeModuleNoLock(false);
         }
 
         _messageHub.Publish(new BreakpointDisposedMessage(breakpoint));
@@ -253,6 +264,7 @@ public sealed class Ipfd : IMessageObserver<ConfigurationChangedMessage>, IDispo
         }
 
         _module ??= new(_resourceProvider, _logger);
+        _dtrEntry.Shown = true;
         return _module;
     }
 
@@ -267,25 +279,32 @@ public sealed class Ipfd : IMessageObserver<ConfigurationChangedMessage>, IDispo
                 return;
             }
 
-            foreach (var breakpoint in _breakpoints) {
-                breakpoint?.Dispose();
-            }
-
-            _module?.Dispose();
-            _module = null;
+            FreeModuleNoLock(true);
         }
     }
 
-    private void FreeModuleIfUnusedNoLock()
+    public void Unload()
     {
-        foreach (var breakpoint in _breakpoints) {
-            if (breakpoint is not null) {
+        lock (this) {
+            FreeModuleNoLock(true);
+        }
+    }
+
+    private void FreeModuleNoLock(bool force)
+    {
+        if (force) {
+            foreach (var breakpoint in _breakpoints) {
+                breakpoint?.Dispose();
+            }
+        } else {
+            if (_breakpoints.OfType<Breakpoint>().Any()) {
                 return;
             }
         }
 
         _module?.Dispose();
         _module = null;
+        _dtrEntry.Shown = false;
     }
 
     public void Dispose()
@@ -297,12 +316,8 @@ public sealed class Ipfd : IMessageObserver<ConfigurationChangedMessage>, IDispo
     private void Dispose(bool disposing)
     {
         lock (this) {
-            foreach (var breakpoint in _breakpoints) {
-                breakpoint?.Dispose();
-            }
-
-            _module?.Dispose();
-            _module = null;
+            FreeModuleNoLock(true);
+            _dtrEntry.Remove();
         }
     }
 }

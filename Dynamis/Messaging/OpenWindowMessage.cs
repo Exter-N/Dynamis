@@ -2,4 +2,4 @@ using Dalamud.Interface.Windowing;
 
 namespace Dynamis.Messaging;
 
-public record OpenWindowMessage<T>() where T : Window;
+public record OpenWindowMessage<T> where T : Window;

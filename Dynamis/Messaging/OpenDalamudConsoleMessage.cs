@@ -1,3 +1,3 @@
 namespace Dynamis.Messaging;
 
-public record OpenDalamudConsoleMessage();
+public record OpenDalamudConsoleMessage;

@@ -1,5 +1,3 @@
 namespace Dynamis.UI.Windows;
 
-public interface ISingletonWindow
-{
-}
+public interface ISingletonWindow;

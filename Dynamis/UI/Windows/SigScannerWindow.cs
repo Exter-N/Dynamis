@@ -3,13 +3,14 @@ using Dalamud.Interface;
 using Dalamud.Interface.Style;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
+using Dynamis.Messaging;
 using Dynamis.Utility;
 using ImGuiNET;
 using Microsoft.Extensions.Logging;
 
 namespace Dynamis.UI.Windows;
 
-public sealed class SigScannerWindow : Window, ISingletonWindow
+public sealed class SigScannerWindow : Window, ISingletonWindow, IMessageObserver<CommandMessage>
 {
     private const int MaxResultHistorySize = 32;
 
@@ -112,6 +113,7 @@ public sealed class SigScannerWindow : Window, ISingletonWindow
                         ImGui.TextUnformatted("Not Found");
                     }
                 }
+
                 if (result.Exception is not null && ImGui.IsItemHovered()) {
                     using var _ = ImRaii.Tooltip();
                     ImGui.TextUnformatted(result.Exception.ToString());
@@ -139,7 +141,10 @@ public sealed class SigScannerWindow : Window, ISingletonWindow
 
             result = new(signature, type, offset, success, address, null);
         } catch (Exception e) {
-            _logger.LogError(e, "Signature scan failed for signature {Signature} with type {Type} and offset {Offset}", signature, type, offset);
+            _logger.LogError(
+                e, "Signature scan failed for signature {Signature} with type {Type} and offset {Offset}", signature,
+                type, offset
+            );
             result = new(signature, type, offset, false, 0, e);
         }
 
@@ -148,6 +153,58 @@ public sealed class SigScannerWindow : Window, ISingletonWindow
         if (_vmResults.Count > MaxResultHistorySize) {
             _vmResults.RemoveAt(_vmResults.Count - 1);
         }
+    }
+
+    public void HandleMessage(CommandMessage message)
+    {
+        if (!message.IsSubCommand("sigscan", "sig", "scan", "ss", "s")) {
+            return;
+        }
+
+        if (message.Arguments.Equals(1, "close")) {
+            message.SetHandled();
+            IsOpen = false;
+            return;
+        }
+
+        if (message.Arguments.Equals(1, "clear")) {
+            message.SetHandled();
+            _vmResults.Clear();
+            return;
+        }
+
+        IsOpen = true;
+        BringToFront();
+
+        if (message.Arguments.Equals(1, null)) {
+            message.SetHandled();
+            return;
+        }
+
+        _vmSignature = message.Arguments[1];
+        ScanType type;
+        if (message.Arguments.Equals(2, null, "text", "t")) {
+            type = ScanType.Text;
+        } else if (message.Arguments.Equals(2, "data", "d")) {
+            type = ScanType.Data;
+        } else if (message.Arguments.Equals(2, "module", "m")) {
+            type = ScanType.Module;
+        } else if (message.Arguments.Equals(2, "staticaddress", "static", "sa", "s")) {
+            type = ScanType.StaticAddress;
+        } else {
+            return;
+        }
+
+        if (type == ScanType.StaticAddress && message.Arguments.Count > 3) {
+            if (!message.Arguments.TryGetInteger(3, out var offset)) {
+                return;
+            }
+
+            _vmOffset = offset;
+        }
+
+        message.SetHandled();
+        RunScan(type);
     }
 
     private enum ScanType

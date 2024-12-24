@@ -67,6 +67,19 @@ public sealed class BreakpointWindow : Window
         imGuiComponents.AddTitleBarButtons(this);
     }
 
+    public void Configure(nint address, BreakpointFlags condition, BreakpointFlags length, bool enable, int maximumHits)
+    {
+        _vmNewAddress = address;
+        _vmCondition = condition;
+        _vmLength = length;
+        _vmEnable = enable;
+        _vmMaximum = maximumHits;
+
+        _vmSyncTask = _breakpoint.ModifyAsync(
+            _vmNewAddress, (_vmEnable ? BreakpointFlags.LocalEnable : 0) | _vmLength | _vmCondition
+        );
+    }
+
     public override void Draw()
     {
         DrawBreakpointEditor();

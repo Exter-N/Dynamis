@@ -7,14 +7,13 @@ using ImGuiNET;
 
 namespace Dynamis.UI.Windows;
 
-public sealed class ToolboxWindow : Window, ISingletonWindow
+public sealed class ToolboxWindow : Window, ISingletonWindow, IMessageObserver<CommandMessage>
 {
     private readonly MessageHub             _messageHub;
     private readonly ConfigurationContainer _configuration;
 
-    public ToolboxWindow(MessageHub messageHub, ConfigurationContainer configuration, ImGuiComponents imGuiComponents) : base(
-        "Dynamis - Toolbox", ImGuiWindowFlags.NoResize
-    )
+    public ToolboxWindow(MessageHub messageHub, ConfigurationContainer configuration, ImGuiComponents imGuiComponents) :
+        base("Dynamis Toolbox", ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoDocking)
     {
         _messageHub = messageHub;
         _configuration = configuration;
@@ -52,5 +51,16 @@ public sealed class ToolboxWindow : Window, ISingletonWindow
         if (ImGui.Button("Dalamud Console / Log window", new(ImGui.GetContentRegionAvail().X, -1.0f))) {
             _messageHub.Publish<OpenDalamudConsoleMessage>();
         }
+    }
+
+    public void HandleMessage(CommandMessage message)
+    {
+        if (!message.IsSubCommand(null, "toolbox", "tb", "t", "main", "m")) {
+            return;
+        }
+
+        message.SetHandled();
+        IsOpen = true;
+        BringToFront();
     }
 }

@@ -4,12 +4,13 @@ using Dalamud.Interface.Style;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
+using Dynamis.Messaging;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using ImGuiNET;
 
 namespace Dynamis.UI.Windows;
 
-public sealed class ObjectTableWindow : Window, ISingletonWindow
+public sealed class ObjectTableWindow : Window, ISingletonWindow, IMessageObserver<CommandMessage>
 {
     private readonly ImGuiComponents            _imGuiComponents;
     private readonly IFramework                 _framework;
@@ -93,6 +94,27 @@ public sealed class ObjectTableWindow : Window, ISingletonWindow
 
     private TableEntry[] TakeSnapshot()
         => _objectTable.Select(TableEntry.FromGameObject).ToArray();
+
+    public void HandleMessage(CommandMessage message)
+    {
+        if (!message.IsSubCommand("objtable", "objecttable", "objtbl", "ot", "o")) {
+            return;
+        }
+
+        if (message.Arguments.Equals(1, "close", "x")) {
+            message.SetHandled();
+            IsOpen = false;
+            return;
+        }
+
+        message.SetHandled();
+        IsOpen = true;
+        BringToFront();
+
+        if (message.Arguments.Equals(1, "refresh", "r")) {
+
+        }
+    }
 
     private readonly record struct TableEntry(
         ushort ObjectIndex,

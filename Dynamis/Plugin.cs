@@ -33,6 +33,8 @@ public sealed class Plugin : IDalamudPlugin
         IDalamudPluginInterface pluginInterface,
         ITextureProvider textureProvider,
         ICommandManager commandManager,
+        IChatGui chatGui,
+        IDtrBar dtrBar,
         IPluginLog pluginLog,
         ISigScanner sigScanner,
         IGameInteropProvider gameInteropProvider,
@@ -60,6 +62,8 @@ public sealed class Plugin : IDalamudPlugin
                         collection.AddSingleton(pluginInterface);
                         collection.AddSingleton(textureProvider);
                         collection.AddSingleton(commandManager);
+                        collection.AddSingleton(chatGui);
+                        collection.AddSingleton(dtrBar);
                         collection.AddSingleton(pluginLog);
                         collection.AddSingleton(sigScanner);
                         collection.AddSingleton(gameInteropProvider);
