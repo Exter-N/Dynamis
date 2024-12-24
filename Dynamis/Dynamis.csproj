@@ -3,10 +3,12 @@
     <Import Project="Dalamud.Plugin.Bootstrap.targets"/>
 
     <PropertyGroup>
+        <TargetFramework>net8.0-windows</TargetFramework>
+        <LangVersion>preview</LangVersion>
         <Authors></Authors>
         <Company></Company>
         <Version>9.0.0.1</Version>
-        <Description>A sample plugin.</Description>
+        <Description>Developer/debugging/RE tool and experiment workbench.</Description>
         <Copyright></Copyright>
         <PackageProjectUrl>https://github.com/Exter-N/Dynamis</PackageProjectUrl>
         <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
