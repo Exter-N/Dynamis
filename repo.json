@@ -10,7 +10,7 @@
     ],
     "InternalName": "Dynamis",
     "AssemblyVersion": "0.0.0.0",
-    "TestingAssemblyVersion": "0.0.0.0",
+    "TestingAssemblyVersion": "0.0.1.3",
     "RepoUrl": "https://github.com/Exter-N/Dynamis",
     "ApplicableVersion": "any",
     "DalamudApiLevel": 11,
@@ -20,7 +20,7 @@
     "DownloadCount": 0,
     "LastUpdate": 0,
     "DownloadLinkInstall": "https://github.com/Exter-N/Dynamis/releases/download/0.0.0.0/Dynamis.zip",
-    "DownloadLinkTesting": "https://github.com/Exter-N/Dynamis/releases/download/0.0.0.0/Dynamis.zip",
+    "DownloadLinkTesting": "https://github.com/Exter-N/Dynamis/releases/download/testing_0.0.1.3/Dynamis.zip",
     "DownloadLinkUpdate": "https://github.com/Exter-N/Dynamis/releases/download/0.0.0.0/Dynamis.zip",
     "IconUrl": "https://raw.githubusercontent.com/Exter-N/Dynamis/main/Dynamis/Resources/Dynamis128.png"
   }
