@@ -9,6 +9,7 @@
     "reverse-engineering",
     "developer-tools"
   ],
+  "AssemblyVersion": "9.0.0.1",
   "IconUrl": "https://raw.githubusercontent.com/Exter-N/Dynamis/main/Dynamis/Resources/Dynamis128.png",
   "RepoUrl": "https://github.com/Exter-N/Dynamis"
 }
