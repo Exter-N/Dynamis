@@ -15,6 +15,7 @@ jobs:
           submodules: recursive
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1.10.1
+        working-directory: ./ipfd
       - name: Setup .NET
         uses: actions/setup-dotnet@v1
         with:
@@ -27,7 +28,8 @@ jobs:
           Expand-Archive -Force latest.zip "$env:AppData\XIVLauncher\addon\Hooks\dev\"
       - name: Build IPFD
         run: |
-          cd ipfd && cargo build --release
+          cargo build --release
+        working-directory: ipfd
       - name: Build plugin
         run: |
           dotnet build --no-restore --configuration Release --nologo
