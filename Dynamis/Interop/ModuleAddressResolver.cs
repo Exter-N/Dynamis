@@ -1,8 +1,9 @@
 using Dynamis.Interop.Win32;
+using Microsoft.Extensions.Logging;
 
 namespace Dynamis.Interop;
 
-public sealed class ModuleAddressResolver
+public sealed class ModuleAddressResolver(SymbolApi symbolApi, ILogger<ModuleAddressResolver> logger)
 {
     private static readonly IComparer<(Lazy<string>, IntPtr BaseAddress)> ModuleCacheComparer =
         Comparer<(Lazy<string>, IntPtr BaseAddress)>.Create((lhs, rhs) => lhs.BaseAddress.CompareTo(rhs.BaseAddress));
@@ -12,7 +13,7 @@ public sealed class ModuleAddressResolver
 
     private const long ModuleCacheMaxAge = 5000L;
 
-    public (string ModuleName, nint AddressOffset)? Resolve(nint address)
+    public (string ModuleName, string? SymbolName, nint Displacement)? Resolve(nint address)
     {
         if (!VirtualMemory.TryQuery(address, out var basicInfo) || basicInfo.Type != MemoryType.Image) {
             return null;
@@ -27,11 +28,24 @@ public sealed class ModuleAddressResolver
             i = ~i - 1;
         }
 
-        if (i >= 0) {
-            return (_moduleCache[i].ModuleName.Value, address - _moduleCache[i].BaseAddress);
+        if (i < 0) {
+            return null;
         }
 
-        return null;
+        try {
+            if (symbolApi.SymFromAddr(ProcessThreadApi.GetCurrentProcess(), address) is
+                {
+                } symbol) {
+                return (_moduleCache[i].ModuleName.Value, symbol.Name, symbol.Displacement);
+            }
+        } catch (Exception e) {
+            logger.LogError(
+                e, "Failed to resolve symbol information for address {Module}+{Displacement}",
+                _moduleCache[i].ModuleName.Value, address - _moduleCache[i].BaseAddress
+            );
+        }
+
+        return (_moduleCache[i].ModuleName.Value, null, address - _moduleCache[i].BaseAddress);
     }
 
     private void UpdateModuleCacheIfStale()

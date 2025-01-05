@@ -7,6 +7,7 @@ using Dynamis.ClientStructs;
 using Dynamis.Configuration;
 using Dynamis.Interop;
 using Dynamis.Interop.Ipfd;
+using Dynamis.Interop.Win32;
 using Dynamis.Logging;
 using Dynamis.Messaging;
 using Dynamis.Resources;
@@ -84,6 +85,7 @@ public sealed class Plugin : IDalamudPlugin
                         collection.AddSingleton<ConfigurationContainer>();
                         collection.AddSingleton<DataYamlContainer>();
                         collection.AddSingleton<MemoryHeuristics>();
+                        collection.AddSingleton<SymbolApi>();
                         collection.AddSingleton<ModuleAddressResolver>();
                         collection.AddSingleton<AddressIdentifier>();
                         collection.AddSingleton<ClassRegistry>();
