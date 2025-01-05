@@ -27,6 +27,16 @@ public sealed partial class SafeLibraryHandle : SafeHandle
         }
     }
 
+    public static SafeLibraryHandle Get(string moduleName)
+    {
+        var hModule = GetModuleHandle(moduleName);
+        if (hModule == 0) {
+            Marshal.ThrowExceptionForHR(Marshal.GetHRForLastWin32Error());
+        }
+
+        return new(hModule, false);
+    }
+
     public nint GetProcAddress(string procName)
     {
         var address = GetProcAddress(handle, procName);
@@ -45,6 +55,9 @@ public sealed partial class SafeLibraryHandle : SafeHandle
 
     [LibraryImport("kernel32.dll", EntryPoint = "LoadLibraryW", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
     private static partial nint LoadLibrary(string lpLibFileName);
+
+    [LibraryImport("kernel32.dll", EntryPoint = "GetModuleHandleW", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
+    private static partial nint GetModuleHandle(string lpModuleName);
 
     [LibraryImport("kernel32.dll", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
     private static partial nint GetProcAddress(nint hModule, string lpProcName);

@@ -11,6 +11,7 @@ public sealed class ObjectInspector(
     MemoryHeuristics memoryHeuristics,
     AddressIdentifier addressIdentifier,
     ModuleAddressResolver moduleAddressResolver,
+    SymbolApi symbolApi,
     ClassRegistry classRegistry,
     Ipfd.Ipfd ipfd)
 {
@@ -73,6 +74,7 @@ public sealed class ObjectInspector(
         context.Live = false;
 
         var stackPointer = unchecked((nint)exceptionInfo->ContextRecord->Rsp & -8);
+        var stackDisplacement = unchecked((nuint)((nint)exceptionInfo->ContextRecord->Rsp - stackPointer));
         ProcessThreadApi.GetCurrentThreadStackLimits(out var stackLowLimit, out var stackHighLimit);
         var stack = TakeMinimalSnapshot(
             stackPointer,
@@ -87,9 +89,14 @@ public sealed class ObjectInspector(
             false
         );
         stack.Name = $"Stack of thread {threadId}";
+        stack.Displacement += stackDisplacement;
         stack.Live = false;
 
         context.AssociatedSnapshot = stack;
+
+        var reader = new SnapshotReader(null);
+        reader.Mount(context);
+        context.StackTrace = symbolApi.StackWalk(*exceptionInfo->ContextRecord, reader);
 
         return (threadId, context);
     }
@@ -104,7 +111,7 @@ public sealed class ObjectInspector(
         if (protection.CanExecute()) {
             var moduleAddress = moduleAddressResolver.Resolve(objectAddress);
             var displacement = moduleAddress?.SymbolName != null
-                ? moduleAddress.Value.Displacement
+                ? moduleAddress.Displacement
                 : 0;
             return (classRegistry.GetFunctionClass(objectAddress - displacement, safeReads), (uint)displacement);
         }

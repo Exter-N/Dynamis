@@ -16,11 +16,7 @@ public class AddressIdentifier(DataYamlContainer dataYamlContainer, ModuleAddres
             } resolved) {
             return AddressIdentification.Default with
             {
-                Name = resolved.SymbolName is not null
-                    ? resolved.Displacement != 0
-                        ? $"{resolved.ModuleName}!{resolved.SymbolName}+{resolved.Displacement:X}"
-                        : $"{resolved.ModuleName}!{resolved.SymbolName}"
-                    : $"{resolved.ModuleName}+{resolved.Displacement:X}",
+                Name = resolved.ToString(),
             };
         }
 

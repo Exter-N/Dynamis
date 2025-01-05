@@ -257,6 +257,9 @@ public sealed class ObjectInspectorWindow : Window
     public void DrawAssociatedSnapshot()
         => _associatedSnapshotViewer.Draw();
 
+    public void DrawAssociatedSnapshot(Range range)
+        => _associatedSnapshotViewer.Draw(range);
+
     private void DrawClass(ClassInfo? @class)
     {
         if (@class is null) {

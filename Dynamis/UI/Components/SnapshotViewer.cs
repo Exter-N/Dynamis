@@ -18,6 +18,8 @@ public sealed class SnapshotViewer(
 {
     private ObjectSnapshot? _vmSnapshot;
 
+    private int _vmOffset;
+
     public ObjectSnapshot? Snapshot
     {
         get => _vmSnapshot;
@@ -36,12 +38,34 @@ public sealed class SnapshotViewer(
         );
     }
 
+    public void Draw(Range range)
+    {
+        if (_vmSnapshot is null) {
+            return;
+        }
+
+        var offset = _vmOffset;
+        try {
+            offset = range.Start.GetOffset(_vmSnapshot.Data.Length);
+            ImGuiComponents.DrawHexViewer(
+                "snapshot", _vmSnapshot.Data.AsSpan(range),
+                _vmSnapshot.HighlightColors is not null
+                    ? _vmSnapshot.HighlightColors.AsSpan(range)
+                    : ReadOnlySpan<byte>.Empty,
+                configuration.Configuration.GetHexViewerPalette(), OnSnapshotHover
+            );
+        } finally {
+            _vmOffset = offset;
+        }
+    }
+
     private void OnSnapshotHover(int offset, bool printable, bool clicked)
     {
         if (_vmSnapshot is null) {
             return;
         }
 
+        offset += _vmOffset;
         var path = GetValuePath(_vmSnapshot.Class, (uint)offset);
         if (path.Path.Length == 0) {
             var ptrOffset = offset & -nint.Size;

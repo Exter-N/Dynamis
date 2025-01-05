@@ -5,6 +5,7 @@ using Dalamud.Interface.Windowing;
 using Dynamis.Configuration;
 using Dynamis.Interop;
 using Dynamis.Interop.Ipfd;
+using Dynamis.Interop.Win32;
 using Dynamis.Messaging;
 using ImGuiNET;
 using Microsoft.Extensions.Logging;

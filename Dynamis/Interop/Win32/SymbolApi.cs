@@ -7,7 +7,8 @@ namespace Dynamis.Interop.Win32;
 
 public sealed partial class SymbolApi
 {
-    private const int MaxSymName = 2000;
+    private const int MaxSymName            = 2000;
+    private const int ImageFileMachineAmd64 = 0x8664;
 
     public SymbolApi(IDalamudPluginInterface pi, ILogger<SymbolApi> logger)
     {
@@ -56,6 +57,18 @@ public sealed partial class SymbolApi
     private static unsafe partial bool SymFromAddr(nint hProcess, ulong Address, out ulong Displacement,
         SymbolInfo* Symbol);
 
+    [LibraryImport(
+        "dbghelp.dll", EntryPoint = "StackWalk64", StringMarshalling = StringMarshalling.Utf16
+    )]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static unsafe partial bool StackWalk64(uint MachineType, nint hProcess, nint hThread,
+        StackFrame* StackFrame, Context* ContextRecord, nint ReadMemoryRoutine, nint FunctionTableAccessRoutine,
+        nint GetModuleBaseRoutine, nint TranslateAddress);
+
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public delegate bool ReadProcessMemoryRoutine(nint hProcess, ulong qwBaseAddress, nint lpBuffer, uint nSize,
+        out uint lpNumberOfBytesRead);
+
     public unsafe (string Name, SymbolInfo Info, nint Displacement)? SymFromAddr(nint hProcess, nint Address)
     {
         bool success;
@@ -78,5 +91,43 @@ public sealed partial class SymbolApi
         }
 
         return (new(symInfo->Name, 0, (int)symInfo->NameLen), *symInfo, unchecked((nint)displacement));
+    }
+
+    public unsafe StackFrame[] StackWalk(Context context, ReadProcessMemoryRoutine? readProcessMemory)
+    {
+        var currentProcess = ProcessThreadApi.GetCurrentProcess();
+        var currentThread = ProcessThreadApi.GetCurrentThread();
+        var readMemoryRoutine = readProcessMemory is not null
+            ? Marshal.GetFunctionPointerForDelegate(readProcessMemory)
+            : 0;
+        var dbghelp = SafeLibraryHandle.Get("dbghelp.dll");
+        var functionTableAccessRoutine = dbghelp.GetProcAddress("SymFunctionTableAccess64");
+        var getModuleBaseRoutine = dbghelp.GetProcAddress("SymGetModuleBase64");
+        var trace = new List<StackFrame>();
+        var writableContext = stackalloc Context[1];
+        *writableContext = context;
+        var stackFrame = stackalloc StackFrame[1];
+        stackFrame->AddrPC.Offset = context.Rip;
+        stackFrame->AddrPC.Mode = StackFrame.AddressMode.AddrModeFlat;
+        stackFrame->AddrStack.Offset = context.Rsp;
+        stackFrame->AddrStack.Mode = StackFrame.AddressMode.AddrModeFlat;
+        stackFrame->AddrFrame.Offset = context.Rbp;
+        stackFrame->AddrFrame.Mode = StackFrame.AddressMode.AddrModeFlat;
+        while (true) {
+            lock (this) {
+                if (!StackWalk64(
+                        ImageFileMachineAmd64, currentProcess,             currentThread, stackFrame, writableContext,
+                        readMemoryRoutine,     functionTableAccessRoutine, getModuleBaseRoutine, 0
+                    )) {
+                    break;
+                }
+            }
+
+            trace.Add(*stackFrame);
+        }
+
+        GC.KeepAlive(readProcessMemory);
+
+        return trace.ToArray();
     }
 }

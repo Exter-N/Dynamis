@@ -11,6 +11,9 @@ public static partial class ProcessThreadApi
     public static partial void GetCurrentThreadStackLimits(out nint lowLimit, out nint highLimit);
 
     [LibraryImport("kernel32.dll")]
+    public static partial nint GetCurrentThread();
+
+    [LibraryImport("kernel32.dll")]
     public static partial nint GetCurrentProcess();
 
     [LibraryImport("psapi.dll", SetLastError = true)]

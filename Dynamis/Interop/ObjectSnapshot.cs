@@ -1,3 +1,5 @@
+using Dynamis.Interop.Win32;
+
 namespace Dynamis.Interop;
 
 public class ObjectSnapshot(byte[] data)
@@ -14,4 +16,5 @@ public class ObjectSnapshot(byte[] data)
     public byte[]?    HighlightColors { get; set; }
 
     public ObjectSnapshot? AssociatedSnapshot { get; set; }
+    public StackFrame[]?   StackTrace         { get; set; }
 }
