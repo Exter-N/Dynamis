@@ -4,7 +4,7 @@ namespace Dynamis.Interop;
 
 public sealed partial class ClassRegistry
 {
-    public unsafe ClassInfo GetVirtualTableClass(string className, nint vtbl, uint ownerSize, bool safeReads)
+    public unsafe ClassInfo GetVirtualTableClass(string className, nint vtbl, (uint, nuint) ownerSizeAndDisplacement, bool safeReads)
     {
         var vtblClassName = $"<Virtual Table> {className}";
         ClassInfo? classInfo;
@@ -40,7 +40,7 @@ public sealed partial class ClassRegistry
                 EstimatedSize = (uint)(knownVfuncCount * sizeof(nint) + EstimateVtblRestSize(
                     vtbl + (nint)knownVfuncCount * sizeof(nint), safeReads
                 )),
-                VtblOwnerSizeFromDtor = ownerSize,
+                VtblOwnerSizeAndDisplacementFromDtor = ownerSizeAndDisplacement,
                 Fields = fields.ToArray(),
             };
 
@@ -75,7 +75,7 @@ public sealed partial class ClassRegistry
                     return vtblSize + i;
                 }
 
-                if (memoryHeuristics.EstimateSizeFromDtor(func).HasValue) {
+                if (memoryHeuristics.EstimateSizeAndDisplacementFromDtor(func).HasValue) {
                     return vtblSize + i;
                 }
             }

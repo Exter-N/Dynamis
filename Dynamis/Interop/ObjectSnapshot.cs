@@ -7,7 +7,8 @@ public class ObjectSnapshot(byte[] data)
 
     public bool Live { get; set; } = true;
 
-    public byte[] Data { get; set; } = data;
+    public byte[] Data         { get; set; } = data;
+    public nuint  Displacement { get; set; } = 0;
 
     public ClassInfo? Class           { get; set; }
     public byte[]?    HighlightColors { get; set; }

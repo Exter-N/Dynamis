@@ -39,25 +39,12 @@ public sealed partial class ClassRegistry
     private (FunctionInstruction[] Instructions, nint Size) GetFunctionBody(nint functionAddress, bool safeReads)
     {
         var codeReader = new ExecutableMemoryCodeReader(functionAddress, safeReads ? ipfd : null);
-        var decoder = Decoder.Create(64, codeReader);
-        decoder.IP = unchecked((ulong)functionAddress);
-        var body = new List<FunctionInstruction>();
-        var branchTargets = new HashSet<nint>();
-        foreach (var instr in decoder) {
-            body.Add(new(instr, GetMemoryOperand(instr)));
-            if (instr.FlowControl is FlowControl.UnconditionalBranch or FlowControl.ConditionalBranch) {
-                branchTargets.Add(unchecked((nint)instr.NearBranchTarget));
-            }
+        var decoder = codeReader.CreateDecoder();
+        var instructions = MemoryHeuristics.GetFunctionInstructions(decoder)
+                                           .Select(instr => new FunctionInstruction(instr, GetMemoryOperand(instr)))
+                                           .ToArray();
 
-            if (instr.FlowControl is FlowControl.UnconditionalBranch or FlowControl.IndirectBranch
-                or FlowControl.Return) {
-                if (!branchTargets.Contains(unchecked((nint)decoder.IP))) {
-                    break;
-                }
-            }
-        }
-
-        return (body.ToArray(), unchecked((nint)decoder.IP - functionAddress));
+        return (instructions, unchecked((nint)decoder.IP - functionAddress));
     }
 
     private static void ConnectJumps(FunctionInstruction[] body)

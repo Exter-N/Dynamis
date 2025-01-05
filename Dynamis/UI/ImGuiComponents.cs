@@ -1,5 +1,6 @@
 using Dalamud.Interface;
 using Dalamud.Interface.ImGuiFileDialog;
+using Dalamud.Interface.Style;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dynamis.Interop;
@@ -115,15 +116,26 @@ public sealed partial class ImGuiComponents(
             ImGui.TextUnformatted(wellKnownStr);
         }
 
-        @class ??= objectInspector.DetermineClass(pointer, false);
+        nuint displacement = 0;
+        if (@class is null) {
+            var classAndDisplacement = objectInspector.DetermineClassAndDisplacement(pointer, false);
+            @class = classAndDisplacement.Class;
+            displacement = classAndDisplacement.Displacement;
+        }
         if (@class.Known && @class.Name != wellKnown.ClassName) {
             ImGui.TextUnformatted($"Class Name: {@class.Name}");
+        }
+
+        if (displacement > 0) {
+            using (ImRaii.PushColor(ImGuiCol.Text, StyleModel.GetFromCurrent().BuiltInColors!.DalamudYellow!.Value)) {
+                ImGui.TextUnformatted($"Displacement: {displacement} (0x{displacement:X}) bytes");
+            }
         }
 
         ImGui.TextUnformatted($"Estimated Size: {@class.EstimatedSize} (0x{@class.EstimatedSize:X}) bytes");
 
         foreach (var inspector in objectInspectorDispatcher.Value.GetInspectors(@class)) {
-            inspector.DrawAdditionalTooltipDetails(pointer, @class);
+            inspector.DrawAdditionalTooltipDetails(pointer - (nint)displacement, @class);
         }
     }
 

@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using Dynamis.ClientStructs;
 using Dynamis.Interop.Win32;
 using Dynamis.UI;
+using Microsoft.Extensions.Logging;
 
 namespace Dynamis.Interop;
 
@@ -9,6 +10,7 @@ public sealed class ObjectInspector(
     DataYamlContainer dataYamlContainer,
     MemoryHeuristics memoryHeuristics,
     AddressIdentifier addressIdentifier,
+    ModuleAddressResolver moduleAddressResolver,
     ClassRegistry classRegistry,
     Ipfd.Ipfd ipfd)
 {
@@ -26,7 +28,13 @@ public sealed class ObjectInspector(
 
     public unsafe ObjectSnapshot TakeMinimalSnapshot(nint objectAddress, ClassInfo? @class = null, bool safeReads = true)
     {
-        @class ??= DetermineClass(objectAddress, safeReads);
+        nuint displacement = 0;
+        if (@class is null) {
+            var classAndDisplacement = DetermineClassAndDisplacement(objectAddress, safeReads);
+            @class = classAndDisplacement.Class;
+            displacement = classAndDisplacement.Displacement;
+            objectAddress -= (nint)displacement;
+        }
         var data = new byte[@class.EstimatedSize];
         if (safeReads) {
             ipfd.Copy<byte>(objectAddress, data.Length, data);
@@ -37,6 +45,7 @@ public sealed class ObjectInspector(
         return new(data)
         {
             Address = objectAddress,
+            Displacement = displacement,
             Class = @class,
         };
     }
@@ -85,39 +94,53 @@ public sealed class ObjectInspector(
         return (threadId, context);
     }
 
-    public ClassInfo DetermineClass(nint objectAddress, bool safeReads = true)
+    public (ClassInfo Class, nuint Displacement) DetermineClassAndDisplacement(nint objectAddress, bool safeReads = true)
     {
         var protection = VirtualMemory.GetProtection(objectAddress);
         if (!protection.CanRead()) {
-            return new ClassInfo();
+            return (new ClassInfo(), 0);
         }
 
         if (protection.CanExecute()) {
-            return classRegistry.GetFunctionClass(objectAddress, safeReads);
+            var moduleAddress = moduleAddressResolver.Resolve(objectAddress);
+            var displacement = moduleAddress?.SymbolName != null
+                ? moduleAddress.Value.Displacement
+                : 0;
+            return (classRegistry.GetFunctionClass(objectAddress - displacement, safeReads), (uint)displacement);
         }
 
         var restOfPageSize = (uint)(MemoryHeuristics.NextPage(objectAddress) - objectAddress).ToInt32();
         if ((objectAddress & (nint.Size - 1)) != 0) {
             // The object is not aligned on a void* boundary.
             // Return a dummy class that will contain the rest of the page.
-            return new ClassInfo
+            return (new ClassInfo
             {
                 EstimatedSize = restOfPageSize,
-            };
+            }, 0);
         }
 
         var vtbl = Read<nint>(objectAddress, safeReads);
-        if ((vtbl & (nint.Size - 1)) == 0 && VirtualMemory.GetProtection(vtbl).CanExecute()
-                                          && memoryHeuristics.EstimateSizeFromDtor(vtbl) is
+        var vtblProtection = VirtualMemory.GetProtection(vtbl);
+        if ((vtbl & (nint.Size - 1)) == 0 && vtblProtection.CanExecute()
+                                          && memoryHeuristics.EstimateSizeAndDisplacementFromDtor(vtbl) is
                                              {
                                              } ownerSize) {
             // objectAddress is actually a vtbl and vtbl is actually a dtor
-            return classRegistry.GetVirtualTableClass(
+            return (classRegistry.GetVirtualTableClass(
                 DetermineClassName(0, objectAddress).ClassName, objectAddress, ownerSize, safeReads
-            );
+            ), 0);
         }
 
-        return classRegistry.GetClass(DetermineClassName(objectAddress, vtbl).ClassName, vtbl, restOfPageSize);
+        if (vtblProtection.CanRead()) {
+            var dtor = Read<nint>(vtbl, safeReads);
+            var displacement = memoryHeuristics.EstimateDisplacementFromVfunc(dtor);
+            if (displacement != 0) {
+                var actual = DetermineClassAndDisplacement(objectAddress - (nint)displacement, safeReads);
+                return (actual.Class, actual.Displacement + displacement);
+            }
+        }
+
+        return (classRegistry.GetClass(DetermineClassName(objectAddress, vtbl).ClassName, vtbl, restOfPageSize), 0);
     }
 
     private unsafe DataYamlContainer.InstanceName DetermineClassName(nint objectAddress, nint vtbl)
@@ -208,7 +231,7 @@ public sealed class ObjectInspector(
                             } else if (!protect.CanRead()) {
                                 color = (byte)HexViewerColor.BadPointer;
                             } else {
-                                color = (byte)GetClassColor(DetermineClass(value, safeReads));
+                                color = (byte)GetClassColor(DetermineClassAndDisplacement(value, safeReads).Class);
                             }
                         }
 
@@ -251,7 +274,7 @@ public sealed class ObjectInspector(
                 } else if (!protect.CanRead()) {
                     color = (byte)HexViewerColor.Default;
                 } else {
-                    color = (byte)GetClassColor(DetermineClass(value, safeReads));
+                    color = (byte)GetClassColor(DetermineClassAndDisplacement(value, safeReads).Class);
                 }
             }
 

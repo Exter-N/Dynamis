@@ -30,7 +30,7 @@ public sealed class ClassInfo
         => Known || SizeFromDtor.HasValue;
 
     /// <remarks> Only applies if <see cref="Kind"/> is <see cref="ClassKind.VirtualTable"/>. </remarks>
-    public uint? VtblOwnerSizeFromDtor { get; set; }
+    public (uint Size, nuint Displacement)? VtblOwnerSizeAndDisplacementFromDtor { get; set; }
 
     /// <remarks> Only applies if <see cref="Kind"/> is <see cref="ClassKind.Function"/>. </remarks>
     public FunctionInstruction[] FunctionBody { get; set; } = [];

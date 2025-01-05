@@ -1,7 +1,6 @@
-using System.Runtime.InteropServices;
 using Dalamud.Plugin.Services;
 using Dalamud.Utility.Signatures;
-using Dynamis.Interop.Win32;
+using Iced.Intel;
 
 namespace Dynamis.Interop;
 
@@ -32,57 +31,129 @@ public sealed class MemoryHeuristics
         return (address + pageSize) & ~(pageSize - 1);
     }
 
-    public unsafe uint? EstimateSizeFromDtor(nint dtor)
+    public static IEnumerable<Instruction> GetFunctionInstructions(Decoder decoder)
+    {
+        var branchTargets = new HashSet<nint>();
+        foreach (var instr in decoder) {
+            yield return instr;
+            if (instr.FlowControl is FlowControl.UnconditionalBranch or FlowControl.ConditionalBranch) {
+                branchTargets.Add(unchecked((nint)instr.NearBranchTarget));
+            }
+
+            if (instr.FlowControl is FlowControl.UnconditionalBranch or FlowControl.IndirectBranch
+                or FlowControl.Return) {
+                if (!branchTargets.Contains(unchecked((nint)decoder.IP))) {
+                    break;
+                }
+            }
+        }
+    }
+
+    public nuint EstimateDisplacementFromVfunc(nint vfunc)
+    {
+        var codeReader = new ExecutableMemoryCodeReader(vfunc, _ipfd);
+        var decoder = codeReader.CreateDecoder();
+        using var enumerator = GetFunctionInstructions(decoder).GetEnumerator();
+        if (!enumerator.MoveNext()) {
+            return 0;
+        }
+
+        var instr = enumerator.Current;
+        if (instr is not
+            {
+                OpCode.Mnemonic: Mnemonic.Sub,
+                Op0Kind: OpKind.Register,
+                Op0Register: Register.RCX,
+            }) {
+            return 0;
+        }
+
+        var displacement = GetImmediateOp1(instr);
+        if (!displacement.HasValue) {
+            return 0;
+        }
+
+        if (!enumerator.MoveNext()) {
+            return 0;
+        }
+
+        instr = enumerator.Current;
+        if (instr.FlowControl is not FlowControl.UnconditionalBranch) {
+            return 0;
+        }
+
+        return (nuint)displacement.Value + EstimateDisplacementFromVfunc((nint)instr.NearBranchTarget);
+    }
+
+    public (uint Size, nuint Displacement)? EstimateSizeAndDisplacementFromDtor(nint dtor)
     {
         if (_freeMemory == 0 && _freeMemory2 == 0) {
             return null;
         }
 
-        var pageSize = (nint)Environment.SystemPageSize;
-        if (!VirtualMemory.TryQuery(dtor & ~(pageSize - 1), out var pageInfo)) {
-            return null;
-        }
-
-        if (!pageInfo.State.HasFlag(MemoryState.Commit) || !pageInfo.Protect.CanRead()
-                                                        || !pageInfo.Protect.CanExecute()) {
-            return null;
-        }
-
-        var endOfPage = (dtor + pageSize) & ~(pageSize - 1);
-        var searchPtr = (byte*)dtor.ToPointer();
-        var pageSnapshot = new byte[(endOfPage - dtor).ToInt32()];
-        _ipfd.Copy<byte>((nint)searchPtr, pageSnapshot.Length, pageSnapshot);
-        var restOfPage = (ReadOnlySpan<byte>)pageSnapshot;
-        int candidatePos;
-        while (restOfPage.Length >= 10 && (candidatePos = restOfPage.IndexOf((byte)0xBA)) >= 0) {
-            searchPtr += candidatePos + 1;
-            restOfPage = restOfPage[(candidatePos + 1)..];
-            if (restOfPage.Length < 9) {
-                break;
+        var codeReader = new ExecutableMemoryCodeReader(dtor, _ipfd);
+        var decoder = codeReader.CreateDecoder();
+        var index = -1;
+        uint? size = null;
+        nuint? displacement = null;
+        foreach (var instr in GetFunctionInstructions(decoder)) {
+            ++index;
+            if (instr is
+                {
+                    OpCode.Mnemonic: Mnemonic.Mov,
+                    Op0Kind: OpKind.Register,
+                    Op0Register: Register.EDX,
+                }) {
+                size = (uint?)GetImmediateOp1(instr);
             }
 
-            nint calledFunction;
-            if (restOfPage[4] == 0xE8) {
-                calledFunction = new(searchPtr + 9 + MemoryMarshal.Read<int>(restOfPage[5..]));
-            } else if (IsMovToRcx(restOfPage[4..7]) && restOfPage[7] == 0xE8 && restOfPage.Length >= 12) {
-                calledFunction = new(searchPtr + 12 + MemoryMarshal.Read<int>(restOfPage[8..]));
-            } else {
-                continue;
+            if (instr.FlowControl is FlowControl.Call) {
+                var callee = (nint)instr.MemoryDisplacement64;
+                if (callee == _freeMemory || callee == _freeMemory2) {
+                    return size.HasValue
+                        ? (size.Value, 0)
+                        : null;
+                }
             }
 
-            if (_freeMemory != 0 && calledFunction == _freeMemory || _freeMemory2 != 0 && calledFunction == _freeMemory2) {
-                return MemoryMarshal.Read<uint>(restOfPage);
+            if (index == 0 && instr is
+                {
+                    OpCode.Mnemonic: Mnemonic.Sub,
+                    Op0Kind: OpKind.Register,
+                    Op0Register: Register.RCX,
+                }) {
+                displacement = (nuint?)GetImmediateOp1(instr);
+            }
+
+            if (index == 1 && instr.FlowControl is FlowControl.UnconditionalBranch) {
+                if (!displacement.HasValue) {
+                    return null;
+                }
+
+                var originalSizeAndDisplacement = EstimateSizeAndDisplacementFromDtor((nint)instr.NearBranchTarget);
+                if (!originalSizeAndDisplacement.HasValue) {
+                    return null;
+                }
+
+                return (originalSizeAndDisplacement.Value.Size,
+                    originalSizeAndDisplacement.Value.Displacement + displacement.Value);
             }
         }
 
         return null;
     }
 
-    private static bool IsMovToRcx(ReadOnlySpan<byte> insn)
-        => insn[1] switch
+    private static ulong? GetImmediateOp1(Instruction instr)
+        => instr.Op1Kind switch
         {
-            0x89 => (insn[0] & 0xFB) == 0x48 && (insn[2] & 0xC7) == 0xC1,
-            0x8B => (insn[0] & 0xFE) == 0x48 && (insn[2] & 0xF8) == 0xC8,
-            _    => false,
+            OpKind.Immediate8      => instr.Immediate8,
+            OpKind.Immediate8to16  => (ulong)instr.Immediate8to16,
+            OpKind.Immediate8to32  => (ulong)instr.Immediate8to32,
+            OpKind.Immediate8to64  => (ulong)instr.Immediate8to64,
+            OpKind.Immediate16     => instr.Immediate16,
+            OpKind.Immediate32     => instr.Immediate32,
+            OpKind.Immediate32to64 => (ulong)instr.Immediate32to64,
+            OpKind.Immediate64     => instr.Immediate64,
+            _                      => null,
         };
 }

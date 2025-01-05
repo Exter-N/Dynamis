@@ -147,19 +147,22 @@ public sealed class SnapshotViewer(
         object value,
         nint? ea) : IDrawable
     {
-        private readonly string?    _enumName = path.EnumType is not null ? Enum.GetName(path.EnumType, value) : null;
+        private readonly string? _enumName = path.EnumType is not null ? Enum.GetName(path.EnumType, value) : null;
 
-        private readonly ClassInfo? _class = path.Type == FieldType.Pointer && (nint)value != 0
-            ? objectInspector.DetermineClass((nint)value)
-            : null;
+        private readonly (ClassInfo Class, nuint Displacement)? _class =
+            path.Type == FieldType.Pointer && (nint)value != 0
+                ? objectInspector.DetermineClassAndDisplacement((nint)value)
+                : null;
 
         public bool Draw()
         {
             var ret = false;
             if (path.Type == FieldType.Pointer && (nint)value != 0) {
-                if (_class is not null && _class.Kind == ClassKind.VirtualTable) {
+                if (_class is
+                    {
+                    } @class && @class.Class.Kind == ClassKind.VirtualTable) {
                     if (ImGui.Selectable("Inspect virtual table")) {
-                        messageHub.Publish(new InspectObjectMessage((nint)value, _class));
+                        messageHub.Publish(new InspectObjectMessage((nint)value, @class.Class));
                         ret = true;
                     }
 
@@ -171,7 +174,9 @@ public sealed class SnapshotViewer(
                     }
                 } else {
                     if (ImGui.Selectable("Inspect object")) {
-                        messageHub.Publish(new InspectObjectMessage((nint)value, _class));
+                        messageHub.Publish(
+                            new InspectObjectMessage((nint)value - (nint)(_class?.Displacement ?? 0), _class?.Class)
+                        );
                         ret = true;
                     }
                 }

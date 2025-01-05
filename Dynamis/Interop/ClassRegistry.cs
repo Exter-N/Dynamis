@@ -114,7 +114,8 @@ public sealed partial class ClassRegistry(
     private void PopulateFromVtbl(ClassInfo classInfo, nint vtbl, bool safeReads)
     {
         var dtor = VirtualMemory.GetProtection(vtbl).CanRead() ? Read<nint>(vtbl, safeReads) : 0;
-        classInfo.SizeFromDtor = memoryHeuristics.EstimateSizeFromDtor(dtor);
+        var sizeFromDtor0 = memoryHeuristics.EstimateSizeAndDisplacementFromDtor(dtor);
+        classInfo.SizeFromDtor = sizeFromDtor0.HasValue ? sizeFromDtor0.Value.Size : null;
 
         if ((dataYamlContainer.Data?.Classes?.TryGetValue(classInfo.Name, out var @class) ?? false)
          && @class?.Vtbls is not null) {
@@ -124,10 +125,10 @@ public sealed partial class ClassRegistry(
                 }
 
                 dtor = Read<nint>(vt.Ea.Value, safeReads);
-                var sizeFromDtor = memoryHeuristics.EstimateSizeFromDtor(dtor);
+                var sizeFromDtor = memoryHeuristics.EstimateSizeAndDisplacementFromDtor(dtor);
                 if (sizeFromDtor.HasValue && (!classInfo.SizeFromDtor.HasValue
-                                           || classInfo.SizeFromDtor.Value < sizeFromDtor.Value)) {
-                    classInfo.SizeFromDtor = sizeFromDtor;
+                                           || classInfo.SizeFromDtor.Value < sizeFromDtor.Value.Size)) {
+                    classInfo.SizeFromDtor = sizeFromDtor.Value.Size;
                 }
             }
         }

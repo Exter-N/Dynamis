@@ -37,4 +37,11 @@ public sealed class ExecutableMemoryCodeReader(nint startingAddress, Ipfd.Ipfd? 
 
         return ret;
     }
+
+    public Decoder CreateDecoder()
+    {
+        var decoder = Decoder.Create(64, this);
+        decoder.IP = unchecked((ulong)(_page | _offset));
+        return decoder;
+    }
 }

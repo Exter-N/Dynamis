@@ -105,6 +105,7 @@ public sealed class ObjectInspectorWindow : Window
     {
         try {
             _vmSnapshot = _objectInspector.TakeSnapshot(_vmAddress, @class);
+            _vmAddress = _vmSnapshot.Address ?? _vmAddress;
             _vmStatus = 1;
         } catch (Exception e) {
             _logger.LogError(e, "Object snapshotting or inspection failed for address 0x{Address:X}", _vmAddress);
