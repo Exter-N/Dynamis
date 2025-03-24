@@ -46,7 +46,7 @@ public sealed class SnapshotViewer(
 
         var offset = _vmOffset;
         try {
-            offset = range.Start.GetOffset(_vmSnapshot.Data.Length);
+            _vmOffset = range.Start.GetOffset(_vmSnapshot.Data.Length);
             ImGuiComponents.DrawHexViewer(
                 "snapshot", _vmSnapshot.Data.AsSpan(range),
                 _vmSnapshot.HighlightColors is not null
