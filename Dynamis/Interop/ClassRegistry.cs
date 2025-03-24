@@ -14,6 +14,7 @@ public sealed partial class ClassRegistry(
     ILogger<ClassRegistry> logger,
     MemoryHeuristics memoryHeuristics,
     AddressIdentifier addressIdentifier,
+    ModuleAddressResolver moduleAddressResolver,
     Ipfd.Ipfd ipfd,
     DataYamlContainer dataYamlContainer)
     : IMessageObserver<ConfigurationChangedMessage>
@@ -34,6 +35,7 @@ public sealed partial class ClassRegistry(
             classInfo = new ClassInfo
             {
                 Name = className,
+                DefiningModule = GetVtblDefiningModule(vtbl, true),
             };
 
             PopulateFromVtbl(classInfo, vtbl, true);

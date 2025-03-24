@@ -15,6 +15,7 @@ public sealed class VirtualTableInspector : IDynamicObjectInspector
             {
             } size) {
             ImGui.TextUnformatted($"Class Size: {size.Size} (0x{size.Size:X}) bytes");
+
             if (size.Displacement > 0) {
                 ImGui.TextUnformatted($"Displacement: {size.Displacement} (0x{size.Displacement:X}) bytes");
             }

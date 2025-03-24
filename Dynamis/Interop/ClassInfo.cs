@@ -6,6 +6,8 @@ public sealed class ClassInfo
 {
     public string Name { get; set; } = string.Empty;
 
+    public string DefiningModule { get; set; } = string.Empty;
+
     public ClassKind Kind { get; set; } = ClassKind.Regular;
 
     public Type? ManagedType { get; set; }

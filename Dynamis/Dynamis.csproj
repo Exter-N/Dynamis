@@ -3,7 +3,7 @@
     <Import Project="Dalamud.Plugin.Bootstrap.targets"/>
 
     <PropertyGroup>
-        <TargetFramework>net8.0-windows</TargetFramework>
+        <TargetFramework>net9.0-windows</TargetFramework>
         <LangVersion>preview</LangVersion>
         <Authors></Authors>
         <Company></Company>
@@ -45,18 +45,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Localization\" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <None Remove="Resources\Dynamis.png" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <None Remove="Resources\Dynamis64.png" />
-      <EmbeddedResource Include="Resources\Dynamis64.png" />
-      <None Remove="Resources\Dynamis128.png" />
-      <EmbeddedResource Include="Resources\Dynamis128.png" />
+        <EmbeddedResource Include="Resources\*.png" />
     </ItemGroup>
 
     <ItemGroup>

@@ -1,4 +1,5 @@
 using System.Numerics;
+using SharpDX;
 
 namespace Dynamis.Utility;
 
@@ -12,6 +13,7 @@ internal static class VectorExtensions
                 Y = vec.Y * max.X / vec.X,
             };
         }
+
         if (vec.Y > max.Y) {
             vec = max with
             {
@@ -21,4 +23,10 @@ internal static class VectorExtensions
 
         return vec;
     }
+
+    public static Size2 ToSize(this Vector2 vec)
+        => new((int)vec.X, (int)vec.Y);
+
+    public static Vector2 ToVector(this Size2 size)
+        => new(size.Width, size.Height);
 }

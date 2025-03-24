@@ -294,6 +294,10 @@ public sealed class ObjectInspector(
         {
             ClassKind.Function     => HexViewerColor.CodePointer,
             ClassKind.VirtualTable => HexViewerColor.VirtualTablePointer,
-            _                      => @class.IsClass ? HexViewerColor.ObjectPointer : HexViewerColor.Pointer,
+            _ => @class.IsClass
+                ? HexViewerColor.ObjectPointer
+                : string.IsNullOrEmpty(@class.DefiningModule)
+                    ? HexViewerColor.Pointer
+                    : HexViewerColor.LibraryObjectPointer,
         };
 }

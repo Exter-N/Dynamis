@@ -14,7 +14,16 @@ public sealed class ResourceProvider(IDalamudPluginInterface pi, ITextureProvide
 
     public static Stream GetManifestResourceStream(string name)
         => Assembly.GetExecutingAssembly().GetManifestResourceStream(typeof(ResourceProvider), name)
-            ?? throw new Exception($"ManifestResource \"{name}\" not found");
+#if DEBUG
+        ?? throw new Exception(
+               $"ManifestResource \"{name}\" not found - Available resources: \"{string.Join(
+                   "\", \"", Assembly.GetExecutingAssembly().GetManifestResourceNames()
+                                     .Where(n => n.StartsWith("Dynamis.Resources."))
+                                     .Select(n => n[18..]))}\""
+           );
+#else
+        ?? throw new Exception($"ManifestResource \"{name}\" not found");
+#endif
 
     public static byte[] GetManifestResourceBytes(string name)
     {

@@ -36,6 +36,7 @@ public sealed partial class ClassRegistry
             classInfo = new ClassInfo
             {
                 Name = vtblClassName,
+                DefiningModule = GetVtblDefiningModule(vtbl, safeReads),
                 Kind = ClassKind.VirtualTable,
                 EstimatedSize = (uint)(knownVfuncCount * sizeof(nint) + EstimateVtblRestSize(
                     vtbl + (nint)knownVfuncCount * sizeof(nint), safeReads
@@ -85,5 +86,31 @@ public sealed partial class ClassRegistry
         } while (VirtualMemory.GetProtection(vtbl).CanRead());
 
         return vtblSize;
+    }
+
+    private string GetVtblDefiningModule(nint vtbl, bool safeReads)
+    {
+        if (!VirtualMemory.GetProtection(vtbl).CanRead()) {
+            return string.Empty;
+        }
+
+        var vf0 = Read<nint>(vtbl, safeReads);
+        var vf0Protection = VirtualMemory.GetProtection(vf0);
+        if (!vf0Protection.CanRead() || !vf0Protection.CanExecute()) {
+            return string.Empty;
+        }
+
+        var vtblModuleAddress = moduleAddressResolver.Resolve(vtbl);
+        if (string.IsNullOrEmpty(vtblModuleAddress?.ModuleName)) {
+            return string.Empty;
+        }
+
+        var vf0ModuleAddress = moduleAddressResolver.Resolve(vf0);
+
+        return string.Equals(
+            vtblModuleAddress.ModuleName, vf0ModuleAddress?.ModuleName, StringComparison.OrdinalIgnoreCase
+        )
+            ? vtblModuleAddress.ModuleName
+            : string.Empty;
     }
 }

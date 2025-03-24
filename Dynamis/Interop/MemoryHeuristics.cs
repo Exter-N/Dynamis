@@ -34,8 +34,27 @@ public sealed class MemoryHeuristics
     public static IEnumerable<Instruction> GetFunctionInstructions(Decoder decoder)
     {
         var branchTargets = new HashSet<nint>();
+        var shallStop = false;
+        var buffer = new List<Instruction>(16);
         foreach (var instr in decoder) {
-            yield return instr;
+            if (!shallStop) {
+                yield return instr;
+            } else if (branchTargets.Contains(unchecked((nint)decoder.IP))) {
+                shallStop = false;
+                foreach (var bufferedInstr in buffer) {
+                    yield return bufferedInstr;
+                }
+
+                buffer.Clear();
+                yield return instr;
+            } else {
+                if (0 == (decoder.IP & 0xF)) {
+                    break;
+                }
+
+                buffer.Add(instr);
+            }
+
             if (instr.FlowControl is FlowControl.UnconditionalBranch or FlowControl.ConditionalBranch) {
                 branchTargets.Add(unchecked((nint)instr.NearBranchTarget));
             }
@@ -43,7 +62,11 @@ public sealed class MemoryHeuristics
             if (instr.FlowControl is FlowControl.UnconditionalBranch or FlowControl.IndirectBranch
                 or FlowControl.Return) {
                 if (!branchTargets.Contains(unchecked((nint)decoder.IP))) {
-                    break;
+                    if (0 == (decoder.IP & 0xF)) {
+                        break;
+                    }
+
+                    shallStop = true;
                 }
             }
         }
@@ -100,19 +123,20 @@ public sealed class MemoryHeuristics
             ++index;
             if (instr is
                 {
-                    OpCode.Mnemonic: Mnemonic.Mov,
                     Op0Kind: OpKind.Register,
                     Op0Register: Register.EDX,
                 }) {
-                size = (uint?)GetImmediateOp1(instr);
+                if (instr.OpCode.Mnemonic == Mnemonic.Mov) {
+                    size = (uint?)GetImmediateOp1(instr);
+                } else {
+                    size = null;
+                }
             }
 
-            if (instr.FlowControl is FlowControl.Call) {
+            if (size.HasValue && instr.FlowControl is FlowControl.Call) {
                 var callee = (nint)instr.MemoryDisplacement64;
                 if (callee == _freeMemory || callee == _freeMemory2) {
-                    return size.HasValue
-                        ? (size.Value, 0)
-                        : null;
+                    return (size.Value, 0);
                 }
             }
 

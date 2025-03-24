@@ -134,6 +134,10 @@ public sealed partial class ImGuiComponents(
 
         ImGui.TextUnformatted($"Estimated Size: {@class.EstimatedSize} (0x{@class.EstimatedSize:X}) bytes");
 
+        if (!string.IsNullOrEmpty(@class.DefiningModule)) {
+            ImGui.TextUnformatted($"Defined in Module: {@class.DefiningModule}");
+        }
+
         foreach (var inspector in objectInspectorDispatcher.Value.GetInspectors(@class)) {
             inspector.DrawAdditionalTooltipDetails(pointer - (nint)displacement, @class);
         }
