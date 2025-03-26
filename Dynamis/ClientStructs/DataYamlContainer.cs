@@ -119,7 +119,17 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
     public IEnumerable<KeyValuePair<nint, AddressIdentification>> GetWellKnownAddresses(AddressType types)
     {
         static unsafe nint Resolve(DataYaml.Instance instance)
-            => instance.Pointer ? *(nint*)instance.Ea.Value : instance.Ea.Value;
+        {
+            if (!instance.Pointer) {
+                return instance.Ea.Value;
+            }
+
+            try {
+                return *(nint*)instance.Ea.Value;
+            } catch (AccessViolationException) {
+                return 0;
+            }
+        }
 
         static unsafe nint ReadVfuncAddress(nint vtbl, uint index)
             => ((nint*)vtbl)[index];
