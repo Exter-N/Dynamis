@@ -118,7 +118,7 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
 
     public IEnumerable<KeyValuePair<nint, AddressIdentification>> GetWellKnownAddresses(AddressType types)
     {
-        static unsafe nint Resolve(DataYaml.Instance instance)
+        unsafe nint Resolve(DataYaml.Instance instance)
         {
             if (!instance.Pointer) {
                 return instance.Ea.Value;
@@ -127,12 +127,20 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
             try {
                 return *(nint*)instance.Ea.Value;
             } catch (AccessViolationException) {
+                _logger.LogError("Failed to dereference instance ea 0x{Ea:X}, returning nullptr", instance.Ea.Value);
                 return 0;
             }
         }
 
-        static unsafe nint ReadVfuncAddress(nint vtbl, uint index)
-            => ((nint*)vtbl)[index];
+        unsafe nint ReadVfuncAddress(nint vtbl, uint index)
+        {
+            try {
+                return ((nint*)vtbl)[index];
+            } catch (AccessViolationException) {
+                _logger.LogError("Failed to read vfunc address 0x{Vtbl:X}[{Index}], returning nullptr", vtbl, index);
+                return 0;
+            }
+        }
 
         if (Data is null) {
             yield break;
