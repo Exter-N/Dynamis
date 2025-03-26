@@ -83,7 +83,7 @@ public sealed class BreakpointWindowFactory(
                     Title = "Breakpoint allocation failed",
                     Type = NotificationType.Error,
                     Minimized = false,
-                    IconTextureTask = resourceProvider.LoadManifestResourceImageAsync("Dynamis64.png")!,
+                    IconTexture = resourceProvider.LoadManifestResourceImage("Dynamis64.png")!,
                 }
             );
             return;

@@ -1,4 +1,5 @@
 using System.Reflection;
+using Dalamud.Interface.Textures;
 using Dalamud.Interface.Textures.TextureWraps;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
@@ -45,9 +46,9 @@ public sealed class ResourceProvider(IDalamudPluginInterface pi, ITextureProvide
         return buffer.ToArray();
     }
 
-    public Task<IDalamudTextureWrap> LoadFileImageAsync(string fileName)
-        => textureProvider.CreateFromImageAsync(File.OpenRead(GetFileResourcePath(fileName)), debugName: fileName);
+    public ISharedImmediateTexture LoadFileImage(string fileName)
+        => textureProvider.GetFromFile(GetFileResourcePath(fileName));
 
-    public Task<IDalamudTextureWrap> LoadManifestResourceImageAsync(string name)
-        => textureProvider.CreateFromImageAsync(GetManifestResourceStream(name), debugName: name);
+    public ISharedImmediateTexture LoadManifestResourceImage(string name)
+        => textureProvider.GetFromManifestResource(Assembly.GetExecutingAssembly(), "Dynamis.Resources." + name);
 }
