@@ -17,17 +17,19 @@ public sealed class SigScannerWindow : Window, ISingletonWindow, IMessageObserve
     private readonly ILogger<SigScannerWindow> _logger;
     private readonly ISigScanner               _sigScanner;
     private readonly ImGuiComponents           _imGuiComponents;
+    private readonly MessageHub                _messageHub;
 
     private          string           _vmSignature = string.Empty;
     private          int              _vmOffset    = 0;
     private readonly List<ScanResult> _vmResults   = [];
 
     public SigScannerWindow(ILogger<SigScannerWindow> logger, ISigScanner sigScanner,
-        ImGuiComponents imGuiComponents) : base("Dynamis - Signature Scanner", 0)
+        ImGuiComponents imGuiComponents, MessageHub messageHub) : base("Dynamis - Signature Scanner", 0)
     {
         _logger = logger;
         _sigScanner = sigScanner;
         _imGuiComponents = imGuiComponents;
+        _messageHub = messageHub;
 
         SizeConstraints = new WindowSizeConstraints
         {
@@ -36,6 +38,11 @@ public sealed class SigScannerWindow : Window, ISingletonWindow, IMessageObserve
         };
 
         imGuiComponents.AddTitleBarButtons(this);
+    }
+
+    public override void OnOpen()
+    {
+        _messageHub.Publish<DataYamlPreloadMessage>();
     }
 
     public override void Draw()

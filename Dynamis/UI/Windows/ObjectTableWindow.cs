@@ -12,19 +12,20 @@ namespace Dynamis.UI.Windows;
 
 public sealed class ObjectTableWindow : Window, ISingletonWindow, IMessageObserver<CommandMessage>
 {
-    private readonly ImGuiComponents            _imGuiComponents;
-    private readonly IFramework                 _framework;
-    private readonly IObjectTable               _objectTable;
+    private readonly ImGuiComponents _imGuiComponents;
+    private readonly IFramework      _framework;
+    private readonly IObjectTable    _objectTable;
+    private readonly MessageHub      _messageHub;
 
     private Task<TableEntry[]>? _vmTable;
 
-    public ObjectTableWindow(ImGuiComponents imGuiComponents, IFramework framework, IObjectTable objectTable) : base(
-        "Dynamis - Object Table", 0
-    )
+    public ObjectTableWindow(ImGuiComponents imGuiComponents, IFramework framework, IObjectTable objectTable,
+        MessageHub messageHub) : base("Dynamis - Object Table", 0)
     {
         _imGuiComponents = imGuiComponents;
         _framework = framework;
         _objectTable = objectTable;
+        _messageHub = messageHub;
 
         SizeConstraints = new WindowSizeConstraints
         {
@@ -33,6 +34,11 @@ public sealed class ObjectTableWindow : Window, ISingletonWindow, IMessageObserv
         };
 
         imGuiComponents.AddTitleBarButtons(this);
+    }
+
+    public override void OnOpen()
+    {
+        _messageHub.Publish<DataYamlPreloadMessage>();
     }
 
     public override void Draw()
@@ -112,7 +118,7 @@ public sealed class ObjectTableWindow : Window, ISingletonWindow, IMessageObserv
         BringToFront();
 
         if (message.Arguments.Equals(1, "refresh", "r")) {
-
+            _vmTable = _framework.RunOnFrameworkThread(TakeSnapshot);
         }
     }
 

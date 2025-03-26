@@ -65,16 +65,51 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
         }
 
         ImGui.SetNextItemWidth(
-            inputWidth - innerSpacing - ImGuiComponents.NormalizedIconButtonSize(FontAwesomeIcon.Sync).X
+            inputWidth - innerSpacing * 2.0f - ImGuiComponents.NormalizedIconButtonSize(FontAwesomeIcon.Sync).X
+          - ImGuiComponents.NormalizedIconButtonSize(
+                                configuration.AutomaticDataYaml ? FontAwesomeIcon.Hdd : FontAwesomeIcon.CloudDownloadAlt
+                            )
+                           .X
         );
-        _imGuiComponents.InputFile(
-            "###dataYamlPath", "data.yml{.yml,.yaml}", configuration.DataYamlPath,
-            newPath =>
-            {
-                _configuration.Configuration.DataYamlPath = newPath;
-                _configuration.Save(nameof(_configuration.Configuration.DataYamlPath));
+        if (configuration.AutomaticDataYaml) {
+            using (ImRaii.Disabled()) {
+                var dummy = "Automatically download from GitHub";
+                ImGui.InputText(
+                    "###dataYamlPathDummy", ref dummy, (uint)dummy.Length + 1, ImGuiInputTextFlags.ReadOnly
+                );
             }
-        );
+
+            ImGui.SameLine(0.0f, innerSpacing);
+            if (ImGuiComponents.NormalizedIconButton(FontAwesomeIcon.Hdd)) {
+                configuration.AutomaticDataYaml = false;
+                _configuration.Save(nameof(configuration.AutomaticDataYaml));
+            }
+
+            if (ImGui.IsItemHovered()) {
+                using var _ = ImRaii.Tooltip();
+                ImGui.TextUnformatted("Use a local copy of the file instead");
+            }
+        } else {
+            _imGuiComponents.InputFile(
+                "###dataYamlPath", "data.yml{.yml,.yaml}", configuration.DataYamlPath,
+                newPath =>
+                {
+                    _configuration.Configuration.DataYamlPath = newPath;
+                    _configuration.Save(nameof(_configuration.Configuration.DataYamlPath));
+                }
+            );
+
+            ImGui.SameLine(0.0f, innerSpacing);
+            if (ImGuiComponents.NormalizedIconButton(FontAwesomeIcon.CloudDownloadAlt)) {
+                configuration.AutomaticDataYaml = true;
+                _configuration.Save(nameof(configuration.AutomaticDataYaml));
+            }
+
+            if (ImGui.IsItemHovered()) {
+                using var _ = ImRaii.Tooltip();
+                ImGui.TextUnformatted("Automatically download the file from GitHub instead");
+            }
+        }
 
         ImGui.SameLine(0.0f, innerSpacing);
         if (ImGuiComponents.NormalizedIconButton(FontAwesomeIcon.Sync)) {

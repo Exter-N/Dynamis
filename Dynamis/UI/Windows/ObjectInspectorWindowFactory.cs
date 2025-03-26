@@ -37,6 +37,8 @@ public sealed class ObjectInspectorWindowFactory(
 
     private ObjectInspectorWindow CreateWindow()
     {
+        dataYamlContainer.Preload();
+
         var window = new ObjectInspectorWindow(
             logger, windowSystem, imGuiComponents, dataYamlContainer, objectInspector, snapshotViewerFactory,
             objectInspectorDispatcher, GetFreeIndex()

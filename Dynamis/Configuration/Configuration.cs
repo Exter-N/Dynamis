@@ -26,7 +26,11 @@ public sealed class Configuration : IPluginConfiguration
 
     public int MinimumLogLevel { get; set; } = (int)LogLevel.Information;
 
+    public bool AutomaticDataYaml { get; set; } = true;
+
     public string DataYamlPath { get; set; } = string.Empty;
+
+    public string DataYamlETag { get; set; } = string.Empty;
 
     public uint[] HexViewerPalette { get; set; } = [];
 

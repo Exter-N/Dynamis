@@ -1,3 +1,5 @@
+using System.Net;
+using Dalamud.Plugin;
 using Dynamis.Configuration;
 using Dynamis.Interop;
 using Dynamis.Messaging;
@@ -7,10 +9,15 @@ using YamlDotNet.RepresentationModel;
 
 namespace Dynamis.ClientStructs;
 
-public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMessage>
+public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMessage>, IMessageObserver<DataYamlPreloadMessage>
 {
+    private const string DownloadSourceUri =
+        "https://raw.githubusercontent.com/aers/FFXIVClientStructs/refs/heads/main/ida/data.yml";
+
     private readonly ConfigurationContainer     _configuration;
     private readonly ILogger<DataYamlContainer> _logger;
+    private readonly IDalamudPluginInterface    _pi;
+    private readonly HttpClient                 _httpClient;
 
     private Lazy<DataYaml?>?                             _data;
     private Lazy<Dictionary<string, Address>?>?          _globalsInverse;
@@ -20,6 +27,9 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
     private Lazy<Dictionary<nint, string>?>?             _classesByVtbl;
     private Lazy<Dictionary<nint, MemberFunctionName>?>? _memberFunctions;
     private Lazy<Dictionary<nint, MemberFunctionName>?>? _virtualFunctions;
+
+    private string AutoPath
+        => Path.Combine(_pi.GetPluginConfigDirectory(), "data.yml");
 
     public DataYaml? Data
         => _data!.Value;
@@ -45,10 +55,12 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
     public Dictionary<nint, MemberFunctionName>? VirtualFunctions
         => _virtualFunctions!.Value;
 
-    public DataYamlContainer(ConfigurationContainer configuration, ILogger<DataYamlContainer> logger)
+    public DataYamlContainer(ConfigurationContainer configuration, ILogger<DataYamlContainer> logger, IDalamudPluginInterface pi, HttpClient httpClient)
     {
         _configuration = configuration;
         _logger = logger;
+        _pi = pi;
+        _httpClient = httpClient;
         Refresh();
     }
 
@@ -182,14 +194,60 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
 
     public void HandleMessage(ConfigurationChangedMessage message)
     {
-        if (message.IsPropertyChanged(nameof(Configuration.Configuration.DataYamlPath))) {
+        if (message.IsPropertyChanged(nameof(Configuration.Configuration.AutomaticDataYaml))
+         || message.IsPropertyChanged(nameof(Configuration.Configuration.DataYamlPath))) {
             Refresh();
         }
     }
 
+    public void HandleMessage(DataYamlPreloadMessage _)
+        => Preload();
+
+    public void Preload()
+        => ThreadPool.QueueUserWorkItem(state => _ = Data);
+
+    private async Task Download(CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, DownloadSourceUri);
+        var eTag = _configuration.Configuration.DataYamlETag;
+        if (File.Exists(AutoPath) && !string.IsNullOrEmpty(eTag)) {
+            request.Headers.Add("If-None-Match", eTag);
+        }
+
+        using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotModified) {
+            _logger.LogInformation("No change to data.yml, keeping cached version");
+            return;
+        }
+
+        response.EnsureSuccessStatusCode();
+
+        eTag = response.Headers.TryGetValues("ETag", out var eTags)
+            ? eTags.FirstOrDefault(string.Empty)
+            : string.Empty;
+        var contents = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+
+        await File.WriteAllBytesAsync(AutoPath, contents, cancellationToken);
+        _configuration.Configuration.DataYamlETag = eTag;
+        _configuration.Save(nameof(_configuration.Configuration.DataYamlETag));
+        _logger.LogInformation("Updated data.yml to ETag {ETag}", eTag);
+    }
+
     private DataYaml? Load()
     {
-        var path = _configuration.Configuration.DataYamlPath;
+        string path;
+        if (_configuration.Configuration.AutomaticDataYaml) {
+            try {
+                Download(CancellationToken.None).Wait();
+            } catch (Exception e) {
+                _logger.LogError(e, "Failed to download data.yml from {Source}", DownloadSourceUri);
+            }
+
+            path = AutoPath;
+        } else {
+            path = _configuration.Configuration.DataYamlPath;
+        }
+
         if (path.Length == 0) {
             return null;
         }

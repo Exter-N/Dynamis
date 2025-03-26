@@ -78,6 +78,13 @@ public sealed class Plugin : IDalamudPlugin
                         collection.AddSingleton(new Dalamud.Localization("Dynamis.Localization.", "", useEmbedded: true));
                         collection.AddSingleton(new WindowSystem("Dynamis"));
 
+                        collection.AddSingleton(
+                            new HttpClient()
+                            {
+                                Timeout = TimeSpan.FromSeconds(5),
+                            }
+                        );
+
                         collection.AddSingleton<FileDialogManager>();
                         collection.AddSingleton<MessageHub>();
                         collection.AddSingleton<IpcProvider>();

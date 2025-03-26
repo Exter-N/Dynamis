@@ -45,6 +45,8 @@ public sealed class BreakpointWindowFactory(
 
     private BreakpointWindow CreateWindow(Breakpoint breakpoint)
     {
+        messageHub.Publish<DataYamlPreloadMessage>();
+
         var window = new BreakpointWindow(
             logger, windowSystem, imGuiComponents, objectInspector, configuration, messageHub, breakpoint,
             GetFreeIndex()
