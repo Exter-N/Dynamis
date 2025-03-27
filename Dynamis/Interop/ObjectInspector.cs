@@ -163,7 +163,7 @@ public sealed class ObjectInspector(
 
             if (objectAddress != 0) {
                 foreach (var (pointer, name2) in dataYamlContainer.ClassesByInstancePointer!) {
-                    if (*(nint*)pointer == objectAddress) {
+                    if (VirtualMemory.GetProtection(pointer).CanRead() && *(nint*)pointer == objectAddress) {
                         return name2;
                     }
                 }
