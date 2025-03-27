@@ -17,7 +17,8 @@ public sealed partial class ClassRegistry
 
             var knownVfuncCount = 1u;
             if (dataYamlContainer.Data?.Classes?.TryGetValue(className, out var @class) ?? false) {
-                if (@class.Vtbls is not null && @class.Vfuncs is not null && @class.Vtbls[0].Ea == vtbl) {
+                if (@class.Vtbls is not null && @class.Vfuncs is not null
+                                             && dataYamlContainer.GetLiveAddress(@class.Vtbls[0].Ea) == vtbl) {
                     foreach (var (index, name) in @class.Vfuncs) {
                         knownVfuncCount = Math.Max(knownVfuncCount, index + 1);
                         fields.Add(

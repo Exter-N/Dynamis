@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using Dalamud.Plugin;
 using Dynamis.Configuration;
@@ -15,6 +16,7 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
     private const string DownloadSourceUri =
         "https://raw.githubusercontent.com/aers/FFXIVClientStructs/refs/heads/main/ida/data.yml";
 
+    private readonly nint                       _exeOffset;
     private readonly ConfigurationContainer     _configuration;
     private readonly ILogger<DataYamlContainer> _logger;
     private readonly IDalamudPluginInterface    _pi;
@@ -62,8 +64,15 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
         _logger = logger;
         _pi = pi;
         _httpClient = httpClient;
+        _exeOffset = Process.GetCurrentProcess().MainModule!.BaseAddress - unchecked((nint)0x140000000);
         Refresh();
     }
+
+    public nint GetLiveAddress(Address address)
+        => address.Value + _exeOffset;
+
+    public Address GetOriginalAddress(nint address)
+        => new(address - _exeOffset);
 
     public unsafe AddressIdentification IdentifyAddress(nint address, AddressType typeHint = AddressType.All)
     {
@@ -82,7 +91,7 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
         }
 
         if (typeHint.HasFlag(AddressType.Function)
-         && (Data.Functions?.TryGetValue(address, out var fnName) ?? false)) {
+         && (Data.Functions?.TryGetValue(GetOriginalAddress(address), out var fnName) ?? false)) {
             return new(AddressType.Function, string.Empty, fnName);
         }
 
@@ -92,7 +101,7 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
         }
 
         if (typeHint.HasFlag(AddressType.Function)
-         && (Data.Globals?.TryGetValue(address, out var gName) ?? false)) {
+         && (Data.Globals?.TryGetValue(GetOriginalAddress(address), out var gName) ?? false)) {
             return new(AddressType.Global, string.Empty, gName);
         }
 
@@ -121,16 +130,17 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
     {
         unsafe nint Resolve(DataYaml.Instance instance)
         {
+            var ea = GetLiveAddress(instance.Ea);
             if (!instance.Pointer) {
-                return instance.Ea.Value;
+                return ea;
             }
 
-            if (!VirtualMemory.GetProtection(instance.Ea.Value).CanRead()) {
-                _logger.LogError("Cannot dereference ea pointer 0x{Ea:X}, returning nullptr", instance.Ea.Value);
+            if (!VirtualMemory.GetProtection(ea).CanRead()) {
+                _logger.LogError("Cannot dereference ea pointer 0x{Ea:X}, returning nullptr", ea);
                 return 0;
             }
 
-            return *(nint*)instance.Ea.Value;
+            return *(nint*)ea;
         }
 
         unsafe nint ReadVfuncAddress(nint vtbl, uint index)
@@ -150,13 +160,13 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
 
         if (types.HasFlag(AddressType.Global) && Data.Globals is not null) {
             foreach (var (ea, name) in Data.Globals) {
-                yield return new(ea, new(AddressType.Global, string.Empty, name));
+                yield return new(GetLiveAddress(ea), new(AddressType.Global, string.Empty, name));
             }
         }
 
         if (types.HasFlag(AddressType.Function) && Data.Functions is not null) {
             foreach (var (ea, name) in Data.Functions) {
-                yield return new(ea, new(AddressType.Function, string.Empty, name));
+                yield return new(GetLiveAddress(ea), new(AddressType.Function, string.Empty, name));
             }
         }
 
@@ -176,21 +186,21 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
 
             if (types.HasFlag(AddressType.VirtualTable) && @class.Vtbls is not null) {
                 foreach (var vtbl in @class.Vtbls) {
-                    yield return new(vtbl.Ea, new(AddressType.VirtualTable, className, null));
+                    yield return new(GetLiveAddress(vtbl.Ea), new(AddressType.VirtualTable, className, null));
                 }
             }
 
             if (types.HasFlag(AddressType.Function)) {
                 if (@class.Funcs is not null) {
                     foreach (var (ea, name) in @class.Funcs) {
-                        yield return new(ea.Value, new(AddressType.Function, className, name));
+                        yield return new(GetLiveAddress(ea), new(AddressType.Function, className, name));
                     }
                 }
 
                 var vtbl0 = @class.Vtbls?[0];
                 if (vtbl0 is not null && @class.Vfuncs is not null) {
                     foreach (var (index, name) in @class.Vfuncs) {
-                        var ea = ReadVfuncAddress(vtbl0.Ea.Value, index);
+                        var ea = ReadVfuncAddress(GetLiveAddress(vtbl0.Ea), index);
                         if (ea != 0) {
                             yield return new(ea, new(AddressType.Function, className, name));
                         }
@@ -294,7 +304,7 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
         return data is null ? null : function(data);
     }
 
-    private static Dictionary<nint, InstanceName> CalculateClassesByInstance(DataYaml data, bool pointer)
+    private Dictionary<nint, InstanceName> CalculateClassesByInstance(DataYaml data, bool pointer)
     {
         var classesByInstance = new Dictionary<nint, InstanceName>();
         if (data.Classes is not null) {
@@ -305,7 +315,7 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
 
                 foreach (var instance in @class.Instances) {
                     if (instance.Pointer == pointer) {
-                        classesByInstance.Add(instance.Ea, new(className, instance.Name));
+                        classesByInstance.Add(GetLiveAddress(instance.Ea), new(className, instance.Name));
                     }
                 }
             }
@@ -314,7 +324,7 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
         return classesByInstance;
     }
 
-    private static Dictionary<nint, string> CalculateClassesByVtbl(DataYaml data)
+    private Dictionary<nint, string> CalculateClassesByVtbl(DataYaml data)
     {
         var classesByInstance = new Dictionary<nint, string>();
         if (data.Classes is not null) {
@@ -324,7 +334,7 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
                 }
 
                 foreach (var vtbl in @class.Vtbls) {
-                    classesByInstance.Add(vtbl.Ea, name);
+                    classesByInstance.Add(GetLiveAddress(vtbl.Ea), name);
                 }
             }
         }
@@ -332,7 +342,7 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
         return classesByInstance;
     }
 
-    private static Dictionary<nint, MemberFunctionName> CalculateMemberFunctions(DataYaml data)
+    private Dictionary<nint, MemberFunctionName> CalculateMemberFunctions(DataYaml data)
     {
         var memberFunctions = new Dictionary<nint, MemberFunctionName>();
         if (data.Classes is not null) {
@@ -342,7 +352,7 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
                 }
 
                 foreach (var (address, fName) in @class.Funcs) {
-                    memberFunctions.Add(address, new(name, fName));
+                    memberFunctions.Add(GetLiveAddress(address), new(name, fName));
                 }
             }
         }
@@ -350,7 +360,7 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
         return memberFunctions;
     }
 
-    private static unsafe Dictionary<nint, MemberFunctionName> CalculateVirtualFunctions(DataYaml data)
+    private unsafe Dictionary<nint, MemberFunctionName> CalculateVirtualFunctions(DataYaml data)
     {
         var virtualFunctions = new Dictionary<nint, MemberFunctionName>();
         if (data.Classes is not null) {
@@ -364,7 +374,7 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
                     continue;
                 }
 
-                var vtblEa = vtbl.Ea.Value;
+                var vtblEa = GetLiveAddress(vtbl.Ea);
                 foreach (var (index, fName) in @class.Vfuncs) {
                     virtualFunctions.Add(vtblEa + (nint)index * sizeof(nint), new(name, fName));
                 }

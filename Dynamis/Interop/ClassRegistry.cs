@@ -122,7 +122,7 @@ public sealed partial class ClassRegistry(
         if ((dataYamlContainer.Data?.Classes?.TryGetValue(classInfo.Name, out var @class) ?? false)
          && @class?.Vtbls is not null) {
             foreach (var vt in @class.Vtbls) {
-                if (vt.Ea == vtbl) {
+                if (dataYamlContainer.GetLiveAddress(vt.Ea) == vtbl) {
                     continue;
                 }
 

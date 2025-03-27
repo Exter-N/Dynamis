@@ -8,6 +8,9 @@ namespace Dynamis.ClientStructs;
 
 public record struct Address(nint Value) : IYamlConvertible
 {
+    public nint RelocatedValue(nint moduleOffset)
+        => Value + moduleOffset;
+
     public void Read(IParser parser, Type expectedType, ObjectDeserializer nestedObjectDeserializer)
     {
         Value = DoParse(parser.Consume<Scalar>().Value);
@@ -56,9 +59,15 @@ public record struct Address(nint Value) : IYamlConvertible
     public override string ToString()
         => $"0x{Value:X}";
 
-    public static implicit operator nint(Address value)
+    public static explicit operator nint(Address value)
         => value.Value;
 
-    public static implicit operator Address(nint value)
+    public static explicit operator Address(nint value)
         => new(value);
+
+    public static Address operator +(Address lhs, nint rhs)
+        => new(lhs.Value + rhs);
+
+    public static Address operator +(nint lhs, Address rhs)
+        => new(lhs + rhs.Value);
 }
