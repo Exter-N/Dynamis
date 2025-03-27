@@ -20,6 +20,6 @@ Please note that while Dynamis' tools have some overlap with existing ones, it d
 
 1. In `/xlsettings`, add `https://raw.githubusercontent.com/Exter-N/Dynamis/dalamondieu/repo.json` to your custom repositories ;
 2. In `/xlplugins`, install the plugin ;
-3. (Optional, but strongly recommended) If you have a copy of [ClientStructs' data.yml](https://github.com/aers/FFXIVClientStructs/blob/main/ida/data.yml) that is up to date for the current version of the game, tell Dynamis where to find it in `/dynamis settings`.
+3. (Optional, but strongly recommended) Check `/dynamis settings` and configure it to your liking. If you're a ClientStructs contributor, you can provide it with your own copy of [data.yml](https://github.com/aers/FFXIVClientStructs/blob/main/ida/data.yml) instead of having it automatically fetch and manage it.
 
 At a later point, if you want to extend Dynamis to better suit your own use cases, and/or contribute to it, you may then grab the source and compile it yourself to use it as a dev plugin. If you don't want to bother with compiling IPFD (which requires a Rust toolchain), you may just get the DLL from the releases/actions, and put it where the .NET project expects it.
