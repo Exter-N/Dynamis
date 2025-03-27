@@ -70,9 +70,9 @@ public sealed partial class ClassRegistry(
             };
 
             if (dataYamlContainer.Data?.Classes?.TryGetValue(className, out var dataClass) ?? false) {
-                var vtbl = dataClass?.Vtbls?[0]?.Ea.Value;
+                var vtbl = dataClass?.Vtbls?[0]?.Ea;
                 if (vtbl.HasValue) {
-                    PopulateFromVtbl(classInfo, vtbl.Value, true);
+                    PopulateFromVtbl(classInfo, dataYamlContainer.GetLiveAddress(vtbl.Value), true);
                 }
             }
 
@@ -122,11 +122,12 @@ public sealed partial class ClassRegistry(
         if ((dataYamlContainer.Data?.Classes?.TryGetValue(classInfo.Name, out var @class) ?? false)
          && @class?.Vtbls is not null) {
             foreach (var vt in @class.Vtbls) {
-                if (dataYamlContainer.GetLiveAddress(vt.Ea) == vtbl) {
+                var otherVtbl = dataYamlContainer.GetLiveAddress(vt.Ea);
+                if (otherVtbl == vtbl) {
                     continue;
                 }
 
-                dtor = Read<nint>(vt.Ea.Value, safeReads);
+                dtor = VirtualMemory.GetProtection(otherVtbl).CanRead() ? Read<nint>(otherVtbl, safeReads) : 0;
                 var sizeFromDtor = memoryHeuristics.EstimateSizeAndDisplacementFromDtor(dtor);
                 if (sizeFromDtor.HasValue && (!classInfo.SizeFromDtor.HasValue
                                            || classInfo.SizeFromDtor.Value < sizeFromDtor.Value.Size)) {

@@ -8,9 +8,6 @@ namespace Dynamis.ClientStructs;
 
 public record struct Address(nint Value) : IYamlConvertible
 {
-    public nint RelocatedValue(nint moduleOffset)
-        => Value + moduleOffset;
-
     public void Read(IParser parser, Type expectedType, ObjectDeserializer nestedObjectDeserializer)
     {
         Value = DoParse(parser.Consume<Scalar>().Value);
