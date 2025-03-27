@@ -36,6 +36,8 @@ public sealed class Configuration : IPluginConfiguration
 
     public bool EnableIpfd { get; set; } = false;
 
+    public bool EnableWineSymbolHandler { get; set; } = false;
+
     public uint[] GetHexViewerPalette()
     {
         var defaultPalette = GetDefaultHexViewerPalette();

@@ -1,8 +1,10 @@
 ﻿using System.Numerics;
 using Dalamud.Interface;
+using Dalamud.Interface.Style;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
+using Dalamud.Utility;
 using Dynamis.Configuration;
 using Dynamis.Interop.Ipfd;
 using Dynamis.Messaging;
@@ -130,11 +132,41 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
             _configuration.Save(nameof(configuration.EnableIpfd));
         }
 
+        ImGui.SameLine(0.0f, innerSpacing);
+        DrawUnstableSettingWarning();
+
         ImGui.SameLine();
         using (ImRaii.Disabled(!_ipfd.Loaded)) {
             if (ImGui.Button("Force Unload##ipfd")) {
                 _ipfd.Unload();
             }
+        }
+
+        if (Util.IsWine()) {
+            var enableWineSymbolHandler = configuration.EnableWineSymbolHandler;
+            if (ImGui.Checkbox("Enable Symbol Handler", ref enableWineSymbolHandler)) {
+                configuration.EnableWineSymbolHandler = enableWineSymbolHandler;
+                _configuration.Save(nameof(configuration.EnableWineSymbolHandler));
+            }
+
+            ImGui.SameLine(0.0f, innerSpacing);
+            DrawUnstableSettingWarning();
+        }
+    }
+
+    private static void DrawUnstableSettingWarning()
+    {
+        ImGuiComponents.NormalizedIcon(
+            FontAwesomeIcon.ExclamationTriangle,
+            StyleModel.GetFromCurrent().BuiltInColors!.DalamudOrange!.Value.ToUInt32()
+        );
+
+        if (ImGui.IsItemHovered()) {
+            using var _ = ImRaii.Tooltip();
+            ImGui.TextUnformatted("This setting may cause stability issues.");
+            ImGui.TextUnformatted(
+                $"Disabling it may then require hand-editing pluginConfigs{(Util.IsWine() ? '/' : '\\')}Dynamis.json."
+            );
         }
     }
 

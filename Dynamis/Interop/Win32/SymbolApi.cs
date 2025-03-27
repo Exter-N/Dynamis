@@ -1,19 +1,34 @@
 using System.Runtime.InteropServices;
 using Dalamud.Plugin;
 using Dalamud.Utility;
+using Dynamis.Configuration;
+using Dynamis.Messaging;
 using Microsoft.Extensions.Logging;
 
 namespace Dynamis.Interop.Win32;
 
-public sealed partial class SymbolApi
+public sealed partial class SymbolApi : IMessageObserver<ConfigurationChangedMessage>
 {
     private const int MaxSymName            = 2000;
     private const int ImageFileMachineAmd64 = 0x8664;
 
-    public SymbolApi(IDalamudPluginInterface pi, ILogger<SymbolApi> logger)
+    private readonly IDalamudPluginInterface _pi;
+    private readonly ILogger<SymbolApi>      _logger;
+    private readonly ConfigurationContainer  _configuration;
+
+    private bool _initialized;
+
+    public SymbolApi(IDalamudPluginInterface pi, ILogger<SymbolApi> logger, ConfigurationContainer configuration)
     {
-        if (Util.IsWine()) {
+        _pi = pi;
+        _logger = logger;
+        _configuration = configuration;
+        if (!Util.IsWine()) {
+            // On Windows, Dalamud will have initialized this at boot.
+            _initialized = true;
+        } else if (configuration.Configuration.EnableWineSymbolHandler) {
             InitSymbolHandler(pi, logger);
+            _initialized = true;
         }
     }
 
@@ -36,6 +51,15 @@ public sealed partial class SymbolApi
             }
         } catch (Exception ex) {
             logger.LogError(ex, "SymbolHandler Initialize Failed.");
+        }
+    }
+
+    public void HandleMessage(ConfigurationChangedMessage message)
+    {
+        if (message.IsPropertyChanged(nameof(_configuration.Configuration.EnableWineSymbolHandler))
+         && _configuration.Configuration.EnableWineSymbolHandler && !_initialized) {
+            InitSymbolHandler(_pi, _logger);
+            _initialized = true;
         }
     }
 
@@ -71,6 +95,10 @@ public sealed partial class SymbolApi
 
     public unsafe (string Name, SymbolInfo Info, nint Displacement)? SymFromAddr(nint hProcess, nint Address)
     {
+        if (!_initialized) {
+            return null;
+        }
+
         bool success;
         ulong displacement;
         var buffer = stackalloc byte[sizeof(SymbolInfo) + (MaxSymName - 1) * sizeof(char)];
@@ -95,6 +123,10 @@ public sealed partial class SymbolApi
 
     public unsafe StackFrame[] StackWalk(Context context, ReadProcessMemoryRoutine? readProcessMemory)
     {
+        if (!_initialized) {
+            return [];
+        }
+
         var currentProcess = ProcessThreadApi.GetCurrentProcess();
         var currentThread = ProcessThreadApi.GetCurrentThread();
         var readMemoryRoutine = readProcessMemory is not null
