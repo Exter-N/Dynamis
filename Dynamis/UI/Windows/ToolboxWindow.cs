@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using System.Reflection;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dynamis.Configuration;
@@ -13,7 +14,10 @@ public sealed class ToolboxWindow : Window, ISingletonWindow, IMessageObserver<C
     private readonly ConfigurationContainer _configuration;
 
     public ToolboxWindow(MessageHub messageHub, ConfigurationContainer configuration, ImGuiComponents imGuiComponents) :
-        base("Dynamis Toolbox", ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoDocking)
+        base(
+            $"Dynamis {Assembly.GetExecutingAssembly().GetName().Version} Toolbox###DynamisToolbox",
+            ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoDocking
+        )
     {
         _messageHub = messageHub;
         _configuration = configuration;

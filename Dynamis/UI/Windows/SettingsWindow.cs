@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using System.Reflection;
 using Dalamud.Interface;
 using Dalamud.Interface.Style;
 using Dalamud.Interface.Utility.Raii;
@@ -26,7 +27,7 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
 
     public SettingsWindow(ConfigurationContainer configuration, ImGuiComponents imGuiComponents, IChatGui chatGui,
         MessageHub messageHub, Ipfd ipfd) : base(
-        "Dynamis Settings",
+        $"Dynamis {Assembly.GetExecutingAssembly().GetName().Version} Settings###DynamisSettings",
         ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoDocking
     )
     {
