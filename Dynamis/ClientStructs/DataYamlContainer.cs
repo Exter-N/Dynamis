@@ -2,6 +2,7 @@ using System.Net;
 using Dalamud.Plugin;
 using Dynamis.Configuration;
 using Dynamis.Interop;
+using Dynamis.Interop.Win32;
 using Dynamis.Messaging;
 using Dynamis.Utility;
 using Microsoft.Extensions.Logging;
@@ -124,22 +125,23 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
                 return instance.Ea.Value;
             }
 
-            try {
-                return *(nint*)instance.Ea.Value;
-            } catch (AccessViolationException) {
-                _logger.LogError("Failed to dereference instance ea 0x{Ea:X}, returning nullptr", instance.Ea.Value);
+            if (!VirtualMemory.GetProtection(instance.Ea.Value).CanRead()) {
+                _logger.LogError("Cannot dereference ea pointer 0x{Ea:X}, returning nullptr", instance.Ea.Value);
                 return 0;
             }
+
+            return *(nint*)instance.Ea.Value;
         }
 
         unsafe nint ReadVfuncAddress(nint vtbl, uint index)
         {
-            try {
-                return ((nint*)vtbl)[index];
-            } catch (AccessViolationException) {
-                _logger.LogError("Failed to read vfunc address 0x{Vtbl:X}[{Index}], returning nullptr", vtbl, index);
+            var ptr = ((nint*)vtbl) + index;
+            if (!VirtualMemory.GetProtection((nint)ptr).CanRead()) {
+                _logger.LogError("Cannot dereference vfunc pointer 0x{Ea:X}, returning nullptr", (nint)ptr);
                 return 0;
             }
+
+            return *ptr;
         }
 
         if (Data is null) {
