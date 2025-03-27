@@ -67,7 +67,7 @@ public sealed partial class ClassRegistry
             }
 
             for (var i = 0; i < restOfPageSize; i += sizeof(nint)) {
-                var func = *(nint*)(vtbl + i);
+                var func = *(nint*)(restOfPage + i);
                 if (func == 0) {
                     continue;
                 }
