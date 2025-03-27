@@ -99,7 +99,7 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
         if (address != 0) {
             if (typeHint.HasFlag(AddressType.Instance) && ClassesByInstancePointer is not null) {
                 foreach (var (pointer, name2) in ClassesByInstancePointer) {
-                    if (*(nint*)pointer == address) {
+                    if (VirtualMemory.GetProtection(pointer).CanRead() && *(nint*)pointer == address) {
                         return new(AddressType.Instance, name2.ClassName, name2.Name);
                     }
                 }
@@ -107,7 +107,7 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
 
             if (typeHint.HasFlag(AddressType.Function) && VirtualFunctions is not null) {
                 foreach (var (pointer, vfName) in VirtualFunctions) {
-                    if (*(nint*)pointer == address) {
+                    if (VirtualMemory.GetProtection(pointer).CanRead() && *(nint*)pointer == address) {
                         return new(AddressType.Function, vfName.ClassName, vfName.FunctionName);
                     }
                 }
