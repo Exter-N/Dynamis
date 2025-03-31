@@ -21,6 +21,7 @@ public sealed class IpcProvider(
     private ICallGateProvider<nint, object?>?                           _imGuiDrawPointerTooltipDetails;
     private ICallGateProvider<nint, (string, Type?, uint, uint)>?       _getClass;
     private ICallGateProvider<nint, string?, Type?, (bool, uint)>?      _isInstanceOf;
+    private ICallGateProvider<object?>?                                 _preloadDataYaml;
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -74,11 +75,22 @@ public sealed class IpcProvider(
             logger.LogError(e, $"Error while registering IPC provider for {nameof(IsInstanceOf)}");
         }
 
+        try {
+            _preloadDataYaml = pi.GetIpcProvider<object?>($"Dynamis.{nameof(PreloadDataYaml)}.V1");
+            _preloadDataYaml.RegisterAction(PreloadDataYaml);
+        } catch (Exception e) {
+            _preloadDataYaml = null;
+            logger.LogError(e, $"Error while registering IPC provider for {nameof(PreloadDataYaml)}");
+        }
+
         return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
+        _preloadDataYaml?.UnregisterAction();
+        _preloadDataYaml = null;
+
         _isInstanceOf?.UnregisterFunc();
         _isInstanceOf = null;
 
@@ -175,4 +187,7 @@ public sealed class IpcProvider(
 
         return (false, 0);
     }
+
+    private void PreloadDataYaml()
+        => messageHub.Publish<DataYamlPreloadMessage>();
 }
