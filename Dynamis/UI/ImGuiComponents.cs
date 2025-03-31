@@ -15,6 +15,7 @@ namespace Dynamis.UI;
 public sealed partial class ImGuiComponents(
     MessageHub messageHub,
     FileDialogManager fileDialogManager,
+    ModuleAddressResolver moduleAddressResolver,
     AddressIdentifier addressIdentifier,
     ObjectInspector objectInspector,
     Lazy<ObjectInspectorDispatcher> objectInspectorDispatcher,
@@ -81,7 +82,9 @@ public sealed partial class ImGuiComponents(
     {
         using (ImRaii.PushFont(UiBuilder.MonoFont, pointer != 0)) {
             if (ImGui.Selectable(pointer == 0 ? "nullptr" : $"0x{pointer:X}")) {
-                contextMenu.Open(new PointerContextMenu(messageHub, pointer, @class));
+                contextMenu.Open(
+                    new PointerContextMenu(messageHub, pointer, moduleAddressResolver.Resolve(pointer), @class)
+                );
             }
         }
 
@@ -143,7 +146,11 @@ public sealed partial class ImGuiComponents(
         }
     }
 
-    private sealed class PointerContextMenu(MessageHub messageHub, nint pointer, Func<ClassInfo?>? @class) : IDrawable
+    private sealed class PointerContextMenu(
+        MessageHub messageHub,
+        nint pointer,
+        ModuleAddress? moduleAddress,
+        Func<ClassInfo?>? @class) : IDrawable
     {
         public bool Draw()
         {
@@ -153,9 +160,24 @@ public sealed partial class ImGuiComponents(
                 ret = true;
             }
 
-            if (ImGui.Selectable("Copy address")) {
+            if (ImGui.Selectable($"Copy address ({pointer:X})")) {
                 ImGui.SetClipboardText(pointer.ToString("X"));
                 ret = true;
+            }
+
+            if (moduleAddress is not null) {
+                if (ImGui.Selectable($"Copy {moduleAddress}")) {
+                    ImGui.SetClipboardText(moduleAddress.ToString());
+                    ret = true;
+                }
+
+                if (moduleAddress.OriginalAddress != 0 && moduleAddress.OriginalAddress != pointer
+                                                       && ImGui.Selectable(
+                                                              $"Copy original address ({moduleAddress.OriginalAddress:X})"
+                                                          )) {
+                    ImGui.SetClipboardText(moduleAddress.OriginalAddress.ToString("X"));
+                    ret = true;
+                }
             }
 
             return ret;

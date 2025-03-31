@@ -64,7 +64,8 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
         _logger = logger;
         _pi = pi;
         _httpClient = httpClient;
-        _exeOffset = Process.GetCurrentProcess().MainModule!.BaseAddress - unchecked((nint)0x140000000);
+        var exeBaseAddress = Process.GetCurrentProcess().MainModule!.BaseAddress;
+        _exeOffset = exeBaseAddress - ModuleAddressResolver.GetOriginalBaseAddress(exeBaseAddress);
         Refresh();
     }
 

@@ -1,6 +1,6 @@
 namespace Dynamis.Interop;
 
-public record ModuleAddress(string ModuleName, string? SymbolName, nint Displacement)
+public record ModuleAddress(string ModuleName, string? SymbolName, nint Displacement, nint OriginalAddress)
 {
     public override string ToString()
         => SymbolName is not null

@@ -13,6 +13,7 @@ public sealed class SnapshotViewer(
     ConfigurationContainer configuration,
     MessageHub messageHub,
     ObjectInspector objectInspector,
+    ModuleAddressResolver moduleAddressResolver,
     ContextMenu contextMenu,
     ImGuiComponents imGuiComponents)
 {
@@ -99,7 +100,11 @@ public sealed class SnapshotViewer(
 
         if (clicked) {
             contextMenu.Open(
-                new FieldContextMenu(messageHub, objectInspector, path, value, _vmSnapshot.Address + (nint)path.Offset)
+                new FieldContextMenu(
+                    messageHub, objectInspector, path, value,
+                    path.Type == FieldType.Pointer ? moduleAddressResolver.Resolve((nint)value) : null,
+                    _vmSnapshot.Address + (nint)path.Offset
+                )
             );
         }
     }
@@ -169,6 +174,7 @@ public sealed class SnapshotViewer(
         ObjectInspector objectInspector,
         ValuePath path,
         object value,
+        ModuleAddress? moduleAddress,
         nint? ea) : IDrawable
     {
         private readonly string? _enumName = path.EnumType is not null ? Enum.GetName(path.EnumType, value) : null;
@@ -230,6 +236,20 @@ public sealed class SnapshotViewer(
             } else {
                 if (ImGui.Selectable($"Copy {value}")) {
                     ImGui.SetClipboardText($"{value}");
+                    ret = true;
+                }
+            }
+
+            if (moduleAddress is not null) {
+                if (ImGui.Selectable($"Copy {moduleAddress}")) {
+                    ImGui.SetClipboardText(moduleAddress.ToString());
+                    ret = true;
+                }
+
+                if (moduleAddress.OriginalAddress != 0
+                 && (value is not nint pointer || moduleAddress.OriginalAddress != pointer)
+                 && ImGui.Selectable($"Copy original address ({moduleAddress.OriginalAddress:X})")) {
+                    ImGui.SetClipboardText(moduleAddress.OriginalAddress.ToString("X"));
                     ret = true;
                 }
             }

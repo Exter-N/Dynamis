@@ -8,9 +8,10 @@ public sealed class SnapshotViewerFactory(
     ConfigurationContainer configuration,
     MessageHub messageHub,
     ObjectInspector objectInspector,
+    ModuleAddressResolver moduleAddressResolver,
     ContextMenu contextMenu,
     ImGuiComponents imGuiComponents)
 {
     public SnapshotViewer Create()
-        => new(configuration, messageHub, objectInspector, contextMenu, imGuiComponents);
+        => new(configuration, messageHub, objectInspector, moduleAddressResolver, contextMenu, imGuiComponents);
 }
