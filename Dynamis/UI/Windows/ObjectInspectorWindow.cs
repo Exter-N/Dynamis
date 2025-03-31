@@ -277,10 +277,30 @@ public sealed class ObjectInspectorWindow : Window
         }
 
         ImGui.TextUnformatted($"Class Name: {@class.Name}");
+        ImGui.SameLine(0.0f, ImGui.GetStyle().ItemInnerSpacing.X);
+        if (ImGuiComponents.NormalizedIconButton(FontAwesomeIcon.Copy)) {
+            ImGui.SetClipboardText(@class.Name);
+        }
+
+        if (ImGui.IsItemHovered()) {
+            using var _ = ImRaii.Tooltip();
+            ImGui.TextUnformatted("Copy to clipboard");
+        }
+
         if (@class.DataYamlParents.Length > 0 && _vmShowParents) {
             using var indent = ImRaii.PushIndent(2);
             foreach (var parent in @class.DataYamlParents) {
                 ImGui.TextUnformatted($"Parent: {parent.Name}");
+                ImGui.SameLine(0.0f, ImGui.GetStyle().ItemInnerSpacing.X);
+                if (ImGuiComponents.NormalizedIconButton(FontAwesomeIcon.Copy)) {
+                    ImGui.SetClipboardText(parent.Name);
+                }
+
+                if (ImGui.IsItemHovered()) {
+                    using var _ = ImRaii.Tooltip();
+                    ImGui.TextUnformatted("Copy to clipboard");
+                }
+
                 indent.Push();
             }
         }
