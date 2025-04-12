@@ -18,7 +18,11 @@ internal static class TypeExtensions
             t = Enum.GetUnderlyingType(t);
         }
 
-        return t.FullName switch
+        return t.FullName.ToFieldType(isString);
+    }
+
+    public static FieldType? ToFieldType(this string? typeName, bool isString = false)
+        => typeName switch
         {
             "System.Boolean" => FieldType.Boolean,
             "System.Byte"    => isString ? FieldType.ByteString : FieldType.Byte,
@@ -37,7 +41,6 @@ internal static class TypeExtensions
             "System.Double"  => FieldType.Double,
             _                => null,
         };
-    }
 
     public static Type ToType(this FieldType t)
         => t switch
@@ -150,6 +153,7 @@ internal static class TypeExtensions
             FieldType.CharString => new string(MemoryMarshal.Cast<byte, char>(bytes)),
             _                    => throw new ArgumentException($"Unrecognized FieldType {t}"),
         };
+
     public static (ImGuiDataType DataType, string CFormat) ToImGui(this FieldType type, bool hexIntegers)
         => type switch
         {

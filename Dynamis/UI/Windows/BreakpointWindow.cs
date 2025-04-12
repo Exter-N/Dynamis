@@ -12,19 +12,16 @@ using Microsoft.Extensions.Logging;
 
 namespace Dynamis.UI.Windows;
 
-public sealed class BreakpointWindow : Window
+public sealed class BreakpointWindow : IndexedWindow
 {
     private const int MaxSnapshotHistorySize = 32;
 
     private readonly ILogger                _logger;
-    private readonly WindowSystem           _windowSystem;
     private readonly ImGuiComponents        _imGuiComponents;
     private readonly ObjectInspector        _objectInspector;
     private readonly ConfigurationContainer _configuration;
     private readonly MessageHub             _messageHub;
     private readonly Breakpoint             _breakpoint;
-
-    private readonly int _index;
 
     private nint            _vmNewAddress;
     private bool            _vmEnable;
@@ -35,27 +32,19 @@ public sealed class BreakpointWindow : Window
 
     private readonly List<SnapshotRecord> _vmSnapshots = [];
 
-    public int Index
-        => _index;
-
     public Breakpoint Breakpoint
         => _breakpoint;
 
-    public event EventHandler? Close;
-
     public BreakpointWindow(ILogger logger, WindowSystem windowSystem, ImGuiComponents imGuiComponents,
         ObjectInspector objectInspector, ConfigurationContainer configuration, MessageHub messageHub,
-        Breakpoint breakpoint, int index) : base($"Dynamis - IPFD Breakpoint##{index}", 0)
+        Breakpoint breakpoint, int index) : base($"Dynamis - IPFD Breakpoint##{index}", windowSystem, index, 0)
     {
         _logger = logger;
-        _windowSystem = windowSystem;
         _imGuiComponents = imGuiComponents;
         _objectInspector = objectInspector;
         _configuration = configuration;
         _messageHub = messageHub;
         _breakpoint = breakpoint;
-
-        _index = index;
 
         breakpoint.Hit += BreakpointHit;
 
@@ -227,8 +216,7 @@ public sealed class BreakpointWindow : Window
     public override void OnClose()
     {
         _breakpoint.Hit -= BreakpointHit;
-        _windowSystem.RemoveWindow(this);
-        Close?.Invoke(this, EventArgs.Empty);
+        base.OnClose();
         _breakpoint.Dispose();
     }
 

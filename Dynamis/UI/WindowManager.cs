@@ -33,6 +33,9 @@ public sealed class WindowManager(
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
+        foreach (var window in windowSystem.Windows) {
+            (window as IDisposable)?.Dispose();
+        }
         windowSystem.RemoveAllWindows();
         uiBuilder.OpenConfigUi -= OpenConfigUi;
         uiBuilder.OpenMainUi -= OpenMainUi;

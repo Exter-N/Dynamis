@@ -60,13 +60,19 @@ public ref struct SeStringInterpolatedStringHandler
     public void AppendLiteral(string value)
         => _textHandler.AppendLiteral(value);
 
+    [OverloadResolutionPriority(1)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void AppendFormatted(Payload payload)
+    public void AppendFormatted(Payload? payload)
     {
+        if (payload is null) {
+            return;
+        }
+
         Flush();
         _sb.Add(payload);
     }
 
+    [OverloadResolutionPriority(1)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AppendFormatted(BitmapFontIcon icon)
     {
@@ -74,16 +80,26 @@ public ref struct SeStringInterpolatedStringHandler
         _sb.AddIcon(icon);
     }
 
+    [OverloadResolutionPriority(1)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void AppendFormatted(SeString str)
+    public void AppendFormatted(SeString? str)
     {
+        if (str is null) {
+            return;
+        }
+
         Flush();
         _sb.Append(str);
     }
 
+    [OverloadResolutionPriority(1)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void AppendFormatted(IEnumerable<Payload> payloads)
+    public void AppendFormatted(IEnumerable<Payload>? payloads)
     {
+        if (payloads is null) {
+            return;
+        }
+
         Flush();
         _sb.Append(payloads);
     }
@@ -112,6 +128,7 @@ public ref struct SeStringInterpolatedStringHandler
     public void AppendFormatted(scoped ReadOnlySpan<char> value, int alignment = 0, string? format = null)
         => _textHandler.AppendFormatted(value, alignment, format);
 
+    [OverloadResolutionPriority(2)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AppendFormatted(string? value)
         => _textHandler.AppendFormatted(value);

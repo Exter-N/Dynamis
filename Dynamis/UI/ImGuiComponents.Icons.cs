@@ -111,7 +111,7 @@ partial class ImGuiComponents
         return wasClicked;
     }
 
-    public static void NormalizedIcon(FontAwesomeIcon icon, uint color)
+    public static void NormalizedIcon(FontAwesomeIcon icon, uint? color)
     {
         var cursorPos = ImGui.GetCursorPos();
         var iconData = GetIconData(icon);
@@ -129,7 +129,7 @@ partial class ImGuiComponents
                 windowPos.X - scrollPosX + cursorPos.X + iconData.OffsetX,
                 windowPos.Y - scrollPosY + cursorPos.Y + frameOffsetY
             ),
-            color, icon.ToIconString()
+            color ?? ImGui.GetColorU32(ImGuiCol.Text), icon.ToIconString()
         );
 
         ImGui.Dummy(new(iconData.NormalizedIconScale.X, ImGui.GetFrameHeight()));

@@ -14,10 +14,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Dynamis.UI.Windows;
 
-public sealed class ObjectInspectorWindow : Window
+public sealed class ObjectInspectorWindow : IndexedWindow
 {
     private readonly ILogger                         _logger;
-    private readonly WindowSystem                    _windowSystem;
     private readonly DataYamlContainer               _dataYamlContainer;
     private readonly ObjectInspector                 _objectInspector;
     private readonly Lazy<ObjectInspectorDispatcher> _objectInspectorDispatcher;
@@ -25,8 +24,6 @@ public sealed class ObjectInspectorWindow : Window
     private readonly SnapshotViewer   _snapshotViewer;
     private readonly SnapshotViewer   _associatedSnapshotViewer;
     private readonly ClassFieldViewer _classFieldViewer;
-
-    private readonly int _index;
 
     private          bool                     _vmShowParents = false;
     private readonly Dictionary<Type, object> _vmCustom      = [];
@@ -37,24 +34,18 @@ public sealed class ObjectInspectorWindow : Window
 
     private bool _vmLive;
 
-    public int Index
-        => _index;
-
     public nint ObjectAddress
         => _vmAddress;
 
     public ObjectSnapshot? Snapshot
         => _vmSnapshot;
 
-    public event EventHandler? Close;
-
     public ObjectInspectorWindow(ILogger logger, WindowSystem windowSystem, ImGuiComponents imGuiComponents,
         DataYamlContainer dataYamlContainer, ObjectInspector objectInspector,
         SnapshotViewerFactory snapshotViewerFactory, Lazy<ObjectInspectorDispatcher> objectInspectorDispatcher,
-        int index) : base($"Dynamis - Object Inspector##{index}", 0)
+        int index) : base($"Dynamis - Object Inspector##{index}", windowSystem, index, 0)
     {
         _logger = logger;
-        _windowSystem = windowSystem;
         _dataYamlContainer = dataYamlContainer;
         _objectInspector = objectInspector;
         _objectInspectorDispatcher = objectInspectorDispatcher;
@@ -62,8 +53,6 @@ public sealed class ObjectInspectorWindow : Window
         _snapshotViewer = snapshotViewerFactory.Create();
         _associatedSnapshotViewer = snapshotViewerFactory.Create();
         _classFieldViewer = new();
-
-        _index = index;
 
         SizeConstraints = new WindowSizeConstraints
         {
@@ -359,11 +348,5 @@ public sealed class ObjectInspectorWindow : Window
                 );
             }
         }
-    }
-
-    public override void OnClose()
-    {
-        _windowSystem.RemoveWindow(this);
-        Close?.Invoke(this, EventArgs.Empty);
     }
 }

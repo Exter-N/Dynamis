@@ -17,57 +17,23 @@ public sealed class ObjectInspectorWindowFactory(
     ObjectInspector objectInspector,
     SnapshotViewerFactory snapshotViewerFactory,
     Lazy<ObjectInspectorDispatcher> objectInspectorDispatcher)
-    : IMessageObserver<OpenWindowMessage<ObjectInspectorWindow>>,
+    : WindowFactory<ObjectInspectorWindow>(windowSystem),
         IMessageObserver<InspectObjectMessage>,
         IMessageObserver<CommandMessage>
 {
-    private readonly HashSet<ObjectInspectorWindow> _openWindows     = [];
-    private readonly HashSet<int>                   _reusableIndices = [];
-    private          int                            _nextIndex       = 0;
-
-    private int GetFreeIndex()
-    {
-        foreach (var index in _reusableIndices) {
-            _reusableIndices.Remove(index);
-            return index;
-        }
-
-        return _nextIndex++;
-    }
-
-    private ObjectInspectorWindow CreateWindow()
+    protected override ObjectInspectorWindow DoCreateWindow()
     {
         dataYamlContainer.Preload();
 
-        var window = new ObjectInspectorWindow(
-            logger, windowSystem, imGuiComponents, dataYamlContainer, objectInspector, snapshotViewerFactory,
+        return new(
+            logger, WindowSystem, imGuiComponents, dataYamlContainer, objectInspector, snapshotViewerFactory,
             objectInspectorDispatcher, GetFreeIndex()
         );
-        window.Close += WindowClose;
-        windowSystem.AddWindow(window);
-        window.IsOpen = true;
-        _openWindows.Add(window);
-        window.BringToFront();
-
-        return window;
     }
-
-    private void WindowClose(object? sender, EventArgs e)
-    {
-        if (sender is not ObjectInspectorWindow window) {
-            return;
-        }
-
-        _openWindows.Remove(window);
-        _reusableIndices.Add(window.Index);
-    }
-
-    public void HandleMessage(OpenWindowMessage<ObjectInspectorWindow> _)
-        => CreateWindow();
 
     public void HandleMessage(InspectObjectMessage message)
     {
-        var window = _openWindows.FirstOrDefault(
+        var window = OpenWindows.FirstOrDefault(
             message.Snapshot is not null
                 ? window => window.Snapshot == message.Snapshot
                 : message.Class is not null
@@ -80,7 +46,7 @@ public sealed class ObjectInspectorWindowFactory(
             return;
         }
 
-        window = CreateWindow();
+        window = CreateWindow()!;
         if (message.Snapshot is not null) {
             window.Inspect(message.Snapshot);
         } else {
@@ -107,12 +73,12 @@ public sealed class ObjectInspectorWindowFactory(
         message.SetHandled();
 
         var window =
-            _openWindows.FirstOrDefault(window => (window.Snapshot?.Address ?? window.ObjectAddress) == address);
+            OpenWindows.FirstOrDefault(window => (window.Snapshot?.Address ?? window.ObjectAddress) == address);
         if (window is not null) {
             window.BringToFront();
             return;
         }
 
-        CreateWindow().Inspect(address, null);
+        CreateWindow()!.Inspect(address, null);
     }
 }

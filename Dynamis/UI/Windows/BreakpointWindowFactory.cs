@@ -25,52 +25,28 @@ public sealed class BreakpointWindowFactory(
     ConfigurationContainer configuration,
     MessageHub messageHub,
     ResourceProvider resourceProvider)
-    : IMessageObserver<OpenWindowMessage<BreakpointWindow>>,
+    : WindowFactory<BreakpointWindow>(windowSystem),
         IMessageObserver<BreakpointDisposedMessage>,
         IMessageObserver<CommandMessage>
 {
-    private readonly HashSet<BreakpointWindow> _openWindows     = [];
-    private readonly HashSet<int>              _reusableIndices = [];
-    private          int                       _nextIndex       = 0;
-
-    private int GetFreeIndex()
+    private BreakpointWindow DoCreateWindow(Breakpoint breakpoint)
     {
-        foreach (var index in _reusableIndices) {
-            _reusableIndices.Remove(index);
-            return index;
-        }
+        messageHub.Publish<DataYamlPreloadMessage>();
 
-        return _nextIndex++;
+        return new(
+            logger, WindowSystem, imGuiComponents, objectInspector, configuration, messageHub, breakpoint,
+            GetFreeIndex()
+        );
     }
 
     private BreakpointWindow CreateWindow(Breakpoint breakpoint)
     {
-        messageHub.Publish<DataYamlPreloadMessage>();
-
-        var window = new BreakpointWindow(
-            logger, windowSystem, imGuiComponents, objectInspector, configuration, messageHub, breakpoint,
-            GetFreeIndex()
-        );
-        window.Close += WindowClose;
-        windowSystem.AddWindow(window);
-        window.IsOpen = true;
-        _openWindows.Add(window);
-        window.BringToFront();
-
+        var window = DoCreateWindow(breakpoint);
+        SetupWindow(window);
         return window;
     }
 
-    private void WindowClose(object? sender, EventArgs e)
-    {
-        if (sender is not BreakpointWindow window) {
-            return;
-        }
-
-        _openWindows.Remove(window);
-        _reusableIndices.Add(window.Index);
-    }
-
-    public void HandleMessage(OpenWindowMessage<BreakpointWindow> _)
+    protected override BreakpointWindow? DoCreateWindow()
     {
         Breakpoint breakpoint;
         try {
@@ -86,15 +62,15 @@ public sealed class BreakpointWindowFactory(
                     IconTexture = resourceProvider.LoadManifestResourceImage("Dynamis64.png")!,
                 }
             );
-            return;
+            return null;
         }
 
-        CreateWindow(breakpoint);
+        return DoCreateWindow(breakpoint);
     }
 
     public void HandleMessage(BreakpointDisposedMessage message)
     {
-        var window = _openWindows.FirstOrDefault(window => window.Breakpoint == message.Breakpoint);
+        var window = OpenWindows.FirstOrDefault(window => window.Breakpoint == message.Breakpoint);
         if (window is not null) {
             window.IsOpen = false;
         }

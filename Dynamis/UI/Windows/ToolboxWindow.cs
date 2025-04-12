@@ -45,6 +45,10 @@ public sealed class ToolboxWindow : Window, ISingletonWindow, IMessageObserver<C
         }
 
         ImGui.SameLine();
+        if (ImGui.Button("Hosted PowerShell")) {
+            _messageHub.Publish<OpenWindowMessage<HostedPsWindow>>();
+        }
+
         using (ImRaii.Disabled(!_configuration.Configuration.EnableIpfd)) {
             if (ImGui.Button("IPFD Breakpoint")) {
                 _messageHub.Publish<OpenWindowMessage<BreakpointWindow>>();

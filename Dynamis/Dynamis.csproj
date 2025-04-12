@@ -38,6 +38,13 @@
 
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0"/>
+        <PackageReference Include="Microsoft.PowerShell.Commands.Diagnostics" Version="7.6.0-preview.3" />
+        <PackageReference Include="Microsoft.PowerShell.Commands.Management" Version="7.6.0-preview.3" />
+        <PackageReference Include="Microsoft.PowerShell.Commands.Utility" Version="7.6.0-preview.3" />
+        <PackageReference Include="Microsoft.PowerShell.ConsoleHost" Version="7.6.0-preview.3" />
+        <PackageReference Include="Microsoft.PowerShell.Security" Version="7.6.0-preview.3" />
+        <PackageReference Include="Microsoft.WSMan.Management" Version="7.6.0-preview.3" />
+        <PackageReference Include="System.Management.Automation" Version="7.6.0-preview.3" />
         <PackageReference Include="YamlDotNet" Version="15.1.2" />
     </ItemGroup>
 
