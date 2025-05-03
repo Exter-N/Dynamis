@@ -17,18 +17,23 @@ public sealed partial class SymbolApi : IMessageObserver<ConfigurationChangedMes
     private readonly ConfigurationContainer  _configuration;
 
     private bool _initialized;
+    private bool _forceInitialized;
 
     public SymbolApi(IDalamudPluginInterface pi, ILogger<SymbolApi> logger, ConfigurationContainer configuration)
     {
         _pi = pi;
         _logger = logger;
         _configuration = configuration;
-        if (!Util.IsWine()) {
-            // On Windows, Dalamud will have initialized this at boot.
-            _initialized = true;
-        } else if (configuration.Configuration.EnableWineSymbolHandler) {
-            InitSymbolHandler(pi, logger);
-            _initialized = true;
+        switch (configuration.Configuration.SymbolHandlerMode) {
+            case SymbolHandlerMode.ForceInitialize:
+                InitSymbolHandler(pi, logger);
+                _initialized = true;
+                _forceInitialized = true;
+                break;
+            case SymbolHandlerMode.Default:
+                // On Windows, Dalamud will have initialized this at boot.
+                _initialized = !Util.IsWine();
+                break;
         }
     }
 
@@ -56,10 +61,21 @@ public sealed partial class SymbolApi : IMessageObserver<ConfigurationChangedMes
 
     public void HandleMessage(ConfigurationChangedMessage message)
     {
-        if (message.IsPropertyChanged(nameof(_configuration.Configuration.EnableWineSymbolHandler))
-         && _configuration.Configuration.EnableWineSymbolHandler && !_initialized) {
-            InitSymbolHandler(_pi, _logger);
-            _initialized = true;
+        if (!message.IsPropertyChanged(nameof(_configuration.Configuration.SymbolHandlerMode))) {
+            return;
+        }
+
+        switch (_configuration.Configuration.SymbolHandlerMode) {
+            case SymbolHandlerMode.ForceInitialize:
+                if (!_forceInitialized) {
+                    InitSymbolHandler(_pi, _logger);
+                    _initialized = true;
+                    _forceInitialized = true;
+                }
+                break;
+            case SymbolHandlerMode.Default:
+                _initialized |= !Util.IsWine();
+                break;
         }
     }
 

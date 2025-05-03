@@ -14,6 +14,7 @@ using ImGuiNET;
 using Microsoft.Extensions.Logging;
 using static Dynamis.Utility.ChatGuiUtility;
 using static Dynamis.Utility.SeStringUtility;
+using EnumExtensions = Dynamis.Configuration.EnumExtensions;
 
 namespace Dynamis.UI.Windows;
 
@@ -143,16 +144,25 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
             }
         }
 
+        var symbolHandlerMode = configuration.SymbolHandlerMode;
         if (Util.IsWine()) {
-            var enableWineSymbolHandler = configuration.EnableWineSymbolHandler;
+            var enableWineSymbolHandler = symbolHandlerMode == SymbolHandlerMode.ForceInitialize;
             if (ImGui.Checkbox("Enable Symbol Handler", ref enableWineSymbolHandler)) {
-                configuration.EnableWineSymbolHandler = enableWineSymbolHandler;
-                _configuration.Save(nameof(configuration.EnableWineSymbolHandler));
+                symbolHandlerMode = enableWineSymbolHandler
+                    ? SymbolHandlerMode.ForceInitialize
+                    : SymbolHandlerMode.Disable;
+                configuration.SymbolHandlerMode = symbolHandlerMode;
+                _configuration.Save(nameof(configuration.SymbolHandlerMode));
             }
-
-            ImGui.SameLine(0.0f, innerSpacing);
-            DrawUnstableSettingWarning();
+        } else {
+            if (ImGuiComponents.ComboEnum("Symbol Handler Mode", ref symbolHandlerMode, EnumExtensions.Label)) {
+                configuration.SymbolHandlerMode = symbolHandlerMode;
+                _configuration.Save(nameof(configuration.SymbolHandlerMode));
+            }
         }
+
+        ImGui.SameLine(0.0f, innerSpacing);
+        DrawUnstableSettingWarning();
     }
 
     private static void DrawUnstableSettingWarning()
