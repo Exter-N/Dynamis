@@ -12,7 +12,7 @@ public sealed unsafe class TextureResourceHandleInspector(TextureInspector textu
     public void DrawAdditionalHeaderDetails(TextureResourceHandle* pointer, ObjectSnapshot snapshot, bool live,
         ObjectInspectorWindow window)
     {
-        if (live) {
+        if (live && pointer->RefCount > 0) {
             textureInspector.DrawAdditionalHeaderDetails(pointer->Texture, snapshot, live, window);
         }
     }

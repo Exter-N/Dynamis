@@ -21,6 +21,11 @@ public sealed unsafe class ResourceHandleInspector : IObjectInspector<ResourceHa
 
     public void DrawAdditionalTooltipDetails(ResourceHandle* pointer)
     {
+        ImGui.TextUnformatted($"Reference Count: {pointer->RefCount}");
+        if (pointer->RefCount <= 0) {
+            return;
+        }
+
         ImGui.TextUnformatted($"File Name: {pointer->FileName}");
         var length = pointer->GetLength();
         if (length > 0) {
@@ -30,7 +35,15 @@ public sealed unsafe class ResourceHandleInspector : IObjectInspector<ResourceHa
 
     public void DrawAdditionalHeaderDetails(ResourceHandle* pointer, ObjectSnapshot snapshot, bool live, ObjectInspectorWindow window)
     {
+        if (!live) {
+            return;
+        }
+
         DrawAdditionalTooltipDetails(pointer);
+        if (pointer->RefCount <= 0) {
+            return;
+        }
+
         var data = pointer->GetData();
         var length = pointer->GetLength();
         if (data is null || length <= 0) {
