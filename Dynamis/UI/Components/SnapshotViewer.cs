@@ -72,7 +72,7 @@ public sealed class SnapshotViewer(
             var ptrOffset = offset & -nint.Size;
             if (ptrOffset + nint.Size <= _vmSnapshot.Data.Length) {
                 var pointer =
-                    MemoryMarshal.Cast<byte, nint>(_vmSnapshot.Data.AsSpan(ptrOffset..(ptrOffset + nint.Size)))[0];
+                    MemoryMarshal.Read<nint>(_vmSnapshot.Data.AsSpan(ptrOffset..(ptrOffset + nint.Size)));
                 if (VirtualMemory.GetProtection(pointer).CanRead()) {
                     path = new((uint)ptrOffset, (uint)nint.Size, $"Unk_{ptrOffset:X}", FieldType.Pointer, null);
                 }
@@ -111,7 +111,7 @@ public sealed class SnapshotViewer(
 
     private static ValuePath GetValuePath(ClassInfo? @class, uint offset)
     {
-        var field = @class?.Fields
+        var field = @class?.AllScalars
                            .LastOrDefault(field => offset >= field.Offset && offset < field.Offset + field.Size);
         if (field is null) {
             return ValuePath.Default;
@@ -224,11 +224,22 @@ public sealed class SnapshotViewer(
                     ImGui.SetClipboardText($"{value:X}");
                     ret = true;
                 }
+            } else if (path.Type == FieldType.CStringPointer && value is CStringSnapshot str) {
+                if (ImGui.Selectable($"Copy {str.Value}")) {
+                    ImGui.SetClipboardText($"{str.Value}");
+                    ret = true;
+                }
+
+                if (ImGui.Selectable($"Copy {str.Address:X}")) {
+                    ImGui.SetClipboardText($"{str.Address:X}");
+                    ret = true;
+                }
             } else if (path.Type.IsInteger() && $"{value:X}" != $"{value}") {
                 if (ImGui.Selectable($"Copy {value:X}")) {
                     ImGui.SetClipboardText($"{value:X}");
                     ret = true;
                 }
+
                 if (ImGui.Selectable($"Copy {value}")) {
                     ImGui.SetClipboardText($"{value}");
                     ret = true;

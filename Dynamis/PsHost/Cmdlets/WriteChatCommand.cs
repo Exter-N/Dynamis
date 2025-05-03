@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Dynamis.PsHost.Cmdlets;
 
 [Cmdlet(VerbsCommunications.Write, "Chat")]
+[Alias("wrc")]
 public sealed class WriteChatCommand : Cmdlet
 {
     private IChatGui? _chatGui;

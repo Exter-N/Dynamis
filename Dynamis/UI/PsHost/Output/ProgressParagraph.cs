@@ -6,9 +6,11 @@ public sealed class ProgressParagraph : IParagraph
 {
     public void Update(ProgressRecord record)
     {
+        // TODO
     }
 
-    public void Draw()
+    public void Draw(ParagraphDrawFlags flags)
     {
+        // TODO
     }
 }

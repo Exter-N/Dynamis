@@ -23,12 +23,12 @@ public sealed class Section(string title, int index, bool nested) : IParagraph
         }
     }
 
-    public void Draw()
+    public void Draw(ParagraphDrawFlags flags)
     {
         if (nested) {
             using var node = ImRaii.TreeNode($"{title}###{index}", ImGuiTreeNodeFlags.DefaultOpen);
             if (node) {
-                DrawChildren();
+                DrawChildren(flags);
             }
         } else {
             if (!ImGui.CollapsingHeader($"{title}###{index}", ImGuiTreeNodeFlags.DefaultOpen)) {
@@ -36,16 +36,16 @@ public sealed class Section(string title, int index, bool nested) : IParagraph
             }
 
             using (ImRaii.PushId(index)) {
-                DrawChildren();
+                DrawChildren(flags);
             }
         }
     }
 
-    private void DrawChildren()
+    private void DrawChildren(ParagraphDrawFlags flags)
     {
         lock (_children) {
             foreach (var child in _children) {
-                child.Draw();
+                child.Draw(flags);
             }
         }
     }

@@ -131,8 +131,7 @@ public sealed class IpcProvider(
     private (string, Type?, uint, uint) GetClass(nint pointer)
     {
         var (@class, displacement) = objectInspector.DetermineClassAndDisplacement(pointer);
-        return (@class.Name, @class.ManagedType ?? (@class.ManagedParents.Length > 0 ? @class.ManagedParents[0] : null),
-            @class.EstimatedSize, (uint)displacement);
+        return (@class.Name, @class.BestManagedType, @class.EstimatedSize, (uint)displacement);
     }
 
     private (bool, uint) IsInstanceOf(nint pointer, string? className, Type? type)

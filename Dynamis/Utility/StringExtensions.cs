@@ -60,4 +60,51 @@ public static class StringExtensions
 
     public static string EscapePsArgument(this string value)
         => $"'{value.Replace("'", "''").Replace("\u2018", "\u2018\u2018").Replace("\u2019", "\u2019\u2019")}'";
+
+    public static ReadOnlySpan<T> BeforeNull<T>(this ReadOnlySpan<T> span) where T : unmanaged, IEquatable<T>
+    {
+        var pos = span.IndexOf(default(T));
+        return pos >= 0 ? span[..pos] : span;
+    }
+
+    public static int WriteNullTerminated(this ReadOnlySpan<char> value, Span<byte> span)
+    {
+        var byteCount = Encoding.UTF8.GetBytes(value, span);
+        if (byteCount == span.Length) {
+            while ((span[byteCount - 1] & 0xC0) == 0x80) {
+                --byteCount;
+            }
+
+            --byteCount;
+        }
+
+        span[byteCount] = 0;
+        return byteCount;
+    }
+
+    public static int WriteNullTerminated(this string value, Span<byte> span)
+        => WriteNullTerminated(value.AsSpan(), span);
+
+    public static int WriteNullTerminated(this ReadOnlySpan<char> value, Span<char> span)
+    {
+        if (value.Length > span.Length) {
+            value = value[..span.Length];
+        }
+
+        var charCount = value.Length;
+        value.CopyTo(span);
+        if (charCount == span.Length) {
+            while (char.IsLowSurrogate(span[charCount - 1])) {
+                --charCount;
+            }
+
+            --charCount;
+        }
+
+        span[charCount] = '\0';
+        return charCount;
+    }
+
+    public static int WriteNullTerminated(this string value, Span<char> span)
+        => WriteNullTerminated(value.AsSpan(), span);
 }

@@ -43,9 +43,9 @@ public sealed partial class ClassRegistry
                     vtbl + (nint)knownVfuncCount * sizeof(nint), safeReads
                 )),
                 VtblOwnerSizeAndDisplacementFromDtor = ownerSizeAndDisplacement,
-                Fields = fields.ToArray(),
             };
 
+            classInfo.SetFields(fields);
             classInfo.SizeFromOuterContext = classInfo.EstimatedSize;
 
             _classCache.Add(vtblClassName, classInfo);

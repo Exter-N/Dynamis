@@ -5,7 +5,7 @@ using ImGuiNET;
 
 namespace Dynamis.UI.PsHost.Input;
 
-public sealed class CommandPrompt(string prompt, IList<string> commandHistory, Runspace? runspace) : LinePrompt
+public sealed class CommandPrompt(string prompt, IList<string> commandHistory, RunspacePool? runspacePool) : LinePrompt
 {
     private int    _historyCursor  = commandHistory.Count;
     private string _currentCommand = string.Empty;
@@ -99,7 +99,8 @@ public sealed class CommandPrompt(string prompt, IList<string> commandHistory, R
             _completionCommand = command;
             _completionBytePosition = data->CursorPos;
             _completionCharPosition = Encoding.UTF8.GetCharCount(data->Buf, data->CursorPos);
-            using var ps = PowerShell.Create(runspace);
+            using var ps = PowerShell.Create();
+            ps.RunspacePool = runspacePool;
             _completionResult = CommandCompletion.CompleteInput(_completionCommand, _completionCharPosition, [], ps);
             _completionReplacementStart = _completionResult.ReplacementIndex;
             _completionReplacementEnd = _completionReplacementStart + _completionResult.ReplacementLength;

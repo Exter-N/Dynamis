@@ -17,16 +17,17 @@ public static class PseudoClasses
                 // This case intentionally left blank.
                 break;
             case Template.SingleArray:
-                classInfo.Fields =
-                [
-                    new FieldInfo
-                    {
-                        Name = "Data",
-                        Offset = 0,
-                        Size = size,
-                        Type = FieldType.Single,
-                    },
-                ];
+                classInfo.SetFields(
+                    [
+                        new FieldInfo
+                        {
+                            Name = "Data",
+                            Offset = 0,
+                            Size = size,
+                            Type = FieldType.Single,
+                        },
+                    ]
+                );
                 break;
             default:
                 throw new ArgumentOutOfRangeException(

@@ -20,5 +20,7 @@ public enum FieldType : byte
     Pointer,
     ByteString,
     CharString,
+    Object,
     ObjectArray,
+    CStringPointer,
 }

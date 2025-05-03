@@ -43,7 +43,8 @@ public sealed class Plugin : IDalamudPlugin
         ITitleScreenMenu titleScreenMenu,
         INotificationManager notificationManager,
         IFramework framework,
-        IObjectTable objectTable)
+        IObjectTable objectTable,
+        IDataManager dataManager)
     {
         Log = pluginLog;
 
@@ -73,6 +74,7 @@ public sealed class Plugin : IDalamudPlugin
                         collection.AddSingleton(notificationManager);
                         collection.AddSingleton(framework);
                         collection.AddSingleton(objectTable);
+                        collection.AddSingleton(dataManager);
 
                         collection.AddSingleton(pluginInterface.UiBuilder);
 
@@ -102,6 +104,7 @@ public sealed class Plugin : IDalamudPlugin
                         collection.AddSingleton<ImGuiComponents>();
                         collection.AddSingleton<ContextMenu>();
                         collection.AddSingleton<BootHelper>();
+                        collection.AddSingleton<DynamicBoxFactory>();
 
                         collection.AddSingleton<SnapshotViewerFactory>();
 

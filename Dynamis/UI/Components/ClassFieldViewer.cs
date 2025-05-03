@@ -1,3 +1,4 @@
+using Dalamud.Interface.Utility.Raii;
 using Dynamis.Interop;
 using Dynamis.Utility;
 using ImGuiNET;
@@ -22,10 +23,18 @@ public sealed class ClassFieldViewer
 
     public void Draw(nint baseAddress, bool writable)
     {
-        foreach (var field in _vmSnapshot!.Class!.Fields) {
+        DrawObject(baseAddress, string.Empty, _vmSnapshot!.Class!, writable);
+    }
+
+    private bool DrawObject(nint baseAddress, string prefix, ClassInfo @class, bool writable)
+    {
+        var anyChanged = false;
+        foreach (var field in @class.Fields) {
             ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X * 0.4f);
-            DrawField(baseAddress + (nint)field.Offset, string.Empty, field, writable);
+            anyChanged |= DrawField(baseAddress + (nint)field.Offset, prefix, field, writable);
         }
+
+        return anyChanged;
     }
 
     private unsafe bool DrawField(nint address, string prefix, FieldInfo field, bool writable)
@@ -53,6 +62,7 @@ public sealed class ClassFieldViewer
             case FieldType.Single:
             case FieldType.Double:
             case FieldType.Pointer:
+            case FieldType.CStringPointer:
                 var (dataType, format) = field.Type.ToImGui(_vmHexIntegers);
                 if (count > 1) {
                     var anyChanged = false;
@@ -86,6 +96,7 @@ public sealed class ClassFieldViewer
 
                     return anyChanged;
                 }
+
                 boolValue = *(byte*)address != 0;
                 if (ImGui.Checkbox(CalculateSingleLabel(), ref boolValue) && writable) {
                     *(byte*)address = boolValue ? (byte)1 : (byte)0;
@@ -148,19 +159,25 @@ public sealed class ClassFieldViewer
                 );
             case FieldType.CharString:
                 return ImGuiComponents.InputText(
-                    CalculateSingleLabel(), new((void*)address, (int)count), true,
+                    CalculateSingleLabel(), new((void*)address, count), true,
                     writable ? 0 : ImGuiInputTextFlags.ReadOnly
                 );
+            case FieldType.Object when field.ElementClass is not null:
+                using (var node = ImRaii.TreeNode(CalculateSingleLabel())) {
+                    if (node) {
+                        return DrawObject(address, string.Empty, field.ElementClass, writable);
+                    }
+                }
+
+                return false;
             case FieldType.ObjectArray when field.ElementClass is not null:
                 if (count > 1) {
                     var anyChanged = false;
-                    var itemWidth = ImGui.CalcItemWidth();
                     for (var i = 0; i < count; ++i) {
-                        var elementPrefix = $"{prefix}{field.Name}[{i}].";
-                        foreach (var subField in field.ElementClass.Fields) {
-                            ImGui.SetNextItemWidth(itemWidth);
-                            anyChanged |= DrawField(
-                                address + i * elementSize + (nint)subField.Offset, elementPrefix, subField, writable
+                        using var node = ImRaii.TreeNode(CalculateElementLabel(i));
+                        if (node) {
+                            anyChanged |= DrawObject(
+                                address + i * elementSize, string.Empty, field.ElementClass, writable
                             );
                         }
                     }
@@ -168,15 +185,13 @@ public sealed class ClassFieldViewer
                     return anyChanged;
                 }
 
-                var oaAnyChanged = false;
-                var oaItemWidth = ImGui.CalcItemWidth();
-                var oaPrefix = $"{prefix}{field.Name}.";
-                foreach (var subField in field.ElementClass.Fields) {
-                    ImGui.SetNextItemWidth(oaItemWidth);
-                    oaAnyChanged |= DrawField(address + (nint)subField.Offset, oaPrefix, subField, writable);
+                using (var node = ImRaii.TreeNode(CalculateSingleLabel())) {
+                    if (node) {
+                        return DrawObject(address, string.Empty, field.ElementClass, writable);
+                    }
                 }
 
-                return oaAnyChanged;
+                return false;
             default:
                 ImGui.TextUnformatted(
                     $"{CalculateSingleLabel()}: Non-editable field type {field.Type}{(count > 1 ? $"[{count}]" : string.Empty)}"

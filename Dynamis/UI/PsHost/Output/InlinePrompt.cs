@@ -8,7 +8,7 @@ public sealed class InlinePrompt(IPrompt prompt, Action? onComplete, bool sameLi
     private bool    _focus      = focus;
     private Action? _onComplete = onComplete;
 
-    public void Draw()
+    public void Draw(ParagraphDrawFlags flags)
     {
         if (sameLine) {
             ImGui.SameLine(0.0f, ImGui.GetStyle().ItemInnerSpacing.X);

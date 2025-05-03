@@ -4,9 +4,7 @@ using Dalamud.Interface.Style;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dynamis.ClientStructs;
-using Dynamis.Configuration;
 using Dynamis.Interop;
-using Dynamis.Messaging;
 using Dynamis.UI.Components;
 using Dynamis.UI.ObjectInspectors;
 using ImGuiNET;
@@ -220,7 +218,7 @@ public sealed class ObjectInspectorWindow : IndexedWindow
             }
         }
 
-        if (_vmSnapshot.Class?.Fields?.Length > 0) {
+        if (_vmSnapshot.Class?.Fields.Length > 0) {
             using var tab = ImRaii.TabItem("Class Fields");
             if (tab) {
                 _classFieldViewer.DrawHeader();

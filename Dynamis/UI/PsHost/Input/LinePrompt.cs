@@ -1,5 +1,6 @@
 using System.Text;
 using Dalamud.Interface.Utility.Raii;
+using Dynamis.Utility;
 using ImGuiNET;
 
 namespace Dynamis.UI.PsHost.Input;
@@ -59,17 +60,7 @@ public class LinePrompt : IPrompt<string>
 
     protected static unsafe void SetText(ImGuiInputTextCallbackData* data, ReadOnlySpan<char> text)
     {
-        var byteCount = Encoding.UTF8.GetBytes(text, new(data->Buf, data->BufSize));
-        if (byteCount == data->BufSize) {
-            while (byteCount > 0 && (data->Buf[byteCount] & 0xC0) == 0x80) {
-                --byteCount;
-            }
-
-            --byteCount;
-        }
-
-        data->Buf[byteCount] = 0;
-        data->BufTextLen = byteCount;
+        data->BufTextLen = text.WriteNullTerminated(new Span<byte>(data->Buf, data->BufSize));
         data->BufDirty = 1;
     }
 

@@ -5,7 +5,7 @@ using System.Management.Automation.Runspaces;
 
 namespace Dynamis.PsHost;
 
-public sealed class Host(PSHostUserInterface ui, IServiceProvider serviceProvider)
+public sealed class Host(PSHostUserInterface ui, HostContext hostContext)
     : PSHost, IHostSupportsInteractiveSession
 {
     private readonly Stack<Runspace> _runspaceStack = [];
@@ -20,7 +20,7 @@ public sealed class Host(PSHostUserInterface ui, IServiceProvider serviceProvide
         => ui;
 
     public override PSObject PrivateData
-        => new(serviceProvider);
+        => new(hostContext);
 
     public override Guid        InstanceId       { get; } = Guid.NewGuid();
     public override CultureInfo CurrentCulture   { get; } = Thread.CurrentThread.CurrentCulture;

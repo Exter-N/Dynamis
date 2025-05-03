@@ -14,30 +14,77 @@ public sealed class BootHelper(IDalamudPluginInterface pi)
     public InitialSessionState InitialSessionState
         => _initialSessionState;
 
-    public Reverter Setup()
+    public SetupReverter Setup()
         => Setup(pi);
 
-    public static void Configure(Runspace runspace)
+    public static UseReverter Use(RunspacePool runspacePool)
     {
-        AddAssemblies(runspace);
-        RunPreProfile(runspace);
+        var tPool = runspacePool.GetType();
+        var releaseRunspace = (Action<Runspace>)Delegate.CreateDelegate(
+            typeof(Action<Runspace>), runspacePool,
+            tPool.GetMethod("ReleaseRunspace", BindingFlags.Instance | BindingFlags.NonPublic)!
+        );
+        var result = (IAsyncResult)tPool.GetMethod("BeginGetRunspace", BindingFlags.Instance | BindingFlags.NonPublic)
+            !.Invoke(runspacePool, [null, null,])!;
+        result.AsyncWaitHandle.WaitOne();
+        var runspace = (Runspace)tPool.GetMethod("EndGetRunspace", BindingFlags.Instance | BindingFlags.NonPublic)
+            !.Invoke(runspacePool, [result,])!;
+        var previous = Runspace.DefaultRunspace;
+        Runspace.DefaultRunspace = runspace;
+        return new(previous, () => releaseRunspace(runspace));
+    }
+
+    public static void Configure(RunspacePool runspacePool)
+    {
+        var tPool = runspacePool.GetType();
+        var tEventArgs = tPool.Assembly.GetType("System.Management.Automation.Runspaces.RunspaceCreatedEventArgs")!;
+        var tEventHandler = typeof(EventHandler<>).MakeGenericType(tEventArgs);
+        var onRunspaceCreated = (EventHandler<EventArgs>)OnRunspaceCreated;
+        tPool.GetEvent("RunspaceCreated", BindingFlags.Instance | BindingFlags.NonPublic)
+            !.GetAddMethod(true)
+            !.Invoke(runspacePool, [Delegate.CreateDelegate(tEventHandler, onRunspaceCreated.Method),]);
+        var internalPool = tPool.GetField("_internalPool", BindingFlags.Instance | BindingFlags.NonPublic)
+            !.GetValue(runspacePool)!;
+        var runspaceList = (IEnumerable<Runspace>)internalPool.GetType()
+                                                              .GetField(
+                                                                   "runspaceList",
+                                                                   BindingFlags.Instance | BindingFlags.NonPublic
+                                                               )
+                                                               !.GetValue(internalPool)!;
+        foreach (var runspace in runspaceList) {
+            ConfigureRunspace(runspace);
+        }
+
+        return;
+
+        static void OnRunspaceCreated(object? sender, EventArgs e)
+        {
+            Plugin.Log!.Info("Created Runspace");
+            var runspace =
+                (Runspace)e.GetType().GetProperty("Runspace", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(
+                    e
+                )!;
+            ConfigureRunspace(runspace);
+        }
+
+        static void ConfigureRunspace(Runspace runspace)
+        {
+            AddAssemblies(runspace);
+        }
     }
 
     private static void AddAssemblies(Runspace runspace)
     {
         var context = runspace.GetType()
                               .GetProperty("GetExecutionContext", BindingFlags.Instance | BindingFlags.NonPublic)
-                             ?.GetValue(runspace);
+                             !.GetValue(runspace)!;
 
-        var cache = context?.GetType()
-                            .GetProperty(
-                                 "AssemblyCache",
-                                 BindingFlags.Instance | BindingFlags.NonPublic
-                             )
-                           ?.GetValue(context) as Dictionary<string, Assembly>;
-        if (cache is null) {
-            return;
-        }
+        var cache = (Dictionary<string, Assembly>)context.GetType()
+                                                         .GetProperty(
+                                                              "AssemblyCache",
+                                                              BindingFlags.Instance | BindingFlags.NonPublic
+                                                          )
+                                                          !.GetValue(context)!;
 
         AddLoadContext(cache, AssemblyLoadContext.Default);
         AddDefiningLoadContext(cache, typeof(IDalamudPluginInterface));
@@ -64,30 +111,7 @@ public sealed class BootHelper(IDalamudPluginInterface pi)
             => cache.TryAdd(assembly.GetName().ToString(), assembly);
     }
 
-    private static void RunPreProfile(Runspace runspace)
-    {
-        using var ps = PowerShell.Create(runspace);
-        ps.AddScript(@"
-function Out-Log {
-    param (
-        [Parameter(ValueFromPipeline)] [psobject] $InputObject,
-        [Microsoft.Extensions.Logging.LogLevel] $LogLevel = [Microsoft.Extensions.Logging.LogLevel]::Information
-    )
-    Out-String -Stream -InputObject $InputObject | Write-Log
-}
-
-function Out-Chat {
-    param (
-        [Parameter(ValueFromPipeline)] [psobject] $InputObject,
-        [Microsoft.Extensions.Logging.LogLevel] $LogLevel = [Microsoft.Extensions.Logging.LogLevel]::Information
-    )
-    Out-String -Stream -InputObject $InputObject | Write-Chat
-}
-");
-        ps.Invoke();
-    }
-
-    private static Reverter Setup(IDalamudPluginInterface pi)
+    private static SetupReverter Setup(IDalamudPluginInterface pi)
     {
         if (!string.IsNullOrEmpty(AppContext.BaseDirectory)) {
             return default;
@@ -112,9 +136,15 @@ function Out-Chat {
                                                          && t.GetCustomAttribute<CmdletAttribute>() is not null
                                                    )) {
             var cmdletAttribute = cmdletType.GetCustomAttribute<CmdletAttribute>()!;
-            state.Commands.Add(
-                new SessionStateCmdletEntry($"{cmdletAttribute.VerbName}-{cmdletAttribute.NounName}", cmdletType, null)
-            );
+            var command = $"{cmdletAttribute.VerbName}-{cmdletAttribute.NounName}";
+            state.Commands.Add(new SessionStateCmdletEntry(command, cmdletType, null));
+            if (cmdletType.GetCustomAttribute<AliasAttribute>() is
+                {
+                } aliasAttribute) {
+                foreach (var alias in aliasAttribute.AliasNames) {
+                    state.Commands.Add(new SessionStateAliasEntry(alias, command));
+                }
+            }
         }
 
         state.ExecutionPolicy = ExecutionPolicy.Unrestricted;
@@ -122,13 +152,22 @@ function Out-Chat {
         return state;
     }
 
-    public readonly ref struct Reverter(bool revert, object? previous)
+    public readonly ref struct SetupReverter(bool revert, object? previous)
     {
         public void Dispose()
         {
             if (revert) {
                 AppContext.SetData("APP_CONTEXT_BASE_DIRECTORY", previous);
             }
+        }
+    }
+
+    public readonly ref struct UseReverter(Runspace? previous, Action onDispose)
+    {
+        public void Dispose()
+        {
+            Runspace.DefaultRunspace = previous;
+            onDispose();
         }
     }
 }

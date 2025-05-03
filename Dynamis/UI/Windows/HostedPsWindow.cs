@@ -4,6 +4,7 @@ using System.Management.Automation.Runspaces;
 using System.Numerics;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Interface;
+using Dalamud.Interface.Style;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
@@ -29,7 +30,8 @@ public sealed class HostedPsWindow : IndexedWindow, IDisposable
 
     private readonly List<IParagraph> _output = [];
     private          bool             _scrollToBottom;
-    private          bool             _autoScroll = true;
+    private          bool             _autoScroll  = true;
+    private          bool             _copyOnClick = false;
 
     private readonly Stack<Section> _currentSections = [];
     private          TextParagraph? _currentParagraph;
@@ -74,29 +76,29 @@ public sealed class HostedPsWindow : IndexedWindow, IDisposable
     private async Task RunPsSession()
     {
         try {
-            UserInterface ui;
-            Host host;
-            Runspace runspace;
+            var ui = new UserInterface(this);
+            var context = new HostContext(_serviceProvider);
+            var host = new Host(ui, context);
+            RunspacePool runspacePool;
             using (_bootHelper.Setup()) {
-                ui = new(this);
-                host = new(ui, _serviceProvider);
-                runspace = RunspaceFactory.CreateRunspace(host, _bootHelper.InitialSessionState);
+                runspacePool = RunspaceFactory.CreateRunspacePool(1, 4, _bootHelper.InitialSessionState, host);
             }
 
-            runspace.Open();
-            BootHelper.Configure(runspace);
+            context.RunspacePool = new(runspacePool);
+            runspacePool.Open();
+            BootHelper.Configure(runspacePool);
             try {
                 var profilePath = Path.Combine(_pi.GetPluginConfigDirectory(), "Profile.ps1");
                 if (File.Exists(profilePath)) {
                     ExecuteCommand(
-                        runspace, ui, ps => ps.AddScript($". {profilePath.EscapePsArgument()}"), profilePath
+                        runspacePool, ui, ps => ps.AddScript($". {profilePath.EscapePsArgument()}"), profilePath
                     );
                 }
 
                 while (host.ExitCode is null) {
-                    var prompt = GetPrompt(runspace);
-                    var command = await Prompt(new CommandPrompt(prompt, _commandHistory, runspace));
-                    ExecuteCommand(runspace, ui, command);
+                    var prompt = GetPrompt(runspacePool);
+                    var command = await Prompt(new CommandPrompt(prompt, _commandHistory, runspacePool));
+                    ExecuteCommand(runspacePool, ui, command);
                 }
 
                 var exitCode = host.ExitCode.Value;
@@ -110,8 +112,8 @@ public sealed class HostedPsWindow : IndexedWindow, IDisposable
                     _output.Add(exitCodeParagraph);
                 }
             } finally {
-                runspace.Close();
-                runspace.Dispose();
+                runspacePool.Close();
+                runspacePool.Dispose();
             }
         } catch (OperationCanceledException) {
             // This block intentionally left blank.
@@ -120,9 +122,10 @@ public sealed class HostedPsWindow : IndexedWindow, IDisposable
         }
     }
 
-    private string GetPrompt(Runspace runspace)
+    private string GetPrompt(RunspacePool runspacePool)
     {
-        using var ps = PowerShell.Create(runspace);
+        using var ps = PowerShell.Create();
+        ps.RunspacePool = runspacePool;
         ps.AddCommand("prompt");
         try {
             var prompt = ps.Invoke();
@@ -133,12 +136,13 @@ public sealed class HostedPsWindow : IndexedWindow, IDisposable
         }
     }
 
-    private void ExecuteCommand(Runspace runspace, UserInterface ui, string command)
-        => ExecuteCommand(runspace, ui, ps => ps.AddScript(command), command);
+    private void ExecuteCommand(RunspacePool runspacePool, UserInterface ui, string command)
+        => ExecuteCommand(runspacePool, ui, ps => ps.AddScript(command), command);
 
-    private void ExecuteCommand(Runspace runspace, UserInterface ui, Action<PowerShell> prepare, string command)
+    private void ExecuteCommand(RunspacePool runspacePool, UserInterface ui, Action<PowerShell> prepare, string command)
     {
-        using var ps = PowerShell.Create(runspace);
+        using var ps = PowerShell.Create();
+        ps.RunspacePool = runspacePool;
         using var cts = new CancellationTokenSource();
         _currentPowerShell = ps;
         _commandCts = cts;
@@ -380,6 +384,19 @@ public sealed class HostedPsWindow : IndexedWindow, IDisposable
         }
 
         ImGui.SameLine();
+        ImGui.Checkbox("Copy mode", ref _copyOnClick);
+        ImGui.SameLine(0.0f, ImGui.GetStyle().ItemInnerSpacing.X);
+        ImGuiComponents.NormalizedIcon(
+            FontAwesomeIcon.InfoCircle,
+            StyleModel.GetFromCurrent().BuiltInColors!.DalamudGrey!.Value.ToUInt32()
+        );
+
+        if (ImGui.IsItemHovered()) {
+            using var _ = ImRaii.Tooltip();
+            ImGui.TextUnformatted("Click an output line to copy it (as plain text) to your clipboard.");
+        }
+
+        ImGui.SameLine();
         ImGui.Checkbox("Automatically scroll to latest output", ref _autoScroll);
     }
 
@@ -390,9 +407,14 @@ public sealed class HostedPsWindow : IndexedWindow, IDisposable
             return;
         }
 
+        ParagraphDrawFlags flags = 0;
+        if (_copyOnClick) {
+            flags |= ParagraphDrawFlags.CopyOnClick;
+        }
+
         lock (_output) {
             foreach (var section in _output) {
-                section.Draw();
+                section.Draw(flags);
             }
         }
 

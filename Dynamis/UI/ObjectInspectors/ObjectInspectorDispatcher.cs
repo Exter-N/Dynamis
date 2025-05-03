@@ -43,7 +43,9 @@ public sealed class ObjectInspectorDispatcher
             }
         }
 
-        if (@class.ManagedType is Type type) {
+        if (@class.ManagedType is
+            {
+            } type) {
             proxy = GetTypedInspector(type);
             if (proxy is not null) {
                 yield return proxy;
@@ -61,7 +63,9 @@ public sealed class ObjectInspectorDispatcher
     {
         public bool CanInspect(ClassInfo @class)
         {
-            if (@class.ManagedType is Type type && type.IsAssignableFrom(typeof(T))) {
+            if (@class.ManagedType is
+                {
+                } type && type.IsAssignableFrom(typeof(T))) {
                 return true;
             }
 

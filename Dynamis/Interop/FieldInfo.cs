@@ -28,6 +28,9 @@ public sealed class FieldInfo : IComparable<FieldInfo>
         }
     }
 
+    public override string ToString()
+        => Name;
+
     public int CompareTo(FieldInfo? other)
     {
         if (other is null) {

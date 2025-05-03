@@ -127,23 +127,23 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
         return AddressIdentification.Default;
     }
 
-    public IEnumerable<KeyValuePair<nint, AddressIdentification>> GetWellKnownAddresses(AddressType types)
+    public unsafe nint Resolve(DataYaml.Instance instance)
     {
-        unsafe nint Resolve(DataYaml.Instance instance)
-        {
-            var ea = GetLiveAddress(instance.Ea);
-            if (!instance.Pointer) {
-                return ea;
-            }
-
-            if (!VirtualMemory.GetProtection(ea).CanRead()) {
-                _logger.LogError("Cannot dereference ea pointer 0x{Ea:X}, returning nullptr", ea);
-                return 0;
-            }
-
-            return *(nint*)ea;
+        var ea = GetLiveAddress(instance.Ea);
+        if (!instance.Pointer) {
+            return ea;
         }
 
+        if (!VirtualMemory.GetProtection(ea).CanRead()) {
+            _logger.LogError("Cannot dereference ea pointer 0x{Ea:X}, returning nullptr", ea);
+            return 0;
+        }
+
+        return *(nint*)ea;
+    }
+
+    public IEnumerable<KeyValuePair<nint, AddressIdentification>> GetWellKnownAddresses(AddressType types)
+    {
         unsafe nint ReadVfuncAddress(nint vtbl, uint index)
         {
             var ptr = ((nint*)vtbl) + index;

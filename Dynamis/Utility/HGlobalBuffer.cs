@@ -47,6 +47,10 @@ public sealed class HGlobalBuffer<T> : MemoryManager<T> where T : unmanaged
 
     public override unsafe MemoryHandle Pin(int elementIndex = 0)
     {
+        if (elementIndex < 0 || elementIndex >= _length) {
+            throw new ArgumentOutOfRangeException(nameof(elementIndex));
+        }
+
         var pointer = (T*)_address;
         ObjectDisposedException.ThrowIf(pointer is null, this);
         return new(pointer + elementIndex, default, this);

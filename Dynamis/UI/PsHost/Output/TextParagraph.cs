@@ -1,10 +1,14 @@
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Interface.Utility;
+using Dalamud.Utility;
+using ImGuiNET;
 
 namespace Dynamis.UI.PsHost.Output;
 
 public sealed class TextParagraph : IParagraph
 {
+    private readonly int _id = IParagraph.AllocateId();
+
     private SeStringBuilder? _builder = new();
     private byte[]?          _value;
 
@@ -63,11 +67,18 @@ public sealed class TextParagraph : IParagraph
     private void Update()
         => _value ??= _builder!.Build().EncodeWithNullTerminator();
 
-    public void Draw()
+    public void Draw(ParagraphDrawFlags flags)
     {
         lock (this) {
             Update();
-            ImGuiHelpers.SeStringWrapped(_value!.AsSpan(..^1));
+            if (flags.HasFlag(ParagraphDrawFlags.CopyOnClick)) {
+                var result = ImGuiHelpers.SeStringWrapped(_value!.AsSpan(..^1), imGuiId: new(_id));
+                if (result.Clicked) {
+                    ImGui.SetClipboardText(SeString.Parse(_value!.AsSpan(..^1)).TextValue);
+                }
+            } else {
+                ImGuiHelpers.SeStringWrapped(_value!.AsSpan(..^1));
+            }
         }
     }
 }

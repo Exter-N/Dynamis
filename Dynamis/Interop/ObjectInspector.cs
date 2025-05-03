@@ -184,8 +184,9 @@ public sealed class ObjectInspector(
 
     private void HighlightInstance(ReadOnlySpan<byte> objectBytes, ClassInfo classInfo, Span<byte> byteColors, bool safeReads)
     {
-        foreach (var fieldInfo in classInfo.Fields) {
+        foreach (var fieldInfo in classInfo.AllScalars) {
             switch (fieldInfo.Type) {
+                case FieldType.Boolean:
                 case FieldType.Byte:
                 case FieldType.SByte:
                 case FieldType.UInt16:
@@ -194,6 +195,8 @@ public sealed class ObjectInspector(
                 case FieldType.Int32:
                 case FieldType.UInt64:
                 case FieldType.Int64:
+                case FieldType.IntPtr:
+                case FieldType.UIntPtr:
                     byteColors[(int)fieldInfo.Offset..(int)(fieldInfo.Offset + fieldInfo.Size)]
                        .Fill((byte)HexViewerColor.Integer);
                     break;
@@ -225,9 +228,9 @@ public sealed class ObjectInspector(
                     break;
                 case FieldType.Pointer:
                     for (var i = 0u; i < fieldInfo.Size; i += (uint)nint.Size) {
-                        var value = MemoryMarshal.Cast<byte, nint>(
+                        var value = MemoryMarshal.Read<nint>(
                             objectBytes[(int)(fieldInfo.Offset + i)..(int)(fieldInfo.Offset + i + nint.Size)]
-                        )[0];
+                        );
                         byte color;
                         if (value == 0) {
                             color = (byte)HexViewerColor.Null;
@@ -237,6 +240,27 @@ public sealed class ObjectInspector(
                                 color = (byte)HexViewerColor.CodePointer;
                             } else if (!protect.CanRead()) {
                                 color = (byte)HexViewerColor.BadPointer;
+                            } else {
+                                color = (byte)GetClassColor(DetermineClassAndDisplacement(value, safeReads).Class);
+                            }
+                        }
+
+                        byteColors[(int)(fieldInfo.Offset + i)..(int)(fieldInfo.Offset + i + nint.Size)].Fill(color);
+                    }
+
+                    break;
+                case FieldType.CStringPointer:
+                    for (var i = 0u; i < fieldInfo.Size; i += (uint)nint.Size) {
+                        var value = MemoryMarshal.Read<nint>(
+                            objectBytes[(int)(fieldInfo.Offset + i)..(int)(fieldInfo.Offset + i + nint.Size)]
+                        );
+                        byte color;
+                        if (value == 0) {
+                            color = (byte)HexViewerColor.Null;
+                        } else {
+                            var protect = VirtualMemory.GetProtection(value);
+                            if (protect.CanRead()) {
+                                color = (byte)HexViewerColor.Text;
                             } else {
                                 color = (byte)GetClassColor(DetermineClassAndDisplacement(value, safeReads).Class);
                             }
@@ -266,11 +290,11 @@ public sealed class ObjectInspector(
     private void HighlightPointers(ReadOnlySpan<byte> objectBytes, Span<byte> byteColors, bool safeReads)
     {
         for (var i = 0; i + nint.Size - 1 < objectBytes.Length; i += nint.Size) {
-            if (MemoryMarshal.Cast<byte, nint>(byteColors[i..(i + nint.Size)])[0] != 0) {
+            if (MemoryMarshal.Read<nint>(byteColors[i..(i + nint.Size)]) != 0) {
                 continue;
             }
 
-            var value = MemoryMarshal.Cast<byte, nint>(objectBytes[i..(i + nint.Size)])[0];
+            var value = MemoryMarshal.Read<nint>(objectBytes[i..(i + nint.Size)]);
             byte color;
             if (value == 0) {
                 color = (byte)HexViewerColor.Null;

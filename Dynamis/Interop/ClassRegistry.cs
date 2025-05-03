@@ -48,48 +48,27 @@ public sealed partial class ClassRegistry(
         return classInfo;
     }
 
-    public ClassInfo FromClientStructs(Type type)
+    public static bool TryGetClientStructsClassName(Type type, out string className)
     {
         var typeName = type.FullName;
         if (typeName is null || type.Assembly != typeof(StdString).Assembly
                              || !typeName.StartsWith("FFXIVClientStructs.FFXIV.")) {
-            throw new ArgumentException($"Invalid ClientStructs type {type}");
+            className = string.Empty;
+            return false;
         }
 
-        var className = typeName[25..].Replace(".", "::");
-        ClassInfo? classInfo;
-        lock (_classCache) {
-            if (_classCache.TryGetValue(className, out classInfo)) {
-                return classInfo;
-            }
-
-            classInfo = new ClassInfo
-            {
-                Name = className,
-                ManagedType = type,
-            };
-
-            if (dataYamlContainer.Data?.Classes?.TryGetValue(className, out var dataClass) ?? false) {
-                var vtbl = dataClass?.Vtbls?[0]?.Ea;
-                if (vtbl.HasValue) {
-                    PopulateFromVtbl(classInfo, dataYamlContainer.GetLiveAddress(vtbl.Value), true);
-                }
-            }
-
-            PopulateFromClientStructs(classInfo);
-            PopulateAggregates(classInfo, (uint)Environment.SystemPageSize);
-
-            _classCache.Add(className, classInfo);
-        }
-
-        return classInfo;
+        className = typeName[25..].Replace(".", "::");
+        return true;
     }
 
     public ClassInfo FromManagedType(Type type)
     {
-        var className = type.FullName;
-        if (className is null) {
-            throw new ArgumentException($"Invalid type {type}");
+        var isClientStruct = TryGetClientStructsClassName(type, out var className);
+        if (!isClientStruct) {
+            className = type.FullName;
+            if (className is null) {
+                throw new ArgumentException($"Invalid type {type}");
+            }
         }
 
         ClassInfo? classInfo;
@@ -104,7 +83,19 @@ public sealed partial class ClassRegistry(
                 ManagedType = type,
             };
 
-            PopulateFromManagedType(classInfo);
+            if (isClientStruct) {
+                if (dataYamlContainer.Data?.Classes?.TryGetValue(className, out var dataClass) ?? false) {
+                    var vtbl = dataClass.Vtbls?[0].Ea;
+                    if (vtbl.HasValue) {
+                        PopulateFromVtbl(classInfo, dataYamlContainer.GetLiveAddress(vtbl.Value), true);
+                    }
+                }
+
+                PopulateFromClientStructs(classInfo);
+            } else {
+                PopulateFromManagedType(classInfo);
+            }
+
             PopulateAggregates(classInfo, (uint)Environment.SystemPageSize);
 
             _classCache.Add(className, classInfo);
@@ -120,7 +111,7 @@ public sealed partial class ClassRegistry(
         classInfo.SizeFromDtor = sizeFromDtor0.HasValue ? sizeFromDtor0.Value.Size : null;
 
         if ((dataYamlContainer.Data?.Classes?.TryGetValue(classInfo.Name, out var @class) ?? false)
-         && @class?.Vtbls is not null) {
+         && @class.Vtbls is not null) {
             foreach (var vt in @class.Vtbls) {
                 var otherVtbl = dataYamlContainer.GetLiveAddress(vt.Ea);
                 if (otherVtbl == vtbl) {
@@ -148,7 +139,7 @@ public sealed partial class ClassRegistry(
                     break;
                 }
 
-                var parentName = currentClass.Vtbls[0]?.Base;
+                var parentName = currentClass.Vtbls[0].Base;
                 if (parentName is null) {
                     break;
                 }
@@ -175,15 +166,20 @@ public sealed partial class ClassRegistry(
 
     private void PopulateFromManagedType(ClassInfo classInfo)
     {
+        Type managedType;
         if (classInfo.ManagedType is not null) {
             // Cannot use Marshal.SizeOf as it fails on certain types.
-            classInfo.SizeFromManagedType = (uint)UnsafeSizeOf(classInfo.ManagedType);
-            classInfo.Fields = GetFieldsFromManagedType(classInfo.ManagedType).ToArray();
-            Array.Sort(classInfo.Fields);
+            classInfo.SizeFromManagedType = (uint)classInfo.ManagedType.SizeOf();
+            managedType = classInfo.ManagedType;
         } else if (classInfo.ManagedParents.Length > 0) {
-            classInfo.Fields = GetFieldsFromManagedType(classInfo.ManagedParents[0]).ToArray();
-            Array.Sort(classInfo.Fields);
+            managedType = classInfo.ManagedParents[0];
+        } else {
+            return;
         }
+
+        classInfo.SetFields(GetFieldsFromManagedType(managedType));
+        classInfo.SetProperties(GetPropertiesFromManagedType(managedType));
+        classInfo.SetMethods(GetMethodsFromManagedType(managedType));
     }
 
     private static Type? ResolveClientStructsType(string className)
@@ -192,17 +188,17 @@ public sealed partial class ClassRegistry(
     private IEnumerable<FieldInfo> GetFieldsFromManagedType(Type type, uint offset = 0, string prefix = "",
         bool isInherited = false)
     {
-        var inherited = GetCustomAttributes(type, "InheritsAttribute`1")
+        var inherited = type.GetCustomAttributes("InheritsAttribute`1")
                        .Select(attr => attr.GetType().GetGenericArguments()[0].FullName)
                        .OfType<string>()
                        .ToArray();
         foreach (var reflField in
                  type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)) {
-            if (GetCustomAttribute(reflField, "CExportIgnoreAttribute") is not null) {
+            if (reflField.GetCustomAttribute("CExportIgnoreAttribute") is not null) {
                 continue;
             }
 
-            if (GetCustomAttribute(reflField, "FixedSizeArrayAttribute") is
+            if (reflField.GetCustomAttribute("FixedSizeArrayAttribute") is
                 {
                 } fsaAttribute) {
                 var typeName = reflField.FieldType.Name;
@@ -215,15 +211,15 @@ public sealed partial class ClassRegistry(
                         field = new FieldInfo
                         {
                             Name = prefix + reflField.Name,
-                            Offset = offset + (uint)OffsetOf(reflField),
-                            Size = (uint)UnsafeSizeOf(reflField.FieldType),
+                            Offset = offset + (uint)reflField.OffsetOf(),
+                            Size = (uint)reflField.FieldType.SizeOf(),
                         };
                         if (elementFieldType.HasValue) {
                             field.Type = elementFieldType.Value;
                             field.EnumType = elementType.IsEnum ? elementType : null;
                         } else {
                             field.Type = FieldType.ObjectArray;
-                            field.ElementClass = FromClientStructs(elementType);
+                            field.ElementClass = FromManagedType(elementType);
                         }
                     } catch (Exception e) {
                         logger.LogError(
@@ -246,9 +242,9 @@ public sealed partial class ClassRegistry(
                         field = new FieldInfo
                         {
                             Name = prefix + reflField.Name,
-                            Offset = offset + (uint)OffsetOf(reflField),
+                            Offset = offset + (uint)reflField.OffsetOf(),
                             Size =
-                                (uint)(reflField.FieldType.IsPointer ? nint.Size : UnsafeSizeOf(reflField.FieldType)),
+                                (uint)(reflField.FieldType.IsPointer ? nint.Size : reflField.FieldType.SizeOf()),
                             Type = fieldType.Value,
                             EnumType = reflField.FieldType.IsEnum ? reflField.FieldType : null,
                         };
@@ -268,18 +264,32 @@ public sealed partial class ClassRegistry(
             if (reflField.FieldType.IsValueType) {
                 var inheritanceField = IsInheritedField(reflField.FieldType, reflField.Name, type, inherited);
                 if (!isInherited || inheritanceField) {
+                    FieldInfo? objField = null;
                     IEnumerable<FieldInfo> fields;
                     try {
+                        var objOffset = offset + (uint)reflField.OffsetOf();
+                        if (!fieldType.HasValue && !inheritanceField) {
+                            objField = new FieldInfo
+                            {
+                                Name = prefix + reflField.Name,
+                                Offset = objOffset,
+                                Size = (uint)reflField.FieldType.SizeOf(),
+                                Type = FieldType.Object,
+                                ElementClass = FromManagedType(reflField.FieldType),
+                            };
+                        }
                         fields = GetFieldsFromManagedType(
-                            reflField.FieldType, offset + (uint)OffsetOf(reflField),
-                            $"{prefix}{reflField.Name}.",
-                            inheritanceField
+                            reflField.FieldType, objOffset, $"{prefix}{reflField.Name}.", inheritanceField
                         );
                     } catch (Exception e) {
                         logger.LogError(
                             e, "Error while analyzing field {Field} of class {Class}", reflField.Name, type
                         );
                         continue;
+                    }
+
+                    if (objField is not null) {
+                        yield return objField;
                     }
 
                     foreach (var field in fields) {
@@ -295,30 +305,45 @@ public sealed partial class ClassRegistry(
         => Array.IndexOf(inheritedTypeNames, fieldType.FullName) >= 0 && fieldName
          == (fieldType.Name == declaringType.Name ? $"{fieldType.Name}Base" : fieldType.Name);
 
-    private static int UnsafeSizeOf(Type type)
-        => (int)typeof(Unsafe).GetMethod(nameof(Unsafe.SizeOf))!.MakeGenericMethod(type).Invoke(null, null)!;
-
-    private static nint OffsetOf(System.Reflection.FieldInfo field)
+    private IEnumerable<(string Name, MethodInfo? Getter, MethodInfo? Setter)> GetPropertiesFromManagedType(Type type)
     {
-        try {
-            return Marshal.OffsetOf(field.ReflectedType!, field.Name);
-        } catch (ArgumentException) {
-            if (field.ReflectedType is not null && field.ReflectedType.IsExplicitLayout) {
-                var fieldOffset = field.GetCustomAttribute<FieldOffsetAttribute>();
-                if (fieldOffset is not null) {
-                    return fieldOffset.Value;
-                }
+        if (!type.IsValueType) {
+            yield break;
+        }
+
+        foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance)) {
+            if (property.GetIndexParameters().Length > 0) {
+                continue;
             }
 
-            throw;
+            var getter = property.GetGetMethod() is
+            {
+            } get
+                ? StructPointerThunkGenerator.GeneratePointerThunk(get)
+                : null;
+            var setter = property.GetSetMethod() is
+            {
+            } set
+                ? StructPointerThunkGenerator.GeneratePointerThunk(set)
+                : null;
+            yield return (property.Name, getter, setter);
         }
     }
 
-    private static Attribute? GetCustomAttribute(MemberInfo member, string attributeName)
-        => member.GetCustomAttributes().FirstOrDefault(attribute => attribute.GetType().Name == attributeName);
+    private IEnumerable<(string Name, MethodInfo Method)> GetMethodsFromManagedType(Type type)
+    {
+        if (!type.IsValueType) {
+            yield break;
+        }
 
-    private static IEnumerable<Attribute> GetCustomAttributes(MemberInfo member, string attributeName)
-        => member.GetCustomAttributes().Where(attribute => attribute.GetType().Name == attributeName);
+        foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Instance)) {
+            if (method.IsSpecialName) {
+                continue;
+            }
+
+            yield return (method.Name, StructPointerThunkGenerator.GeneratePointerThunk(method));
+        }
+    }
 
     private static void PopulateAggregates(ClassInfo classInfo, uint restOfPageSize)
     {

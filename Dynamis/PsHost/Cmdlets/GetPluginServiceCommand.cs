@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Dynamis.PsHost.Cmdlets;
 
 [Cmdlet(VerbsCommon.Get, "PluginService")]
+[Alias("gsv")]
 public sealed class GetPluginServiceCommand : Cmdlet
 {
     [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true)]

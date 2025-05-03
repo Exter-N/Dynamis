@@ -2,5 +2,10 @@ namespace Dynamis.UI.PsHost.Output;
 
 public interface IParagraph
 {
-    void Draw();
+    private static int _nextId = 0;
+
+    void Draw(ParagraphDrawFlags flags);
+
+    protected static int AllocateId()
+        => Interlocked.Increment(ref _nextId);
 }

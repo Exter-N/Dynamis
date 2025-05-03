@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 namespace Dynamis.PsHost.Cmdlets;
 
 [Cmdlet(VerbsCommunications.Write, "Log")]
+[Alias("wrlog", "wrl")]
 public sealed class WriteLogCommand : Cmdlet
 {
     private ILogger? _logger;
