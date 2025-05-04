@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Ipc;
 using Dynamis.Interop;
@@ -15,9 +16,16 @@ public sealed class IpcProvider(
     ObjectInspector objectInspector)
     : IHostedService
 {
+    public const uint ApiMajorVersion = 1;
+    public const uint ApiMinorVersion = 3;
+
+    private ICallGateProvider<uint, uint, Version, object?>?            _apiInitialized;
+    private ICallGateProvider<object?>?                                 _apiDisposing;
+    private ICallGateProvider<(uint, uint)>?                            _getApiVersion;
     private ICallGateProvider<nint, object?>?                           _inspectObject;
     private ICallGateProvider<nint, uint, string, uint, uint, object?>? _inspectRegion;
     private ICallGateProvider<nint, object?>?                           _imGuiDrawPointer;
+    private ICallGateProvider<Action<nint>>?                            _getImGuiDrawPointerDelegate;
     private ICallGateProvider<nint, object?>?                           _imGuiDrawPointerTooltipDetails;
     private ICallGateProvider<nint, (string, Type?, uint, uint)>?       _getClass;
     private ICallGateProvider<nint, string?, Type?, (bool, uint)>?      _isInstanceOf;
@@ -25,62 +33,36 @@ public sealed class IpcProvider(
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        try {
-            _inspectObject = pi.GetIpcProvider<nint, object?>($"Dynamis.{nameof(InspectObject)}.V1");
-            _inspectObject.RegisterAction(InspectObject);
-        } catch (Exception e) {
-            _inspectObject = null;
-            logger.LogError(e, $"Error while registering IPC provider for {nameof(InspectObject)}");
-        }
+        RegisterEvent(out _apiInitialized, "Dynamis.ApiInitialized");
+        RegisterEvent(out _apiDisposing,   "Dynamis.ApiDisposing");
+
+        RegisterFunc(out _getApiVersion, "Dynamis.GetApiVersion", () => (ApiMajorVersion, ApiMinorVersion));
+
+        RegisterAction(out _inspectObject,    $"Dynamis.{nameof(InspectObject)}.V1",    InspectObject);
+        RegisterAction(out _inspectRegion,    $"Dynamis.{nameof(InspectRegion)}.V1",    InspectRegion);
+        RegisterAction(out _imGuiDrawPointer, $"Dynamis.{nameof(ImGuiDrawPointer)}.V1", ImGuiDrawPointer);
+
+        RegisterFunc(
+            out _getImGuiDrawPointerDelegate, $"Dynamis.Get{nameof(ImGuiDrawPointer)}Delegate.V1",
+            () => ImGuiDrawPointer
+        );
+
+        RegisterAction(
+            out _imGuiDrawPointerTooltipDetails, $"Dynamis.{nameof(ImGuiDrawPointerTooltipDetails)}.V1",
+            ImGuiDrawPointerTooltipDetails
+        );
+
+        RegisterFunc(out _getClass,     $"Dynamis.{nameof(GetClass)}.V1",     GetClass);
+        RegisterFunc(out _isInstanceOf, $"Dynamis.{nameof(IsInstanceOf)}.V1", IsInstanceOf);
+
+        RegisterAction(out _preloadDataYaml, $"Dynamis.{nameof(PreloadDataYaml)}.V1", PreloadDataYaml);
 
         try {
-            _inspectRegion =
-                pi.GetIpcProvider<nint, uint, string, uint, uint, object?>($"Dynamis.{nameof(InspectRegion)}.V1");
-            _inspectRegion.RegisterAction(InspectRegion);
+            _apiInitialized?.SendMessage(
+                ApiMajorVersion, ApiMinorVersion, typeof(IpcProvider).Assembly.GetName().Version ?? new()
+            );
         } catch (Exception e) {
-            _inspectRegion = null;
-            logger.LogError(e, $"Error while registering IPC provider for {nameof(InspectRegion)}");
-        }
-
-        try {
-            _imGuiDrawPointer = pi.GetIpcProvider<nint, object?>($"Dynamis.{nameof(ImGuiDrawPointer)}.V1");
-            _imGuiDrawPointer.RegisterAction(ImGuiDrawPointer);
-        } catch (Exception e) {
-            _imGuiDrawPointer = null;
-            logger.LogError(e, $"Error while registering IPC provider for {nameof(ImGuiDrawPointer)}");
-        }
-
-        try {
-            _imGuiDrawPointerTooltipDetails =
-                pi.GetIpcProvider<nint, object?>($"Dynamis.{nameof(ImGuiDrawPointerTooltipDetails)}.V1");
-            _imGuiDrawPointerTooltipDetails.RegisterAction(ImGuiDrawPointerTooltipDetails);
-        } catch (Exception e) {
-            _imGuiDrawPointerTooltipDetails = null;
-            logger.LogError(e, $"Error while registering IPC provider for {nameof(ImGuiDrawPointerTooltipDetails)}");
-        }
-
-        try {
-            _getClass = pi.GetIpcProvider<nint, (string, Type?, uint, uint)>($"Dynamis.{nameof(GetClass)}.V1");
-            _getClass.RegisterFunc(GetClass);
-        } catch (Exception e) {
-            _getClass = null;
-            logger.LogError(e, $"Error while registering IPC provider for {nameof(GetClass)}");
-        }
-
-        try {
-            _isInstanceOf = pi.GetIpcProvider<nint, string?, Type?, (bool, uint)>($"Dynamis.{nameof(IsInstanceOf)}.V1");
-            _isInstanceOf.RegisterFunc(IsInstanceOf);
-        } catch (Exception e) {
-            _isInstanceOf = null;
-            logger.LogError(e, $"Error while registering IPC provider for {nameof(IsInstanceOf)}");
-        }
-
-        try {
-            _preloadDataYaml = pi.GetIpcProvider<object?>($"Dynamis.{nameof(PreloadDataYaml)}.V1");
-            _preloadDataYaml.RegisterAction(PreloadDataYaml);
-        } catch (Exception e) {
-            _preloadDataYaml = null;
-            logger.LogError(e, $"Error while registering IPC provider for {nameof(PreloadDataYaml)}");
+            logger.LogError(e, "Error while firing API initialized event");
         }
 
         return Task.CompletedTask;
@@ -88,26 +70,29 @@ public sealed class IpcProvider(
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
-        _preloadDataYaml?.UnregisterAction();
-        _preloadDataYaml = null;
+        try {
+            _apiDisposing?.SendMessage();
+        } catch (Exception e) {
+            logger.LogError(e, "Error while firing API disposing event");
+        }
 
-        _isInstanceOf?.UnregisterFunc();
-        _isInstanceOf = null;
+        UnregisterAction(ref _preloadDataYaml);
 
-        _getClass?.UnregisterFunc();
-        _getClass = null;
+        UnregisterFunc(ref _isInstanceOf);
+        UnregisterFunc(ref _getClass);
 
-        _imGuiDrawPointerTooltipDetails?.UnregisterAction();
-        _imGuiDrawPointerTooltipDetails = null;
+        UnregisterAction(ref _imGuiDrawPointerTooltipDetails);
 
-        _imGuiDrawPointer?.UnregisterAction();
-        _imGuiDrawPointer = null;
+        UnregisterFunc(ref _getImGuiDrawPointerDelegate);
 
-        _inspectRegion?.UnregisterAction();
-        _inspectRegion = null;
+        UnregisterAction(ref _imGuiDrawPointer);
+        UnregisterAction(ref _inspectRegion);
+        UnregisterAction(ref _inspectObject);
 
-        _inspectObject?.UnregisterAction();
-        _inspectObject = null;
+        UnregisterFunc(ref _getApiVersion);
+
+        UnregisterEvent(out _apiDisposing);
+        UnregisterEvent(out _apiInitialized);
 
         return Task.CompletedTask;
     }
@@ -189,4 +174,120 @@ public sealed class IpcProvider(
 
     private void PreloadDataYaml()
         => messageHub.Publish<DataYamlPreloadMessage>();
+
+    #region Register helpers
+
+    private void RegisterEvent(out ICallGateProvider<object?>? provider, string name)
+    {
+        try {
+            provider = pi.GetIpcProvider<object?>(name);
+        } catch (Exception e) {
+            provider = null;
+            logger.LogError(e, "Error while registering IPC provider for {Name}", name);
+        }
+    }
+
+    private void RegisterEvent<T1, T2, T3>(out ICallGateProvider<T1, T2, T3, object?>? provider, string name)
+    {
+        try {
+            provider = pi.GetIpcProvider<T1, T2, T3, object?>(name);
+        } catch (Exception e) {
+            provider = null;
+            logger.LogError(e, "Error while registering IPC provider for {Name}", name);
+        }
+    }
+
+    private void RegisterAction(out ICallGateProvider<object?>? provider, string name, Action action)
+    {
+        try {
+            var prov = pi.GetIpcProvider<object?>(name);
+            prov.RegisterAction(action);
+            provider = prov;
+        } catch (Exception e) {
+            provider = null;
+            logger.LogError(e, "Error while registering IPC provider for {Name}", name);
+        }
+    }
+
+    private void RegisterAction<T1>(out ICallGateProvider<T1, object?>? provider, string name, Action<T1> action)
+    {
+        try {
+            var prov = pi.GetIpcProvider<T1, object?>(name);
+            prov.RegisterAction(action);
+            provider = prov;
+        } catch (Exception e) {
+            provider = null;
+            logger.LogError(e, "Error while registering IPC provider for {Name}", name);
+        }
+    }
+
+    private void RegisterAction<T1, T2, T3, T4, T5>(out ICallGateProvider<T1, T2, T3, T4, T5, object?>? provider, string name, Action<T1, T2, T3, T4, T5> action)
+    {
+        try {
+            var prov = pi.GetIpcProvider<T1, T2, T3, T4, T5, object?>(name);
+            prov.RegisterAction(action);
+            provider = prov;
+        } catch (Exception e) {
+            provider = null;
+            logger.LogError(e, "Error while registering IPC provider for {Name}", name);
+        }
+    }
+
+    private void RegisterFunc<TRet>(out ICallGateProvider<TRet>? provider, string name, Func<TRet> func)
+    {
+        try {
+            var prov = pi.GetIpcProvider<TRet>(name);
+            prov.RegisterFunc(func);
+            provider = prov;
+        } catch (Exception e) {
+            provider = null;
+            logger.LogError(e, "Error while registering IPC provider for {Name}", name);
+        }
+    }
+
+    private void RegisterFunc<T1, TRet>(out ICallGateProvider<T1, TRet>? provider, string name, Func<T1, TRet> func)
+    {
+        try {
+            var prov = pi.GetIpcProvider<T1, TRet>(name);
+            prov.RegisterFunc(func);
+            provider = prov;
+        } catch (Exception e) {
+            provider = null;
+            logger.LogError(e, "Error while registering IPC provider for {Name}", name);
+        }
+    }
+
+    private void RegisterFunc<T1, T2, T3, TRet>(out ICallGateProvider<T1, T2, T3, TRet>? provider, string name, Func<T1, T2, T3, TRet> func)
+    {
+        try {
+            var prov = pi.GetIpcProvider<T1, T2, T3, TRet>(name);
+            prov.RegisterFunc(func);
+            provider = prov;
+        } catch (Exception e) {
+            provider = null;
+            logger.LogError(e, "Error while registering IPC provider for {Name}", name);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void UnregisterEvent<T>(out T? provider) where T : class, ICallGateProvider
+    {
+        provider = null;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void UnregisterAction<T>(ref T? provider) where T : class, ICallGateProvider
+    {
+        provider?.UnregisterAction();
+        provider = null;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void UnregisterFunc<T>(ref T? provider) where T : class, ICallGateProvider
+    {
+        provider?.UnregisterFunc();
+        provider = null;
+    }
+
+    #endregion
 }
