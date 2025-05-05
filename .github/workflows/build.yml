@@ -32,8 +32,16 @@ jobs:
       - name: Build plugin
         run: |
           dotnet build --no-restore --configuration Release --nologo
-      - name: Upload a Build Artifact
+          dotnet build --no-restore --configuration ReleaseWithSMA --nologo
+      - name: Upload a Build Artifact (No SMA)
         uses: actions/upload-artifact@v4
         with:
+          name: artifact-no-sma
           path: |
             ./Dynamis/bin/x64/Release/*
+      - name: Upload a Build Artifact (With SMA)
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifact-with-sma
+          path: |
+            ./Dynamis/bin/x64/ReleaseWithSMA/*

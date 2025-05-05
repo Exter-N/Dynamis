@@ -1,3 +1,4 @@
+#if WITH_SMA
 using System.Management.Automation;
 using Dalamud.Interface.Utility.Raii;
 using Dynamis.UI.Components;
@@ -82,3 +83,4 @@ public sealed class CredentialPrompt(
                 : _userName, _passwordInput.GetValue(destructively)
         );
 }
+#endif

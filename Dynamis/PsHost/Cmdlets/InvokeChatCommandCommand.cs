@@ -1,3 +1,4 @@
+#if WITH_SMA
 using System.Management.Automation;
 using Dalamud.Plugin.Services;
 using Dynamis.Messaging;
@@ -26,3 +27,4 @@ public class InvokeChatCommandCommand : Cmdlet
         framework.Run(() => commandManager.ProcessCommand(command));
     }
 }
+#endif

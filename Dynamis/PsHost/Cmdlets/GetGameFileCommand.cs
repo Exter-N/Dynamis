@@ -1,3 +1,4 @@
+#if WITH_SMA
 using System.Management.Automation;
 using Dalamud.Plugin.Services;
 using Lumina.Data;
@@ -31,3 +32,4 @@ public class GetGameFileCommand : Cmdlet
         }
     }
 }
+#endif

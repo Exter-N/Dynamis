@@ -1,3 +1,4 @@
+#if WITH_SMA
 using System.Management.Automation;
 using System.Reflection;
 using Dynamis.ClientStructs;
@@ -57,3 +58,4 @@ public sealed class GetClientStructCommand : Cmdlet
     public static nint CastAddress(object? value)
         => IBoxedAddress.TryUnbox(value, out var address) ? address : ConvertEx.ToIntPtr(value);
 }
+#endif

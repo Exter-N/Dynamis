@@ -1,3 +1,4 @@
+#if WITH_SMA
 using System.Collections.ObjectModel;
 using System.Management.Automation;
 using System.Management.Automation.Host;
@@ -125,3 +126,4 @@ public sealed class UserInterface(HostedPsWindow window) : PSHostUserInterface, 
                   )
                  .Result;
 }
+#endif

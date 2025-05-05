@@ -1,3 +1,4 @@
+#if WITH_SMA
 using System.Management.Automation;
 using Dalamud.Plugin.Services;
 using Dynamis.UI.PsHost.Output;
@@ -31,3 +32,4 @@ public sealed class WriteChatCommand : Cmdlet
         }
     }
 }
+#endif

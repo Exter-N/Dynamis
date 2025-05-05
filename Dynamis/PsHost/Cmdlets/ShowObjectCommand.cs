@@ -1,3 +1,4 @@
+#if WITH_SMA
 using System.Management.Automation;
 using Dalamud.Plugin.Services;
 using Dynamis.Messaging;
@@ -21,3 +22,4 @@ public class ShowObjectCommand : Cmdlet
         messageHub.PublishOnFrameworkThread(message);
     }
 }
+#endif

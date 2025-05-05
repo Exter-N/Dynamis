@@ -1,3 +1,4 @@
+#if WITH_SMA
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Interface.Utility;
 using Dalamud.Utility;
@@ -82,3 +83,4 @@ public sealed class TextParagraph : IParagraph
         }
     }
 }
+#endif

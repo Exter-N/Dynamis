@@ -1,3 +1,4 @@
+#if WITH_SMA
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.Management.Automation;
@@ -142,3 +143,4 @@ public sealed class FormPrompt(
 
     private readonly record struct FormItem(string Key, Func<PSObject> GetResult, IInput Input, string HelpMessage);
 }
+#endif

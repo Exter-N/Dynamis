@@ -1,3 +1,4 @@
+#if WITH_SMA
 using System.Management.Automation;
 using Dynamis.UI.PsHost.Output;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,3 +35,4 @@ public sealed class WriteLogCommand : Cmdlet
         }
     }
 }
+#endif

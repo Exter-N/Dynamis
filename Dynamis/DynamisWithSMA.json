@@ -1,0 +1,16 @@
+{
+  "Author": "Ny",
+  "Name": "Dynamis (with Hosted PowerShell)",
+  "InternalName": "DynamisWithSMA",
+  "Punchline": "Developer/debugging/RE tool and experiment workbench.",
+  "Description": "This plugin contains various tools to help reverse engineering the game through dynamic analysis, and prototyping things.",
+  "ApplicableVersion": "any",
+  "Tags": [
+    "reverse-engineering",
+    "developer-tools",
+    "powershell"
+  ],
+  "AssemblyVersion": "9.0.0.1",
+  "IconUrl": "https://raw.githubusercontent.com/Exter-N/Dynamis/main/Dynamis/DynamisWithSMA128.png",
+  "RepoUrl": "https://github.com/Exter-N/Dynamis"
+}

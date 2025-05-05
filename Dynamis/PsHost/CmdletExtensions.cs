@@ -1,3 +1,4 @@
+#if WITH_SMA
 using System.Management.Automation;
 
 namespace Dynamis.PsHost;
@@ -11,3 +12,4 @@ internal static class CmdletExtensions
     public static IServiceProvider GetServiceProvider(this ICommandRuntime runtime)
         => runtime.GetHostContext().ServiceProvider;
 }
+#endif

@@ -1,3 +1,4 @@
+#if WITH_SMA
 using System.Management.Automation;
 using System.Reflection;
 using Dalamud.Plugin;
@@ -58,3 +59,4 @@ public class GetIpcFunction : Cmdlet
         );
     }
 }
+#endif

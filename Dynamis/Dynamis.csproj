@@ -13,6 +13,31 @@
         <ImplicitUsings>true</ImplicitUsings>
     </PropertyGroup>
 
+    <PropertyGroup>
+        <Configurations>Debug;DebugWithSMA;Release;ReleaseWithSMA</Configurations>
+        <Configuration_Debug Condition="$(Configuration.StartsWith('Debug'))">true</Configuration_Debug>
+        <Configuration_Release Condition="$(Configuration.StartsWith('Release'))">true</Configuration_Release>
+        <Configuration_WithSMA Condition="$(Configuration.EndsWith('WithSMA'))">true</Configuration_WithSMA>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration_Debug)' == 'true'">
+        <DebugSymbols>true</DebugSymbols>
+        <DefineConstants Condition="'$(DefineConstants)' != ''">$(DefineConstants);</DefineConstants>
+        <DefineConstants>$(DefineConstants)DEBUG</DefineConstants>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration_Release)' == 'true'">
+        <Optimize>true</Optimize>
+        <DefineConstants Condition="'$(DefineConstants)' != ''">$(DefineConstants);</DefineConstants>
+        <DefineConstants>$(DefineConstants)RELEASE</DefineConstants>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration_WithSMA)' == 'true'">
+        <AssemblyName>DynamisWithSMA</AssemblyName>
+        <DefineConstants Condition="'$(DefineConstants)' != ''">$(DefineConstants);</DefineConstants>
+        <DefineConstants>$(DefineConstants)WITH_SMA</DefineConstants>
+    </PropertyGroup>
+
     <ItemGroup>
         <Reference Include="CheapLoc">
             <HintPath>$(DalamudLibPath)CheapLoc.dll</HintPath>
@@ -38,6 +63,10 @@
 
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0"/>
+        <PackageReference Include="YamlDotNet" Version="15.1.2" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(Configuration_WithSMA)' == 'true'">
         <PackageReference Include="Microsoft.PowerShell.Commands.Diagnostics" Version="7.6.0-preview.3" />
         <PackageReference Include="Microsoft.PowerShell.Commands.Management" Version="7.6.0-preview.3" />
         <PackageReference Include="Microsoft.PowerShell.Commands.Utility" Version="7.6.0-preview.3" />
@@ -45,7 +74,6 @@
         <PackageReference Include="Microsoft.PowerShell.Security" Version="7.6.0-preview.3" />
         <PackageReference Include="Microsoft.WSMan.Management" Version="7.6.0-preview.3" />
         <PackageReference Include="System.Management.Automation" Version="7.6.0-preview.3" />
-        <PackageReference Include="YamlDotNet" Version="15.1.2" />
     </ItemGroup>
 
     <ItemGroup>
@@ -53,7 +81,14 @@
     </ItemGroup>
 
     <ItemGroup>
-        <None Include="Dynamis.json" CopyToOutputDirectory="PreserveNewest" />
         <None Include="..\ipfd\target\x86_64-pc-windows-gnu\release\dynamis_ipfd.dll" CopyToOutputDirectory="Always" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(Configuration_WithSMA)' == 'true'">
+        <None Include="DynamisWithSMA.json" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(Configuration_WithSMA)' != 'true'">
+        <None Include="Dynamis.json" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 </Project>

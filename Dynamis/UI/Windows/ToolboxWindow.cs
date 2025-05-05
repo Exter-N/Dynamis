@@ -45,14 +45,32 @@ public sealed class ToolboxWindow : Window, ISingletonWindow, IMessageObserver<C
         }
 
         ImGui.SameLine();
+#if WITH_SMA
         if (ImGui.Button("Hosted PowerShell")) {
             _messageHub.Publish<OpenWindowMessage<HostedPsWindow>>();
         }
+#else
+        using (ImRaii.Disabled()) {
+            ImGui.Button("Hosted PowerShell");
+        }
+
+        if (ImGui.IsItemHovered()) {
+            using var _ = ImRaii.Tooltip();
+            ImGui.TextUnformatted("This Dynamis build does not include the hosted PowerShell.");
+            ImGui.TextUnformatted("To use this, install a build that includes this functionality.");
+        }
+#endif
 
         using (ImRaii.Disabled(!_configuration.Configuration.EnableIpfd)) {
             if (ImGui.Button("IPFD Breakpoint")) {
                 _messageHub.Publish<OpenWindowMessage<BreakpointWindow>>();
             }
+        }
+
+        if (!_configuration.Configuration.EnableIpfd && ImGui.IsItemHovered()) {
+            using var _ = ImRaii.Tooltip();
+            ImGui.TextUnformatted("The In-Process Faux Debugger is currently disabled.");
+            ImGui.TextUnformatted("To use this, enable this functionality in Dynamis' settings.");
         }
 
         ImGui.Dummy(new(16.0f, ImGui.GetContentRegionAvail().Y - ImGui.GetFrameHeightWithSpacing()));

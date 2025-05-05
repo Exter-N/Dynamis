@@ -1,3 +1,4 @@
+#if WITH_SMA
 using System.Management.Automation;
 using Dalamud.Plugin.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -40,3 +41,4 @@ public class InvokeOnFrameworkCommand : Cmdlet
         }
     }
 }
+#endif

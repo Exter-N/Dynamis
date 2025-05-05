@@ -1,3 +1,4 @@
+#if WITH_SMA
 using System.Security;
 using Dalamud.Interface.Utility.Raii;
 using Dynamis.UI.Components;
@@ -47,3 +48,4 @@ public sealed class SecureLinePrompt : IPrompt<SecureString>
     public void Cancel()
         => _finishedValue ??= _input.GetValue();
 }
+#endif

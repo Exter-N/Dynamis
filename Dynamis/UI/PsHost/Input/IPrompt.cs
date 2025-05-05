@@ -1,3 +1,4 @@
+#if WITH_SMA
 namespace Dynamis.UI.PsHost.Input;
 
 public interface IPrompt
@@ -18,3 +19,4 @@ public interface IPrompt<out T> : IPrompt
 {
     T Result { get; }
 }
+#endif

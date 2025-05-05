@@ -21,6 +21,7 @@ public sealed class BreakpointWindow : IndexedWindow
     private readonly ObjectInspector        _objectInspector;
     private readonly ConfigurationContainer _configuration;
     private readonly MessageHub             _messageHub;
+    private readonly Ipfd                   _ipfd;
     private readonly Breakpoint             _breakpoint;
 
     private nint            _vmNewAddress;
@@ -30,20 +31,23 @@ public sealed class BreakpointWindow : IndexedWindow
     private int             _vmMaximum = -1;
     private Task?           _vmSyncTask;
 
-    private readonly List<SnapshotRecord> _vmSnapshots = [];
+    private readonly List<SnapshotRecord>  _vmSnapshots   = [];
+    private readonly HashSet<nint>         _vmIps         = [];
+    private readonly HashSet<(nint, nint)> _vmIpsAndTypes = [];
 
     public Breakpoint Breakpoint
         => _breakpoint;
 
     public BreakpointWindow(ILogger logger, WindowSystem windowSystem, ImGuiComponents imGuiComponents,
         ObjectInspector objectInspector, ConfigurationContainer configuration, MessageHub messageHub,
-        Breakpoint breakpoint, int index) : base($"Dynamis - IPFD Breakpoint##{index}", windowSystem, index, 0)
+        Ipfd ipfd, Breakpoint breakpoint, int index) : base($"Dynamis - IPFD Breakpoint##{index}", windowSystem, index, 0)
     {
         _logger = logger;
         _imGuiComponents = imGuiComponents;
         _objectInspector = objectInspector;
         _configuration = configuration;
         _messageHub = messageHub;
+        _ipfd = ipfd;
         _breakpoint = breakpoint;
 
         breakpoint.Hit += BreakpointHit;
@@ -51,7 +55,7 @@ public sealed class BreakpointWindow : IndexedWindow
         SizeConstraints = new WindowSizeConstraints
         {
             MinimumSize = new(768, 432),
-            MaximumSize = new(float.MaxValue, float.MaxValue),
+            MaximumSize = new(16384, 16384),
         };
 
         imGuiComponents.AddTitleBarButtons(this);
@@ -118,7 +122,9 @@ public sealed class BreakpointWindow : IndexedWindow
         using (ImRaii.Disabled(!(_vmSyncTask?.IsCompleted ?? true))) {
             if (ImGui.Button("Apply Configuration")) {
                 _vmSyncTask = _breakpoint.ModifyAsync(
-                    _vmNewAddress, (_vmEnable ? BreakpointFlags.LocalEnable : 0) | _vmLength | _vmCondition
+                    _vmNewAddress,
+                    (_vmEnable ? BreakpointFlags.LocalEnable | BreakpointFlags.GlobalEnable : 0) | _vmLength
+                  | _vmCondition
                 );
             }
         }
@@ -222,6 +228,12 @@ public sealed class BreakpointWindow : IndexedWindow
 
     private unsafe void BreakpointHit(object? sender, BreakpointEventArgs e)
     {
+        var pCtx = e.ExceptionInfo->ContextRecord;
+        var @this = unchecked((nint)e.ExceptionInfo->ContextRecord->Rcx);
+        var typeOfThis = VirtualMemory.GetProtection(@this).CanRead()
+            ? (Ipfd.RequiresSafeRead(@this, pCtx) ? _ipfd.Read<nint>(@this) : *(nint*)@this)
+            : 0;
+
         int maximum;
         lock (this) {
             maximum = _vmMaximum;
@@ -240,7 +252,7 @@ public sealed class BreakpointWindow : IndexedWindow
 
         var time = DateTime.Now;
         var (threadId, context) = _objectInspector.TakeThreadStateSnapshot(e.ExceptionInfo);
-        var record = new SnapshotRecord(time, threadId, e.Address, context);
+        var record = new SnapshotRecord(time, threadId, e.Address, 0, context);
         ThreadPool.QueueUserWorkItem(ProcessSnapshot, record, false);
     }
 
@@ -265,5 +277,6 @@ public sealed class BreakpointWindow : IndexedWindow
         DateTime Time,
         uint ThreadId,
         nint ExceptionAddress,
+        nint TypeOfThis,
         ObjectSnapshot Context);
 }

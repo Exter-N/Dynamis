@@ -1,3 +1,4 @@
+#if WITH_SMA
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Text;
@@ -130,3 +131,4 @@ public sealed class CommandPrompt(string prompt, IList<string> commandHistory, R
         return 0;
     }
 }
+#endif

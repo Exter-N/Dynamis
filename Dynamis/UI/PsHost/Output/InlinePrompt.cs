@@ -1,3 +1,4 @@
+#if WITH_SMA
 using Dynamis.UI.PsHost.Input;
 using ImGuiNET;
 
@@ -22,3 +23,4 @@ public sealed class InlinePrompt(IPrompt prompt, Action? onComplete, bool sameLi
         _onComplete = null;
     }
 }
+#endif

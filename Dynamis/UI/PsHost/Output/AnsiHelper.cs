@@ -1,3 +1,4 @@
+#if WITH_SMA
 using System.Text;
 using System.Text.RegularExpressions;
 using Dynamis.Utility;
@@ -74,3 +75,4 @@ public static partial class AnsiHelper
         }
     }
 }
+#endif

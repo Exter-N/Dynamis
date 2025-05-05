@@ -1,3 +1,4 @@
+#if WITH_SMA
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
 using Dynamis.Messaging;
@@ -28,3 +29,4 @@ public class HostedPsWindowFactory(
         CreateWindow();
     }
 }
+#endif

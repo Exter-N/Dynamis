@@ -1,3 +1,4 @@
+#if WITH_SMA
 using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 
@@ -52,3 +53,4 @@ public abstract class BaseFormPrompt(string? caption, string? message) : IPrompt
 
     public abstract void Cancel();
 }
+#endif

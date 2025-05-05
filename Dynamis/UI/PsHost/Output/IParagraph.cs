@@ -1,3 +1,4 @@
+#if WITH_SMA
 namespace Dynamis.UI.PsHost.Output;
 
 public interface IParagraph
@@ -9,3 +10,4 @@ public interface IParagraph
     protected static int AllocateId()
         => Interlocked.Increment(ref _nextId);
 }
+#endif

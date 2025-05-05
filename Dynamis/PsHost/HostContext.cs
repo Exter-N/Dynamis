@@ -1,3 +1,4 @@
+#if WITH_SMA
 using System.Diagnostics.CodeAnalysis;
 using System.Management.Automation.Runspaces;
 
@@ -19,3 +20,4 @@ public record HostContext(IServiceProvider ServiceProvider)
         return false;
     }
 }
+#endif

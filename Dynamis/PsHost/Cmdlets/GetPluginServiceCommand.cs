@@ -1,3 +1,4 @@
+#if WITH_SMA
 using System.Management.Automation;
 using Dalamud.IoC;
 using Dalamud.Plugin;
@@ -55,3 +56,4 @@ public sealed class GetPluginServiceCommand : Cmdlet
             => Service;
     }
 }
+#endif

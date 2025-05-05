@@ -34,7 +34,7 @@ public sealed class BreakpointWindowFactory(
         messageHub.Publish<DataYamlPreloadMessage>();
 
         return new(
-            logger, WindowSystem, imGuiComponents, objectInspector, configuration, messageHub, breakpoint,
+            logger, WindowSystem, imGuiComponents, objectInspector, configuration, messageHub, ipfd, breakpoint,
             GetFreeIndex()
         );
     }

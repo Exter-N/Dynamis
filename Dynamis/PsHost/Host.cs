@@ -1,3 +1,4 @@
+#if WITH_SMA
 using System.Globalization;
 using System.Management.Automation;
 using System.Management.Automation.Host;
@@ -65,3 +66,4 @@ public sealed class Host(PSHostUserInterface ui, HostContext hostContext)
         _runspaceStack.TryPop(out _);
     }
 }
+#endif

@@ -30,7 +30,7 @@ public sealed class ObjectTableWindow : Window, ISingletonWindow, IMessageObserv
         SizeConstraints = new WindowSizeConstraints
         {
             MinimumSize = new(768, 432),
-            MaximumSize = new(float.MaxValue, float.MaxValue),
+            MaximumSize = new(16384, 16384),
         };
 
         imGuiComponents.AddTitleBarButtons(this);

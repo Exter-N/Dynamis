@@ -1,3 +1,4 @@
+#if WITH_SMA
 using System.Text;
 using Dalamud.Interface.Utility.Raii;
 using Dynamis.Utility;
@@ -71,3 +72,4 @@ public class LinePrompt : IPrompt<string>
         data->SelectionEnd = position;
     }
 }
+#endif

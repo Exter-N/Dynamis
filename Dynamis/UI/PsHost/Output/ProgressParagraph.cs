@@ -1,3 +1,4 @@
+#if WITH_SMA
 using System.Management.Automation;
 
 namespace Dynamis.UI.PsHost.Output;
@@ -14,3 +15,4 @@ public sealed class ProgressParagraph : IParagraph
         // TODO
     }
 }
+#endif

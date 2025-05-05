@@ -1,3 +1,4 @@
+#if WITH_SMA
 using System.Diagnostics.CodeAnalysis;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
@@ -59,7 +60,7 @@ public sealed class HostedPsWindow : IndexedWindow, IDisposable
         SizeConstraints = new WindowSizeConstraints
         {
             MinimumSize = new(768, 432),
-            MaximumSize = new(float.MaxValue, float.MaxValue),
+            MaximumSize = new(16384, 16384),
         };
 
         imGuiComponents.AddTitleBarButtons(this);
@@ -466,3 +467,4 @@ public sealed class HostedPsWindow : IndexedWindow, IDisposable
         _currentPowerShell?.StopAsync(null, null);
     }
 }
+#endif

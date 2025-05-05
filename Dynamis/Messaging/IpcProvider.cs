@@ -16,12 +16,19 @@ public sealed class IpcProvider(
     ObjectInspector objectInspector)
     : IHostedService
 {
-    public const uint ApiMajorVersion = 1;
-    public const uint ApiMinorVersion = 3;
+    public const uint  ApiMajorVersion = 1;
+    public const uint  ApiMinorVersion = 3;
+    public const ulong ApiFeatureFlags = SmaApiFeatureFlag;
 
-    private ICallGateProvider<uint, uint, Version, object?>?            _apiInitialized;
+#if WITH_SMA
+    private const ulong SmaApiFeatureFlag = 1;
+#else
+    private const ulong SmaApiFeatureFlag = 0;
+#endif
+
+    private ICallGateProvider<uint, uint, ulong, Version, object?>?     _apiInitialized;
     private ICallGateProvider<object?>?                                 _apiDisposing;
-    private ICallGateProvider<(uint, uint)>?                            _getApiVersion;
+    private ICallGateProvider<(uint, uint, ulong)>?                     _getApiVersion;
     private ICallGateProvider<nint, object?>?                           _inspectObject;
     private ICallGateProvider<nint, uint, string, uint, uint, object?>? _inspectRegion;
     private ICallGateProvider<nint, object?>?                           _imGuiDrawPointer;
@@ -36,7 +43,9 @@ public sealed class IpcProvider(
         RegisterEvent(out _apiInitialized, "Dynamis.ApiInitialized");
         RegisterEvent(out _apiDisposing,   "Dynamis.ApiDisposing");
 
-        RegisterFunc(out _getApiVersion, "Dynamis.GetApiVersion", () => (ApiMajorVersion, ApiMinorVersion));
+        RegisterFunc(
+            out _getApiVersion, "Dynamis.GetApiVersion", () => (ApiMajorVersion, ApiMinorVersion, ApiFeatureFlags)
+        );
 
         RegisterAction(out _inspectObject,    $"Dynamis.{nameof(InspectObject)}.V1",    InspectObject);
         RegisterAction(out _inspectRegion,    $"Dynamis.{nameof(InspectRegion)}.V1",    InspectRegion);
@@ -59,7 +68,8 @@ public sealed class IpcProvider(
 
         try {
             _apiInitialized?.SendMessage(
-                ApiMajorVersion, ApiMinorVersion, typeof(IpcProvider).Assembly.GetName().Version ?? new()
+                ApiMajorVersion, ApiMinorVersion, ApiFeatureFlags,
+                typeof(IpcProvider).Assembly.GetName().Version ?? new()
             );
         } catch (Exception e) {
             logger.LogError(e, "Error while firing API initialized event");
@@ -187,10 +197,10 @@ public sealed class IpcProvider(
         }
     }
 
-    private void RegisterEvent<T1, T2, T3>(out ICallGateProvider<T1, T2, T3, object?>? provider, string name)
+    private void RegisterEvent<T1, T2, T3, T4>(out ICallGateProvider<T1, T2, T3, T4, object?>? provider, string name)
     {
         try {
-            provider = pi.GetIpcProvider<T1, T2, T3, object?>(name);
+            provider = pi.GetIpcProvider<T1, T2, T3, T4, object?>(name);
         } catch (Exception e) {
             provider = null;
             logger.LogError(e, "Error while registering IPC provider for {Name}", name);

@@ -1,3 +1,4 @@
+#if WITH_SMA
 using System.Collections.ObjectModel;
 using System.Management.Automation.Host;
 using Dalamud.Interface.Utility.Raii;
@@ -55,3 +56,4 @@ public sealed class ChoicePrompt(
     {
     }
 }
+#endif

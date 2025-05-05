@@ -1,3 +1,4 @@
+#if WITH_SMA
 using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 
@@ -50,3 +51,4 @@ public sealed class Section(string title, int index, bool nested) : IParagraph
         }
     }
 }
+#endif

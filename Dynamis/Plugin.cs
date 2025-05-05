@@ -10,7 +10,9 @@ using Dynamis.Interop.Ipfd;
 using Dynamis.Interop.Win32;
 using Dynamis.Logging;
 using Dynamis.Messaging;
+#if WITH_SMA
 using Dynamis.PsHost;
+#endif
 using Dynamis.Resources;
 using Dynamis.UI;
 using Dynamis.UI.Components;
@@ -103,14 +105,18 @@ public sealed class Plugin : IDalamudPlugin
                         collection.AddSingleton<TextureArraySlicer>();
                         collection.AddSingleton<ImGuiComponents>();
                         collection.AddSingleton<ContextMenu>();
+#if WITH_SMA
                         collection.AddSingleton<BootHelper>();
+#endif
                         collection.AddSingleton<DynamicBoxFactory>();
 
                         collection.AddSingleton<SnapshotViewerFactory>();
 
                         collection.AddSingleton<ObjectInspectorWindowFactory>();
                         collection.AddSingleton<BreakpointWindowFactory>();
+#if WITH_SMA
                         collection.AddSingleton<HostedPsWindowFactory>();
+#endif
 
                         collection.AddImplementationSingletons<IObjectInspector>(typeof(Plugin).Assembly);
                         collection.AddImplementationAliases<IObjectInspector>();

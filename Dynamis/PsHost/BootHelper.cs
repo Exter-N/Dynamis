@@ -1,3 +1,4 @@
+#if WITH_SMA
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Reflection;
@@ -171,3 +172,4 @@ public sealed class BootHelper(IDalamudPluginInterface pi)
         }
     }
 }
+#endif

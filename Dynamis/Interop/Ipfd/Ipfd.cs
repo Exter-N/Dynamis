@@ -1,6 +1,7 @@
 using Dalamud.Game.Gui.Dtr;
 using Dalamud.Plugin.Services;
 using Dynamis.Configuration;
+using Dynamis.Interop.Win32;
 using Dynamis.Messaging;
 using Dynamis.Resources;
 using Dynamis.UI.Windows;
@@ -319,5 +320,28 @@ public sealed class Ipfd : IMessageObserver<ConfigurationChangedMessage>, IDispo
             FreeModuleNoLock(true);
             _dtrEntry.Remove();
         }
+    }
+
+    public static unsafe bool RequiresSafeRead(nint pointer, Context* context)
+    {
+        var address = unchecked((ulong)pointer);
+        var control = context->Dr7;
+        if ((control & 0x3) != 0 && (control & 0x30000) == 0x30000 && address == context->Dr0) {
+            return true;
+        }
+
+        if ((control & 0xC) != 0 && (control & 0x300000) == 0x300000 && address == context->Dr1) {
+            return true;
+        }
+
+        if ((control & 0x30) != 0 && (control & 0x3000000) == 0x3000000 && address == context->Dr2) {
+            return true;
+        }
+
+        if ((control & 0xC0) != 0 && (control & 0x30000000) == 0x30000000 && address == context->Dr3) {
+            return true;
+        }
+
+        return false;
     }
 }
