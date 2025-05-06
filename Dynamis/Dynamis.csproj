@@ -15,6 +15,7 @@
 
     <PropertyGroup>
         <Configurations>Debug;DebugWithSMA;Release;ReleaseWithSMA</Configurations>
+        <Configuration Condition="'$(Configuration)' == ''">DebugWithSMA</Configuration>
         <Configuration_Debug Condition="$(Configuration.StartsWith('Debug'))">true</Configuration_Debug>
         <Configuration_Release Condition="$(Configuration.StartsWith('Release'))">true</Configuration_Release>
         <Configuration_WithSMA Condition="$(Configuration.EndsWith('WithSMA'))">true</Configuration_WithSMA>
@@ -78,6 +79,7 @@
 
     <ItemGroup>
         <EmbeddedResource Include="Resources\*.png" />
+        <None Include="*.png" />
     </ItemGroup>
 
     <ItemGroup>
@@ -85,10 +87,12 @@
     </ItemGroup>
 
     <ItemGroup Condition="'$(Configuration_WithSMA)' == 'true'">
+        <None Include="Dynamis.json" />
         <None Include="DynamisWithSMA.json" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(Configuration_WithSMA)' != 'true'">
         <None Include="Dynamis.json" CopyToOutputDirectory="PreserveNewest" />
+        <None Include="DynamisWithSMA.json" />
     </ItemGroup>
 </Project>
