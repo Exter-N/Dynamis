@@ -14,6 +14,7 @@
     </PropertyGroup>
 
     <PropertyGroup>
+        <Use_DalamudPackager>false</Use_DalamudPackager>
         <Configurations>Debug;DebugWithSMA;Release;ReleaseWithSMA</Configurations>
         <Configuration_Debug Condition="$(Configuration.StartsWith('Debug'))">true</Configuration_Debug>
         <Configuration_Release Condition="$(Configuration.StartsWith('Release'))">true</Configuration_Release>

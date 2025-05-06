@@ -22,7 +22,7 @@ jobs:
           dotnet-version: '9.x.x'
 
       - name: Restore dependencies
-        run: dotnet restore -p:Configuration=ReleaseWithSMA
+        run: dotnet restore
 
       - name: Download Dalamud
         run: |
@@ -37,7 +37,7 @@ jobs:
       - name: Build plugin (No SMA)
         run: |
           $ver = '${{ github.ref_name }}'
-          invoke-expression 'dotnet build --no-restore --configuration Release --nologo -p:Version=$ver -p:FileVersion=$ver -p:AssemblyVersion=$ver'
+          invoke-expression 'dotnet build --configuration Release --nologo -p:Version=$ver -p:FileVersion=$ver -p:AssemblyVersion=$ver'
 
       - name: Write version into JSON (No SMA)
         run: |
@@ -58,7 +58,7 @@ jobs:
       - name: Build plugin (With SMA)
         run: |
           $ver = '${{ github.ref_name }}'
-          invoke-expression 'dotnet build --no-restore --configuration ReleaseWithSMA --nologo -p:Version=$ver -p:FileVersion=$ver -p:AssemblyVersion=$ver'
+          invoke-expression 'dotnet build --configuration ReleaseWithSMA --nologo -p:Version=$ver -p:FileVersion=$ver -p:AssemblyVersion=$ver'
 
       - name: Write version into JSON (With SMA)
         run: |
