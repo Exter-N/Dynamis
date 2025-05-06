@@ -22,7 +22,7 @@ jobs:
           dotnet-version: '9.x.x'
 
       - name: Restore dependencies
-        run: dotnet restore
+        run: dotnet restore -p:Configuration=ReleaseWithSMA
 
       - name: Download Dalamud
         run: |
