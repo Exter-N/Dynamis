@@ -125,14 +125,14 @@ jobs:
           $json = Get-Content -Raw $path | ConvertFrom-Json
           $json[0].AssemblyVersion = $ver
           $json[0].TestingAssemblyVersion = $ver
-          $json[0].DownloadLinkInstall = $json.DownloadLinkInstall -replace '[^/]+/Dynamis.zip',"$ver/Dynamis.zip"
-          $json[0].DownloadLinkTesting = $json.DownloadLinkTesting -replace '[^/]+/Dynamis.zip',"$ver/Dynamis.zip"
-          $json[0].DownloadLinkUpdate = $json.DownloadLinkUpdate -replace '[^/]+/Dynamis.zip',"$ver/Dynamis.zip"
+          $json[0].DownloadLinkInstall = $json[0].DownloadLinkInstall -replace '[^/]+/Dynamis.zip',"$ver/Dynamis.zip"
+          $json[0].DownloadLinkTesting = $json[0].DownloadLinkTesting -replace '[^/]+/Dynamis.zip',"$ver/Dynamis.zip"
+          $json[0].DownloadLinkUpdate = $json[0].DownloadLinkUpdate -replace '[^/]+/Dynamis.zip',"$ver/Dynamis.zip"
           $json[1].AssemblyVersion = $ver
           $json[1].TestingAssemblyVersion = $ver
-          $json[1].DownloadLinkInstall = $json.DownloadLinkInstall -replace '[^/]+/DynamisWithSMA.zip',"$ver/DynamisWithSMA.zip"
-          $json[1].DownloadLinkTesting = $json.DownloadLinkTesting -replace '[^/]+/DynamisWithSMA.zip',"$ver/DynamisWithSMA.zip"
-          $json[1].DownloadLinkUpdate = $json.DownloadLinkUpdate -replace '[^/]+/DynamisWithSMA.zip',"$ver/DynamisWithSMA.zip"
+          $json[1].DownloadLinkInstall = $json[1].DownloadLinkInstall -replace '[^/]+/DynamisWithSMA.zip',"$ver/DynamisWithSMA.zip"
+          $json[1].DownloadLinkTesting = $json[1].DownloadLinkTesting -replace '[^/]+/DynamisWithSMA.zip',"$ver/DynamisWithSMA.zip"
+          $json[1].DownloadLinkUpdate = $json[1].DownloadLinkUpdate -replace '[^/]+/DynamisWithSMA.zip',"$ver/DynamisWithSMA.zip"
           $content = $json | ConvertTo-Json -AsArray
           set-content -Path $path -Value $content
 
