@@ -54,7 +54,7 @@ public sealed class ToolboxWindow : Window, ISingletonWindow, IMessageObserver<C
             ImGui.Button("Hosted PowerShell");
         }
 
-        if (ImGui.IsItemHovered()) {
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled)) {
             using var _ = ImRaii.Tooltip();
             ImGui.TextUnformatted("This Dynamis build does not include the hosted PowerShell.");
             ImGui.TextUnformatted("To use this, install a build that includes this functionality.");
@@ -67,7 +67,7 @@ public sealed class ToolboxWindow : Window, ISingletonWindow, IMessageObserver<C
             }
         }
 
-        if (!_configuration.Configuration.EnableIpfd && ImGui.IsItemHovered()) {
+        if (!_configuration.Configuration.EnableIpfd && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled)) {
             using var _ = ImRaii.Tooltip();
             ImGui.TextUnformatted("The In-Process Faux Debugger is currently disabled.");
             ImGui.TextUnformatted("To use this, enable this functionality in Dynamis' settings.");
