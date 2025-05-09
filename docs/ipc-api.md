@@ -8,6 +8,8 @@ Once a function/event is published, its signature will never change until its re
 
 See also: [IpcProvider.cs](../Dynamis/Messaging/IpcProvider.cs).
 
+For an example of a consumer implementation, see [DynamisIpc.cs from Ottermandias/OtterGui](https://github.com/Ottermandias/OtterGui/blob/main/Services/DynamisIpc.cs).
+
 ## Version and Lifecycle
 
 ### `GetApiVersion` function
