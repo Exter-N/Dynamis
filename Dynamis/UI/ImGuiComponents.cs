@@ -121,10 +121,9 @@ public sealed partial class ImGuiComponents(
 
         nuint displacement = 0;
         if (@class is null) {
-            var classAndDisplacement = objectInspector.DetermineClassAndDisplacement(pointer, false);
-            @class = classAndDisplacement.Class;
-            displacement = classAndDisplacement.Displacement;
+            (@class, displacement) = objectInspector.DetermineClassAndDisplacement(pointer, null, false);
         }
+
         if (@class.Known && @class.Name != wellKnown.ClassName) {
             ImGui.TextUnformatted($"Class Name: {@class.Name}");
         }

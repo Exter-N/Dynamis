@@ -31,7 +31,7 @@ public sealed class ObjectInspector(
     {
         nuint displacement = 0;
         if (@class is null) {
-            var classAndDisplacement = DetermineClassAndDisplacement(objectAddress, safeReads);
+            var classAndDisplacement = DetermineClassAndDisplacement(objectAddress, null, safeReads);
             @class = classAndDisplacement.Class;
             displacement = classAndDisplacement.Displacement;
             objectAddress -= (nint)displacement;
@@ -101,7 +101,8 @@ public sealed class ObjectInspector(
         return (threadId, context);
     }
 
-    public (ClassInfo Class, nuint Displacement) DetermineClassAndDisplacement(nint objectAddress, bool safeReads = true)
+    public (ClassInfo Class, nuint Displacement) DetermineClassAndDisplacement(nint objectAddress, nint? vtblHint = null,
+        bool safeReads = true)
     {
         var protection = VirtualMemory.GetProtection(objectAddress);
         if (!protection.CanRead()) {
@@ -126,23 +127,24 @@ public sealed class ObjectInspector(
             }, 0);
         }
 
-        var vtbl = Read<nint>(objectAddress, safeReads);
+        var vtbl = vtblHint ?? Read<nint>(objectAddress, safeReads);
         var vtblProtection = VirtualMemory.GetProtection(vtbl);
         if ((vtbl & (nint.Size - 1)) == 0 && vtblProtection.CanExecute()
                                           && memoryHeuristics.EstimateSizeAndDisplacementFromDtor(vtbl) is
                                              {
                                              } ownerSize) {
             // objectAddress is actually a vtbl and vtbl is actually a dtor
-            return (classRegistry.GetVirtualTableClass(
-                DetermineClassName(0, objectAddress).ClassName, objectAddress, ownerSize, safeReads
-            ), 0);
+            return (
+                classRegistry.GetVirtualTableClass(
+                    DetermineClassName(0, objectAddress).ClassName, objectAddress, ownerSize, safeReads
+                ), 0);
         }
 
         if (vtblProtection.CanRead()) {
             var dtor = Read<nint>(vtbl, safeReads);
             var displacement = memoryHeuristics.EstimateDisplacementFromVfunc(dtor);
             if (displacement != 0) {
-                var actual = DetermineClassAndDisplacement(objectAddress - (nint)displacement, safeReads);
+                var actual = DetermineClassAndDisplacement(objectAddress - (nint)displacement, null, safeReads);
                 return (actual.Class, actual.Displacement + displacement);
             }
         }
@@ -241,7 +243,9 @@ public sealed class ObjectInspector(
                             } else if (!protect.CanRead()) {
                                 color = (byte)HexViewerColor.BadPointer;
                             } else {
-                                color = (byte)GetClassColor(DetermineClassAndDisplacement(value, safeReads).Class);
+                                color = (byte)GetClassColor(
+                                    DetermineClassAndDisplacement(value, null, safeReads).Class
+                                );
                             }
                         }
 
@@ -262,7 +266,9 @@ public sealed class ObjectInspector(
                             if (protect.CanRead()) {
                                 color = (byte)HexViewerColor.Text;
                             } else {
-                                color = (byte)GetClassColor(DetermineClassAndDisplacement(value, safeReads).Class);
+                                color = (byte)GetClassColor(
+                                    DetermineClassAndDisplacement(value, null, safeReads).Class
+                                );
                             }
                         }
 
@@ -305,7 +311,7 @@ public sealed class ObjectInspector(
                 } else if (!protect.CanRead()) {
                     color = (byte)HexViewerColor.Default;
                 } else {
-                    color = (byte)GetClassColor(DetermineClassAndDisplacement(value, safeReads).Class);
+                    color = (byte)GetClassColor(DetermineClassAndDisplacement(value, null, safeReads).Class);
                 }
             }
 

@@ -107,4 +107,12 @@ public static class StringExtensions
 
     public static int WriteNullTerminated(this string value, Span<char> span)
         => WriteNullTerminated(value.AsSpan(), span);
+
+    public static string AfterLast(this string value, string substr)
+    {
+        var pos = value.LastIndexOf(substr, StringComparison.Ordinal);
+        return pos < 0
+            ? value
+            : value[(pos + substr.Length)..];
+    }
 }

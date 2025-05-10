@@ -15,14 +15,12 @@ using static Dynamis.Utility.SeStringUtility;
 namespace Dynamis.UI.Windows;
 
 public sealed class BreakpointWindowFactory(
-    ILogger<BreakpointWindowFactory> logger,
     WindowSystem windowSystem,
     INotificationManager notificationManager,
     IChatGui chatGui,
     ImGuiComponents imGuiComponents,
     ObjectInspector objectInspector,
     Ipfd ipfd,
-    ConfigurationContainer configuration,
     MessageHub messageHub,
     ResourceProvider resourceProvider)
     : WindowFactory<BreakpointWindow>(windowSystem),
@@ -33,10 +31,7 @@ public sealed class BreakpointWindowFactory(
     {
         messageHub.Publish<DataYamlPreloadMessage>();
 
-        return new(
-            logger, WindowSystem, imGuiComponents, objectInspector, configuration, messageHub, ipfd, breakpoint,
-            GetFreeIndex()
-        );
+        return new(WindowSystem, imGuiComponents, objectInspector, messageHub, breakpoint, GetFreeIndex());
     }
 
     private BreakpointWindow CreateWindow(Breakpoint breakpoint)
@@ -144,6 +139,17 @@ public sealed class BreakpointWindowFactory(
             }
         }
 
+        BreakpointWindow.DeduplicationMode deduplicationMode;
+        if (message.Arguments.Equals(4, null, "ipt", "iptype", "addrtype", "at")) {
+            deduplicationMode = BreakpointWindow.DeduplicationMode.ByInstructionPointerAndTypeOfThis;
+        } else if (message.Arguments.Equals(4, "ip", "addr", "a")) {
+            deduplicationMode = BreakpointWindow.DeduplicationMode.ByInstructionPointer;
+        } else if (message.Arguments.Equals(4, "none", "no", "0")) {
+            deduplicationMode = BreakpointWindow.DeduplicationMode.None;
+        } else {
+            return;
+        }
+
         var enabled = message.NamedArguments.ContainsKey("on");
         var hits = -1;
         if (message.NamedArguments.TryGetValue("hits", out var hitsArgs)) {
@@ -153,6 +159,6 @@ public sealed class BreakpointWindowFactory(
         }
 
         message.SetHandled();
-        CreateWindowForCommand()?.Configure(address, condition, length, enabled, hits);
+        CreateWindowForCommand()?.Configure(address, condition, length, enabled, hits, deduplicationMode);
     }
 }

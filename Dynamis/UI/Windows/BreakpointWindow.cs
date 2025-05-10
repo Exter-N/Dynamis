@@ -7,6 +7,7 @@ using Dynamis.Interop;
 using Dynamis.Interop.Ipfd;
 using Dynamis.Interop.Win32;
 using Dynamis.Messaging;
+using Dynamis.Utility;
 using ImGuiNET;
 using Microsoft.Extensions.Logging;
 
@@ -16,38 +17,34 @@ public sealed class BreakpointWindow : IndexedWindow
 {
     private const int MaxSnapshotHistorySize = 32;
 
-    private readonly ILogger                _logger;
-    private readonly ImGuiComponents        _imGuiComponents;
-    private readonly ObjectInspector        _objectInspector;
-    private readonly ConfigurationContainer _configuration;
-    private readonly MessageHub             _messageHub;
-    private readonly Ipfd                   _ipfd;
-    private readonly Breakpoint             _breakpoint;
+    private readonly ImGuiComponents _imGuiComponents;
+    private readonly ObjectInspector _objectInspector;
+    private readonly MessageHub      _messageHub;
+    private readonly Breakpoint      _breakpoint;
 
-    private nint            _vmNewAddress;
-    private bool            _vmEnable;
-    private BreakpointFlags _vmLength;
-    private BreakpointFlags _vmCondition;
-    private int             _vmMaximum = -1;
-    private Task?           _vmSyncTask;
+    private nint              _vmNewAddress;
+    private bool              _vmEnable;
+    private BreakpointFlags   _vmLength;
+    private BreakpointFlags   _vmCondition;
+    private int               _vmMaximum       = -1;
+    private DeduplicationMode _vmDeduplication = DeduplicationMode.ByInstructionPointerAndTypeOfThis;
+    private Task?             _vmSyncTask;
 
-    private readonly List<SnapshotRecord>  _vmSnapshots   = [];
-    private readonly HashSet<nint>         _vmIps         = [];
-    private readonly HashSet<(nint, nint)> _vmIpsAndTypes = [];
+    private readonly List<SnapshotRecord>   _vmSnapshots   = [];
+    private readonly HashSet<nint>          _vmIps         = [];
+    private readonly HashSet<(nint, nint?)> _vmIpsAndTypes = [];
 
     public Breakpoint Breakpoint
         => _breakpoint;
 
-    public BreakpointWindow(ILogger logger, WindowSystem windowSystem, ImGuiComponents imGuiComponents,
-        ObjectInspector objectInspector, ConfigurationContainer configuration, MessageHub messageHub,
-        Ipfd ipfd, Breakpoint breakpoint, int index) : base($"Dynamis - IPFD Breakpoint##{index}", windowSystem, index, 0)
+    public BreakpointWindow(WindowSystem windowSystem, ImGuiComponents imGuiComponents, ObjectInspector objectInspector,
+        MessageHub messageHub, Breakpoint breakpoint, int index) : base(
+        $"Dynamis - IPFD Breakpoint##{index}", windowSystem, index
+    )
     {
-        _logger = logger;
         _imGuiComponents = imGuiComponents;
         _objectInspector = objectInspector;
-        _configuration = configuration;
         _messageHub = messageHub;
-        _ipfd = ipfd;
         _breakpoint = breakpoint;
 
         breakpoint.Hit += BreakpointHit;
@@ -61,16 +58,18 @@ public sealed class BreakpointWindow : IndexedWindow
         imGuiComponents.AddTitleBarButtons(this);
     }
 
-    public void Configure(nint address, BreakpointFlags condition, BreakpointFlags length, bool enable, int maximumHits)
+    public void Configure(nint address, BreakpointFlags condition, BreakpointFlags length, bool enable, int maximumHits, DeduplicationMode deduplicationMode)
     {
         _vmNewAddress = address;
         _vmCondition = condition;
         _vmLength = length;
         _vmEnable = enable;
         _vmMaximum = maximumHits;
+        _vmDeduplication = deduplicationMode;
 
         _vmSyncTask = _breakpoint.ModifyAsync(
-            _vmNewAddress, (_vmEnable ? BreakpointFlags.LocalEnable : 0) | _vmLength | _vmCondition
+            _vmNewAddress,
+            (_vmEnable ? BreakpointFlags.LocalEnable | BreakpointFlags.GlobalEnable : 0) | _vmLength | _vmCondition
         );
     }
 
@@ -93,6 +92,9 @@ public sealed class BreakpointWindow : IndexedWindow
                 _vmMaximum = Math.Clamp(max, -1, ushort.MaxValue);
             }
         }
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(ImGui.CalcTextSize("By Address and Type of This").X + ImGui.GetStyle().FramePadding.X * 2.0f + ImGui.GetFrameHeight());
+        ImGuiComponents.ComboEnum("Deduplicate", ref _vmDeduplication, GetDeduplication);
         using (ImRaii.PushFont(UiBuilder.MonoFont)) {
             ImGui.SetNextItemWidth(ImGui.CalcTextSize("mmmmmmmmmmmmmmmm").X + ImGui.GetStyle().FramePadding.X * 2.0f);
         }
@@ -102,7 +104,7 @@ public sealed class BreakpointWindow : IndexedWindow
         ImGuiComponents.Combo(
             "Condition", ref _vmCondition,
             [BreakpointFlags.InstructionExecution, BreakpointFlags.DataWrites, BreakpointFlags.DataReadsAndWrites,],
-            condition => $"{GetCondition(condition)}"
+            GetCondition
         );
         ImGui.SameLine();
         ImGui.SetNextItemWidth(ImGui.CalcTextSize("m").X + ImGui.GetStyle().FramePadding.X * 2.0f + ImGui.GetFrameHeight());
@@ -167,15 +169,16 @@ public sealed class BreakpointWindow : IndexedWindow
 
     private void DrawSnapshots()
     {
-        using var table = ImRaii.Table("##snapshots", 4, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit);
+        using var table = ImRaii.Table("##snapshots", 5, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit);
         if (!table) {
             return;
         }
 
         ImGui.TableSetupColumn("Date/Time",    ImGuiTableColumnFlags.WidthStretch, 0.3f);
-        ImGui.TableSetupColumn("Thread ID",    ImGuiTableColumnFlags.WidthStretch, 0.2f);
-        ImGui.TableSetupColumn("Address",      ImGuiTableColumnFlags.WidthStretch, 0.25f);
-        ImGui.TableSetupColumn("Thread State", ImGuiTableColumnFlags.WidthStretch, 0.25f);
+        ImGui.TableSetupColumn("Thread ID",    ImGuiTableColumnFlags.WidthStretch, 0.15f);
+        ImGui.TableSetupColumn("Address",      ImGuiTableColumnFlags.WidthStretch, 0.2f);
+        ImGui.TableSetupColumn("Type of This", ImGuiTableColumnFlags.WidthStretch, 0.2f);
+        ImGui.TableSetupColumn("Thread State", ImGuiTableColumnFlags.WidthStretch, 0.15f);
         ImGui.TableHeadersRow();
         lock (_vmSnapshots) {
             var i = 0;
@@ -190,6 +193,12 @@ public sealed class BreakpointWindow : IndexedWindow
 
                 ImGui.TableNextColumn();
                 _imGuiComponents.DrawPointer(record.ExceptionAddress, null);
+
+                ImGui.TableNextColumn();
+                ImGuiComponents.DrawCopyable(
+                    (record.ClassOfThis?.Name ?? string.Empty).AfterLast("::"), false,
+                    () => record.ClassOfThis?.Name ?? string.Empty
+                );
 
                 ImGui.TableNextColumn();
                 if (ImGui.Button("Inspect")) {
@@ -219,6 +228,15 @@ public sealed class BreakpointWindow : IndexedWindow
             _ => throw new Exception($"Unexpected breakpoint length: {flags & BreakpointFlags.LengthFour}"),
         };
 
+    private static string GetDeduplication(DeduplicationMode mode)
+        => mode switch
+        {
+            DeduplicationMode.None => "No",
+            DeduplicationMode.ByInstructionPointer => "By Address",
+            DeduplicationMode.ByInstructionPointerAndTypeOfThis => "By Address and Type of This",
+            _ => throw new Exception($"Unexpected deduplication mode: {mode}"),
+        };
+
     public override void OnClose()
     {
         _breakpoint.Hit -= BreakpointHit;
@@ -230,9 +248,26 @@ public sealed class BreakpointWindow : IndexedWindow
     {
         var pCtx = e.ExceptionInfo->ContextRecord;
         var @this = unchecked((nint)e.ExceptionInfo->ContextRecord->Rcx);
-        var typeOfThis = VirtualMemory.GetProtection(@this).CanRead()
-            ? (Ipfd.RequiresSafeRead(@this, pCtx) ? _ipfd.Read<nint>(@this) : *(nint*)@this)
-            : 0;
+        nint? typeOfThis = VirtualMemory.GetProtection(@this).CanRead() && !Ipfd.RequiresSafeRead(@this, pCtx)
+            ? *(nint*)@this
+            : null;
+
+        bool isIpDuplicate, isIpAndTypeDuplicate;
+        lock (_vmIps) {
+            isIpDuplicate = _vmIps.Add(e.Address);
+            isIpAndTypeDuplicate = _vmIpsAndTypes.Add((e.Address, typeOfThis));
+        }
+
+        var isDuplicate = _vmDeduplication switch
+        {
+            DeduplicationMode.ByInstructionPointer              => isIpDuplicate,
+            DeduplicationMode.ByInstructionPointerAndTypeOfThis => isIpAndTypeDuplicate,
+            _                                                   => false,
+        };
+
+        if (isDuplicate) {
+            return;
+        }
 
         int maximum;
         lock (this) {
@@ -247,12 +282,16 @@ public sealed class BreakpointWindow : IndexedWindow
         }
 
         if (maximum == 0) {
+            if (!isIpDuplicate || !isIpAndTypeDuplicate) {
+                RebuildIndexes();
+            }
+
             return;
         }
 
         var time = DateTime.Now;
         var (threadId, context) = _objectInspector.TakeThreadStateSnapshot(e.ExceptionInfo);
-        var record = new SnapshotRecord(time, threadId, e.Address, 0, context);
+        var record = new SnapshotRecord(time, threadId, e.Address, @this, typeOfThis, context);
         ThreadPool.QueueUserWorkItem(ProcessSnapshot, record, false);
     }
 
@@ -265,10 +304,26 @@ public sealed class BreakpointWindow : IndexedWindow
             _objectInspector.CompleteSnapshot(stack);
         }
 
+        (record.ClassOfThis, record.DisplacementOfThis) =
+            _objectInspector.DetermineClassAndDisplacement(record.This, record.TypeOfThis);
+
         lock (_vmSnapshots) {
             _vmSnapshots.Insert(0, record);
             if (_vmSnapshots.Count > MaxSnapshotHistorySize) {
                 _vmSnapshots.RemoveAt(_vmSnapshots.Count - 1);
+                RebuildIndexes();
+            }
+        }
+    }
+
+    private void RebuildIndexes()
+    {
+        lock (_vmIps) {
+            _vmIps.Clear();
+            _vmIpsAndTypes.Clear();
+            foreach (var snapshot in _vmSnapshots) {
+                _vmIps.Add(snapshot.ExceptionAddress);
+                _vmIpsAndTypes.Add((snapshot.ExceptionAddress, snapshot.TypeOfThis));
             }
         }
     }
@@ -277,6 +332,18 @@ public sealed class BreakpointWindow : IndexedWindow
         DateTime Time,
         uint ThreadId,
         nint ExceptionAddress,
-        nint TypeOfThis,
-        ObjectSnapshot Context);
+        nint This,
+        nint? TypeOfThis,
+        ObjectSnapshot Context)
+    {
+        public ClassInfo? ClassOfThis;
+        public nuint      DisplacementOfThis;
+    }
+
+    public enum DeduplicationMode : byte
+    {
+        None,
+        ByInstructionPointer,
+        ByInstructionPointerAndTypeOfThis,
+    }
 }
