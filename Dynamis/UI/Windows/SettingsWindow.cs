@@ -14,7 +14,7 @@ using ImGuiNET;
 using Microsoft.Extensions.Logging;
 using static Dynamis.Utility.ChatGuiUtility;
 using static Dynamis.Utility.SeStringUtility;
-using EnumExtensions = Dynamis.Configuration.EnumExtensions;
+using ConfigurationEnumExtensions = Dynamis.Configuration.EnumExtensions;
 
 namespace Dynamis.UI.Windows;
 
@@ -155,7 +155,9 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
                 _configuration.Save(nameof(configuration.SymbolHandlerMode));
             }
         } else {
-            if (ImGuiComponents.ComboEnum("Symbol Handler Mode", ref symbolHandlerMode, EnumExtensions.Label)) {
+            if (ImGuiComponents.ComboEnum(
+                    "Symbol Handler Mode", ref symbolHandlerMode, ConfigurationEnumExtensions.Label
+                )) {
                 configuration.SymbolHandlerMode = symbolHandlerMode;
                 _configuration.Save(nameof(configuration.SymbolHandlerMode));
             }

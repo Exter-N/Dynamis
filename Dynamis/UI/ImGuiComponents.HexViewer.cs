@@ -11,9 +11,11 @@ partial class ImGuiComponents
     private static ReadOnlySpan<byte> HexBytes
         => "0123456789ABCDEF"u8;
 
-    public static unsafe (int, bool)? DrawHexViewer(string id, ReadOnlySpan<byte> data, ReadOnlySpan<byte> colors, ReadOnlySpan<uint> palette, Action<int, bool, bool>? onHover = null)
+    public static unsafe (int, HexViewerPart)? DrawHexViewer(string id, ReadOnlySpan<byte> data,
+        ReadOnlySpan<byte> colors, ReadOnlySpan<uint> palette, int maxBytesPerRow = int.MaxValue,
+        Action<int, HexViewerPart, bool>? onHover = null, Func<int, int, int?>? annotateRow = null)
     {
-        if (data.Length == 0) {
+        if (data.Length == 0 || maxBytesPerRow <= 0) {
             return null;
         }
 
@@ -23,13 +25,13 @@ partial class ImGuiComponents
         using var imFont = ImRaii.PushFont(font);
         var emWidth = font.GetCharAdvance('m');
         var spacing = ImGui.GetStyle().ItemInnerSpacing.X;
-        (int, bool)? clickedItem = null;
+        (int, HexViewerPart)? clickedItem = null;
 
         // Get the required number of digits for the byte offset.
         var addressDigitCount = 8 - (BitOperations.LeadingZeroCount((uint)data.Length - 1) >> 2);
         // Spacing is correct for 32 bytes shown per line, too much for 16 and not enough for more, but should not generally matter much.
         var charsPerRow = (int)MathF.Floor((ImGui.GetContentRegionAvail().X - 9 * spacing) / emWidth);
-        var bytesPerRow = (charsPerRow - addressDigitCount - 2) / 4;
+        var bytesPerRow = Math.Min((charsPerRow - addressDigitCount - 2) / 4, maxBytesPerRow);
 
         // Check that we actually need multiple lines and lock to power of 2.
         bytesPerRow = Math.Max(8, Math.Min(1 << BitOperations.Log2((uint)bytesPerRow), data.Length));
@@ -109,15 +111,16 @@ partial class ImGuiComponents
                             ImGui.SetCursorScreenPos(min);
                             var clicked = ImGui.InvisibleButton($"###H{rowStart + i:X}", max - min);
                             if (clicked) {
-                                clickedItem = (rowStart + i, false);
+                                clickedItem = (rowStart + i, HexViewerPart.Hex);
                             }
 
                             if (ImGui.IsItemHovered()) {
                                 imFont.Pop();
-                                onHover(rowStart + i, false, clicked);
+                                onHover(rowStart + i, HexViewerPart.Hex, clicked);
                                 imFont.Push(font);
                             }
                         }
+
                         ImGui.SameLine(0, 0);
                         packStart = packEnd;
                     }
@@ -130,6 +133,7 @@ partial class ImGuiComponents
                         using (var color = ImRaii.PushColor(ImGuiCol.Text, byteColor, byteColor != 0)) {
                             ImGuiNative.igTextUnformatted(packStart, packEnd);
                         }
+
                         var min = ImGui.GetItemRectMin();
                         var max = ImGui.GetItemRectMax();
                         if (onHover is not null && i < numBytes && ImGui.IsMouseHoveringRect(min, max)) {
@@ -137,17 +141,28 @@ partial class ImGuiComponents
                             ImGui.SetCursorScreenPos(min);
                             var clicked = ImGui.InvisibleButton($"###P{rowStart + i:X}", max - min);
                             if (clicked) {
-                                clickedItem = (rowStart + i, true);
+                                clickedItem = (rowStart + i, HexViewerPart.Printable);
                             }
 
                             if (ImGui.IsItemHovered()) {
                                 imFont.Pop();
-                                onHover(rowStart + i, true, clicked);
+                                onHover(rowStart + i, HexViewerPart.Printable, clicked);
                                 imFont.Push(font);
                             }
                         }
+
                         ImGui.SameLine(0, 0);
                         packStart = packEnd;
+                    }
+
+                    if (annotateRow is not null) {
+                        imFont.Pop();
+                        var clickedOffset = annotateRow(rowStart, bytesPerRow);
+                        if (clickedOffset is not null) {
+                            clickedItem = (clickedOffset.Value, HexViewerPart.Annotation);
+                        }
+
+                        imFont.Push(font);
                     }
 
                     ImGui.NewLine();
@@ -159,5 +174,12 @@ partial class ImGuiComponents
         }
 
         return clickedItem;
+    }
+
+    public enum HexViewerPart
+    {
+        Hex,
+        Printable,
+        Annotation,
     }
 }

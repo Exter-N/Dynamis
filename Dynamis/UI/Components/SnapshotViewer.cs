@@ -1,4 +1,6 @@
+using System.Numerics;
 using System.Runtime.InteropServices;
+using System.Text;
 using Dalamud.Interface.Utility.Raii;
 using Dynamis.Configuration;
 using Dynamis.Interop;
@@ -19,12 +21,33 @@ public sealed class SnapshotViewer(
 {
     private ObjectSnapshot? _vmSnapshot;
 
-    private int _vmOffset;
+    private bool _vmAnnotated;
+    private int  _vmOffset;
 
     public ObjectSnapshot? Snapshot
     {
         get => _vmSnapshot;
         set => _vmSnapshot = value;
+    }
+
+    public void DrawHeader()
+    {
+        var itemInnerSpacing = ImGui.GetStyle().ItemInnerSpacing.X;
+        var offset = (ImGui.GetFrameHeight() - ImGui.GetTextLineHeight()) * 0.5f;
+        ImGui.SetCursorPos(ImGui.GetCursorPos() + new Vector2(0.0f, offset));
+        ImGui.TextUnformatted("Display Mode");
+
+        ImGui.SameLine(0.0f, itemInnerSpacing);
+        ImGui.SetCursorPos(ImGui.GetCursorPos() - new Vector2(0.0f, offset));
+        if (ImGui.RadioButton("Compact", !_vmAnnotated)) {
+            _vmAnnotated = false;
+        }
+
+        ImGui.SameLine(0.0f, itemInnerSpacing);
+        ImGui.SetCursorPos(ImGui.GetCursorPos() - new Vector2(0.0f, offset));
+        if (ImGui.RadioButton("Annotated", _vmAnnotated)) {
+            _vmAnnotated = true;
+        }
     }
 
     public void Draw()
@@ -35,7 +58,8 @@ public sealed class SnapshotViewer(
 
         ImGuiComponents.DrawHexViewer(
             "snapshot", _vmSnapshot.Data, _vmSnapshot.HighlightColors,
-            configuration.Configuration.GetHexViewerPalette(), OnSnapshotHover
+            configuration.Configuration.GetHexViewerPalette(), _vmAnnotated ? nint.Size : int.MaxValue, OnSnapshotHover,
+            _vmAnnotated ? AnnotateSnapshotRow : null
         );
     }
 
@@ -53,14 +77,15 @@ public sealed class SnapshotViewer(
                 _vmSnapshot.HighlightColors is not null
                     ? _vmSnapshot.HighlightColors.AsSpan(range)
                     : ReadOnlySpan<byte>.Empty,
-                configuration.Configuration.GetHexViewerPalette(), OnSnapshotHover
+                configuration.Configuration.GetHexViewerPalette(), _vmAnnotated ? nint.Size : int.MaxValue,
+                OnSnapshotHover, _vmAnnotated ? AnnotateSnapshotRow : null
             );
         } finally {
             _vmOffset = offset;
         }
     }
 
-    private void OnSnapshotHover(int offset, bool printable, bool clicked)
+    private void OnSnapshotHover(int offset, ImGuiComponents.HexViewerPart part, bool clicked)
     {
         if (_vmSnapshot is null) {
             return;
@@ -107,6 +132,145 @@ public sealed class SnapshotViewer(
                 )
             );
         }
+    }
+
+    private int? AnnotateSnapshotRow(int offset, int length)
+    {
+        if (length <= 0) {
+            return null;
+        }
+
+        var fields = _vmSnapshot?.Class?.AllScalars.Where(field
+            => offset <= field.Offset && (uint)(offset + length) >= field.Offset + field.Size
+        ) ?? [];
+
+        int? clicked = null;
+        var palette = configuration.Configuration.GetHexViewerPalette();
+        var first = true;
+        foreach (var field in fields) {
+            var elementCount = field.Size / field.ElementSize;
+            var firstElement = true;
+            for (var i = 0u; i < elementCount; ++i) {
+                var elementOffset = field.Offset + i * field.ElementSize;
+                var annotation = GetValueAnnotation(elementOffset, field.ElementSize, field);
+                if (string.IsNullOrEmpty(annotation)) {
+                    continue;
+                }
+
+                if (firstElement) {
+                    if (first) {
+                        ImGui.SameLine();
+                        first = false;
+                    } else {
+                        ImGui.TextUnformatted(" - ");
+                        ImGui.SameLine(0.0f, 0.0f);
+                    }
+
+                    ImGui.TextUnformatted($"{field.Name.AfterLast('.')}: ");
+                    firstElement = false;
+                } else {
+                    ImGui.TextUnformatted(", ");
+                    ImGui.SameLine(0.0f, 0.0f);
+                }
+
+                ImGui.SameLine(0.0f, 0.0f);
+                using (ImRaii.PushColor(
+                           ImGuiCol.Text, palette[_vmSnapshot!.HighlightColors?[elementOffset] ?? 0]
+                       )) {
+                    ImGui.TextUnformatted(annotation);
+                }
+
+                if (HandleHover(unchecked((int)elementOffset))) {
+                    clicked = unchecked((int)elementOffset);
+                }
+
+                ImGui.SameLine(0.0f, 0.0f);
+            }
+        }
+
+        if (!first || _vmSnapshot?.HighlightColors is null) {
+            return clicked;
+        }
+
+        var highlight = _vmSnapshot.HighlightColors[offset];
+        for (var i = 1; i < length; ++i) {
+            if (_vmSnapshot.HighlightColors[offset + i] != highlight) {
+                return clicked;
+            }
+        }
+
+        if (!((HexViewerColor)highlight).IsPointer()) {
+            return clicked;
+        }
+
+        var ptrAnnotation = GetValueAnnotation(unchecked((uint)offset), unchecked((uint)length), null);
+        if (!string.IsNullOrEmpty(ptrAnnotation)) {
+            ImGui.SameLine();
+            ImGui.TextUnformatted($"Unk_{offset:X}: ");
+            ImGui.SameLine(0.0f, 0.0f);
+            using (ImRaii.PushColor(ImGuiCol.Text, palette[highlight])) {
+                ImGui.TextUnformatted(ptrAnnotation);
+            }
+
+            if (HandleHover(offset)) {
+                clicked = offset;
+            }
+
+            ImGui.SameLine(0.0f, 0.0f);
+        }
+
+        return clicked;
+
+        bool HandleHover(int fieldOffset)
+        {
+            var min = ImGui.GetItemRectMin();
+            var max = ImGui.GetItemRectMax();
+            if (!ImGui.IsMouseHoveringRect(min, max)) {
+                return false;
+            }
+
+            ImGui.SameLine(0.0f, 0.0f);
+            ImGui.SetCursorScreenPos(min);
+            var itemClicked = ImGui.InvisibleButton($"###A{fieldOffset:X}", max - min);
+            OnSnapshotHover(fieldOffset, ImGuiComponents.HexViewerPart.Annotation, itemClicked);
+
+            return itemClicked;
+        }
+    }
+
+    private string GetValueAnnotation(uint offset, uint size, FieldInfo? field)
+    {
+        if (_vmSnapshot is null) {
+            return string.Empty;
+        }
+
+        var valueSpan = _vmSnapshot.Data.AsSpan(unchecked((int)offset), unchecked((int)size));
+        if (field is not null && field.Type is not FieldType.Pointer) {
+            var value = field.Type.Read(valueSpan);
+            if (field.EnumType is not null) {
+                value = Enum.GetName(field.EnumType, value) ?? value;
+            }
+
+            return value.ToString()?.ReplaceLineEndings("¶") ?? string.Empty;
+        }
+
+        var pointer = MemoryMarshal.Read<nint>(valueSpan);
+        if (pointer == 0) {
+            return "nullptr";
+        }
+
+        var @class = objectInspector.DetermineClassAndDisplacement(pointer).Class;
+        if (@class.Known) {
+            return @class.Name;
+        }
+
+        var builder = new StringBuilder();
+        builder.Append($"{@class.EstimatedSize} (0x{@class.EstimatedSize:X}) bytes");
+        if (!string.IsNullOrEmpty(@class.DefiningModule)) {
+            builder.Append($", defined in {@class.DefiningModule}");
+        }
+
+        return builder.ToString();
     }
 
     private static ValuePath GetValuePath(ClassInfo? @class, uint offset)

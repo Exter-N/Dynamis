@@ -213,6 +213,7 @@ public sealed class ObjectInspectorWindow : IndexedWindow
 
         using (var tab = ImRaii.TabItem("Memory Snapshot")) {
             if (tab) {
+                _snapshotViewer.DrawHeader();
                 using var _ = ImRaii.Child("###memorySnapshot", -Vector2.One);
                 _snapshotViewer.Draw();
             }
@@ -240,6 +241,9 @@ public sealed class ObjectInspectorWindow : IndexedWindow
             inspector.DrawAdditionalTabs(_vmSnapshot, liveSnapshot && _vmLive, this);
         }
     }
+
+    public void DrawAssociatedSnapshotHeader()
+        => _associatedSnapshotViewer.DrawHeader();
 
     public void DrawAssociatedSnapshot()
         => _associatedSnapshotViewer.Draw();

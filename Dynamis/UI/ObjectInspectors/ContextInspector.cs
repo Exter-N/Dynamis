@@ -37,6 +37,7 @@ public sealed class ContextInspector(ImGuiComponents imGuiComponents, ModuleAddr
         if (snapshot.StackTrace is not null && snapshot.StackTrace.Length > 0) {
             using var tab = ImRaii.TabItem("Stack Snapshot");
             if (tab) {
+                window.DrawAssociatedSnapshotHeader();
                 using var _ = ImRaii.Child("###memorySnapshot", -Vector2.One);
                 if (snapshot.AssociatedSnapshot?.Address is not null
                  && (nint)snapshot.StackTrace[0].AddrStack.Offset > snapshot.AssociatedSnapshot.Address.Value) {
@@ -87,6 +88,7 @@ public sealed class ContextInspector(ImGuiComponents imGuiComponents, ModuleAddr
         } else if (snapshot.AssociatedSnapshot is not null) {
             using var tab = ImRaii.TabItem("Stack Snapshot");
             if (tab) {
+                window.DrawAssociatedSnapshotHeader();
                 using var _ = ImRaii.Child("###memorySnapshot", -Vector2.One);
                 window.DrawAssociatedSnapshot();
             }

@@ -108,6 +108,14 @@ public static class StringExtensions
     public static int WriteNullTerminated(this string value, Span<char> span)
         => WriteNullTerminated(value.AsSpan(), span);
 
+    public static string AfterLast(this string value, char ch)
+    {
+        var pos = value.LastIndexOf(ch);
+        return pos < 0
+            ? value
+            : value[(pos + 1)..];
+    }
+
     public static string AfterLast(this string value, string substr)
     {
         var pos = value.LastIndexOf(substr, StringComparison.Ordinal);
