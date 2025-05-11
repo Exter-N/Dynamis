@@ -23,6 +23,10 @@ public sealed class DynamicBoxFactory(ObjectInspector objectInspector, ClassRegi
             return BoxStruct(address, access);
         }
 
+        if (obj is DynamicMemory memory) {
+            return BoxDynamicMemory(memory, access);
+        }
+
         var type = obj.GetType();
         if (type.IsGenericType) {
             if (type.GetGenericTypeDefinition() == typeof(Memory<>) && !type.GetGenericArguments()[0].IsPrimitive) {
@@ -44,6 +48,42 @@ public sealed class DynamicBoxFactory(ObjectInspector objectInspector, ClassRegi
         }
 
         return obj;
+    }
+
+    public static Type GetBoxType(Type t)
+    {
+        if (t == typeof(void)) {
+            return t;
+        }
+
+        if (IBoxedAddress.CanUnbox(t)) {
+            return typeof(DynamicStructBox);
+        }
+
+        if (t == typeof(DynamicMemory)) {
+            return typeof(DynamicSpanBox);
+        }
+
+        if (t.IsGenericType) {
+            var definition = t.GetGenericTypeDefinition();
+            if ((definition == typeof(Memory<>) || definition == typeof(ReadOnlyMemory<>))
+             && !t.GetGenericArguments()[0].IsPrimitive) {
+                return typeof(DynamicSpanBox);
+            }
+        }
+
+        return t;
+    }
+
+    private DynamicSpanBox BoxDynamicMemory(DynamicMemory memory, BoxAccess access)
+    {
+        var type = memory.ElementType;
+        var pointers = type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Pointer<>);
+        var elementClass = classRegistry.FromManagedType(pointers ? type.GetGenericArguments()[0] : type);
+        return new(
+            memory.Address, memory.ElementType.SizeOf() * memory.Length, elementClass, pointers,
+            memory.Writable ? access : access.Least(BoxAccess.ShallowConstant), this
+        );
     }
 
     private unsafe DynamicSpanBox BoxMemory<T>(Memory<T> memory, BoxAccess access) where T : unmanaged

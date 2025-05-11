@@ -15,6 +15,7 @@ public sealed class SnapshotViewer(
     ConfigurationContainer configuration,
     MessageHub messageHub,
     ObjectInspector objectInspector,
+    ClassRegistry classRegistry,
     ModuleAddressResolver moduleAddressResolver,
     ContextMenu contextMenu,
     ImGuiComponents imGuiComponents)
@@ -97,9 +98,9 @@ public sealed class SnapshotViewer(
             var ptrOffset = offset & -nint.Size;
             if (ptrOffset + nint.Size <= _vmSnapshot.Data.Length) {
                 var pointer =
-                    MemoryMarshal.Read<nint>(_vmSnapshot.Data.AsSpan(ptrOffset..(ptrOffset + nint.Size)));
+                    MemoryMarshal.Read<nint>(_vmSnapshot.Data.AsSpan(ptrOffset, nint.Size));
                 if (VirtualMemory.GetProtection(pointer).CanRead()) {
-                    path = new((uint)ptrOffset, (uint)nint.Size, $"Unk_{ptrOffset:X}", FieldType.Pointer, null);
+                    path = new((uint)ptrOffset, (uint)nint.Size, $"Unk_{ptrOffset:X}", FieldType.Pointer, null, 0, null);
                 }
             }
         }
@@ -109,15 +110,17 @@ public sealed class SnapshotViewer(
         }
 
         using var _ = ImRaii.Tooltip();
-        var valueSpan = _vmSnapshot.Data.AsSpan((int)path.Offset..(int)(path.Offset + path.Size));
-        var value = path.Type.Read(valueSpan);
+        var value = path.Read(_vmSnapshot.Data);
         ImGui.TextUnformatted($"{path.Type.Description()} {path.Path} @ 0x{path.Offset:X}");
         ImGui.Separator();
         ImGui.TextUnformatted(ToString(value, path));
 
-        if (path.Type == FieldType.Pointer && (nint)value != 0) {
+        if (path.Type == FieldType.Pointer && FieldInfo.GetAddress(value) != 0) {
             ImGui.Separator();
-            imGuiComponents.DrawPointerTooltipDetails((nint)value, null);
+            imGuiComponents.DrawPointerTooltipDetails(
+                FieldInfo.GetAddress(value),
+                FieldInfo.DetermineClassAndDisplacement(value, objectInspector, classRegistry)?.Class
+            );
         }
 
         ImGui.Separator();
@@ -126,8 +129,8 @@ public sealed class SnapshotViewer(
         if (clicked) {
             contextMenu.Open(
                 new FieldContextMenu(
-                    messageHub, objectInspector, path, value,
-                    path.Type == FieldType.Pointer ? moduleAddressResolver.Resolve((nint)value) : null,
+                    messageHub, objectInspector, classRegistry, path, value,
+                    path.Type == FieldType.Pointer ? moduleAddressResolver.Resolve(FieldInfo.GetAddress(value)) : null,
                     _vmSnapshot.Address + (nint)path.Offset
                 )
             );
@@ -148,7 +151,7 @@ public sealed class SnapshotViewer(
         var palette = configuration.Configuration.GetHexViewerPalette();
         var first = true;
         foreach (var field in fields) {
-            var elementCount = field.Size / field.ElementSize;
+            var elementCount = field.ElementCount;
             var firstElement = true;
             for (var i = 0u; i < elementCount; ++i) {
                 var elementOffset = field.Offset + i * field.ElementSize;
@@ -245,32 +248,52 @@ public sealed class SnapshotViewer(
         }
 
         var valueSpan = _vmSnapshot.Data.AsSpan(unchecked((int)offset), unchecked((int)size));
-        if (field is not null && field.Type is not FieldType.Pointer) {
-            var value = field.Type.Read(valueSpan);
-            if (field.EnumType is not null) {
-                value = Enum.GetName(field.EnumType, value) ?? value;
+        object value;
+        FieldType type;
+        if (field is not null) {
+            value = _vmSnapshot.Class!.GetFieldValue(
+                field, _vmSnapshot.Data, (offset - field.Offset) / field.ElementSize
+            );
+            if (field.ManagedType is not null && field.ManagedType.IsEnum) {
+                value = Enum.GetName(field.ManagedType, value) ?? value;
             }
 
-            return value.ToString()?.ReplaceLineEndings("¶") ?? string.Empty;
+            type = field.Type;
+        } else {
+            value = MemoryMarshal.Read<nint>(valueSpan);
+            type = FieldType.Pointer;
         }
 
-        var pointer = MemoryMarshal.Read<nint>(valueSpan);
-        if (pointer == 0) {
-            return "nullptr";
-        }
+        return GetAnnotation(value, type).ReplaceLineEndings("¶");
 
-        var @class = objectInspector.DetermineClassAndDisplacement(pointer).Class;
-        if (@class.Known) {
-            return @class.Name;
-        }
+        string GetAnnotation(object value, FieldType type)
+        {
+            if (type is not FieldType.Pointer) {
+                return value.ToString() ?? string.Empty;
+            }
 
-        var builder = new StringBuilder();
-        builder.Append($"{@class.EstimatedSize} (0x{@class.EstimatedSize:X}) bytes");
-        if (!string.IsNullOrEmpty(@class.DefiningModule)) {
-            builder.Append($", defined in {@class.DefiningModule}");
-        }
+            var pointer = FieldInfo.GetAddress(value);
+            if (pointer == 0) {
+                return "nullptr";
+            }
 
-        return builder.ToString();
+            var @class = FieldInfo.DetermineClassAndDisplacement(value, objectInspector, classRegistry)?.Class;
+            if (@class is null) {
+                return string.Empty;
+            }
+
+            if (@class.Known) {
+                return @class.Name;
+            }
+
+            var builder = new StringBuilder();
+            builder.Append($"{@class.EstimatedSize} (0x{@class.EstimatedSize:X}) bytes");
+            if (!string.IsNullOrEmpty(@class.DefiningModule)) {
+                builder.Append($", defined in {@class.DefiningModule}");
+            }
+
+            return builder.ToString();
+        }
     }
 
     private static ValuePath GetValuePath(ClassInfo? @class, uint offset)
@@ -295,7 +318,7 @@ public sealed class SnapshotViewer(
         }
 
         if (field.ElementClass is null) {
-            return new(retOffset, elementSize, path, field.Type, field.EnumType);
+            return new(retOffset, elementSize, path, field.Type, @class, 0, field);
         }
 
         var subPath = GetValuePath(field.ElementClass, offset - retOffset);
@@ -307,19 +330,24 @@ public sealed class SnapshotViewer(
         {
             Offset = retOffset + subPath.Offset,
             Path = $"{path}.{subPath.Path}",
+            OffsetToClass = retOffset + subPath.OffsetToClass,
         };
     }
 
     private static string ToString(object value, ValuePath path)
     {
-        if (path.EnumType is not null) {
-            var enumName = Enum.GetName(path.EnumType, value);
+        if (path.Field?.ManagedType is not null && path.Field.ManagedType.IsEnum) {
+            var enumName = Enum.GetName(path.Field.ManagedType, value);
             if (enumName is not null) {
-                return $"{path.EnumType.Name}.{enumName} = {value}";
+                return $"{path.Field.ManagedType.Name}.{enumName} = {value}";
             }
         }
 
         if (path.Type == FieldType.Pointer) {
+            if (value is DynamicMemory memory) {
+                return $"0x{memory.Address:X}";
+            }
+
             return $"0x{value:X}";
         }
 
@@ -328,35 +356,56 @@ public sealed class SnapshotViewer(
             : $"{value}";
     }
 
-    private readonly record struct ValuePath(uint Offset, uint Size, string Path, FieldType Type, Type? EnumType)
+    private readonly record struct ValuePath(
+        uint Offset,
+        uint Size,
+        string Path,
+        FieldType Type,
+        ClassInfo? Class,
+        uint OffsetToClass,
+        FieldInfo? Field)
     {
-        public static readonly ValuePath Default = new(0, 0, string.Empty, FieldType.Byte, null);
+        public static readonly ValuePath Default = new(0, 0, string.Empty, FieldType.Byte, null, 0, null);
+
+        public object Read(ReadOnlySpan<byte> instance)
+        {
+            if (Class is not null && Field is not null) {
+                instance = instance.Slice(unchecked((int)OffsetToClass), unchecked((int)Class.EstimatedSize));
+                return Class.GetFieldValue(Field, instance, (Offset - Field.Offset - OffsetToClass) / Field.ElementSize);
+            }
+
+            return Type.Read(instance.Slice(unchecked((int)Offset), unchecked((int)Size)));
+        }
     }
 
     private sealed class FieldContextMenu(
         MessageHub messageHub,
         ObjectInspector objectInspector,
+        ClassRegistry classRegistry,
         ValuePath path,
         object value,
         ModuleAddress? moduleAddress,
         nint? ea) : IDrawable
     {
-        private readonly string? _enumName = path.EnumType is not null ? Enum.GetName(path.EnumType, value) : null;
+        private readonly string? _enumName =
+            path.Field?.ManagedType is not null && path.Field.ManagedType.IsEnum
+                ? Enum.GetName(path.Field.ManagedType, value)
+                : null;
 
         private readonly (ClassInfo Class, nuint Displacement)? _class =
-            path.Type == FieldType.Pointer && (nint)value != 0
-                ? objectInspector.DetermineClassAndDisplacement((nint)value)
+            path.Type == FieldType.Pointer
+                ? FieldInfo.DetermineClassAndDisplacement(value, objectInspector, classRegistry)
                 : null;
 
         public bool Draw()
         {
             var ret = false;
-            if (path.Type == FieldType.Pointer && (nint)value != 0) {
+            if (path.Type == FieldType.Pointer && FieldInfo.GetAddress(value) != 0) {
                 if (_class is
                     {
                     } @class && @class.Class.Kind == ClassKind.VirtualTable) {
                     if (ImGui.Selectable("Inspect virtual table")) {
-                        messageHub.Publish(new InspectObjectMessage((nint)value, @class.Class));
+                        messageHub.Publish(new InspectObjectMessage(FieldInfo.GetAddress(value), @class.Class));
                         ret = true;
                     }
 
@@ -369,7 +418,7 @@ public sealed class SnapshotViewer(
                 } else {
                     if (ImGui.Selectable("Inspect object")) {
                         messageHub.Publish(
-                            new InspectObjectMessage((nint)value - (nint)(_class?.Displacement ?? 0), _class?.Class)
+                            new InspectObjectMessage(FieldInfo.GetAddress(value) - (nint)(_class?.Displacement ?? 0), _class?.Class)
                         );
                         ret = true;
                     }
@@ -384,8 +433,8 @@ public sealed class SnapshotViewer(
             }
 
             if (path.Type == FieldType.Pointer) {
-                if (ImGui.Selectable($"Copy {value:X}")) {
-                    ImGui.SetClipboardText($"{value:X}");
+                if (ImGui.Selectable($"Copy {FieldInfo.GetAddress(value):X}")) {
+                    ImGui.SetClipboardText($"{FieldInfo.GetAddress(value):X}");
                     ret = true;
                 }
             } else if (path.Type == FieldType.CStringPointer && value is CStringSnapshot str) {
@@ -422,7 +471,7 @@ public sealed class SnapshotViewer(
                 }
 
                 if (moduleAddress.OriginalAddress != 0
-                 && (value is not nint pointer || moduleAddress.OriginalAddress != pointer)
+                 && (!FieldInfo.TryGetAddress(value, out var pointer) || moduleAddress.OriginalAddress != pointer)
                  && ImGui.Selectable($"Copy original address ({moduleAddress.OriginalAddress:X})")) {
                     ImGui.SetClipboardText(moduleAddress.OriginalAddress.ToString("X"));
                     ret = true;

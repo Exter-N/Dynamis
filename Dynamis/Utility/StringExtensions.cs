@@ -123,4 +123,19 @@ public static class StringExtensions
             ? value
             : value[(pos + substr.Length)..];
     }
+
+    public static IEnumerable<string> Singularize(this string value)
+    {
+        if (value.EndsWith('s')) {
+            yield return value[..^1];
+        }
+
+        if (value.EndsWith("Array", StringComparison.Ordinal)) {
+            yield return value[..^5];
+        }
+
+        if (value.EndsWith("sArray", StringComparison.Ordinal)) {
+            yield return value[..^6];
+        }
+    }
 }

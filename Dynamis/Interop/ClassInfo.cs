@@ -1,6 +1,8 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using Dynamis.ClientStructs;
 using Dynamis.Utility;
 
@@ -56,6 +58,82 @@ public sealed class ClassInfo
 
     public override string ToString()
         => Name;
+
+    public object GetFieldValues(FieldInfo field, ReadOnlySpan<byte> instance)
+    {
+        var elementCount = field.ElementCount;
+        if (elementCount == 0) {
+            return Array.Empty<object>();
+        }
+
+        if (elementCount == 1) {
+            return GetFieldValue(field, instance, 0);
+        }
+
+        return field.Type.ReadAll(instance.Slice(unchecked((int)field.Offset), unchecked((int)field.Size)));
+    }
+
+    public object GetFieldValue(FieldInfo field, ReadOnlySpan<byte> instance, uint elementIndex)
+    {
+        var elementOffset = elementIndex * field.ElementSize;
+        if (elementOffset + field.ElementSize > field.Size) {
+            throw new ArgumentOutOfRangeException(nameof(elementIndex));
+        }
+
+        var element = instance.Slice(unchecked((int)(field.Offset + elementOffset)), unchecked((int)field.ElementSize));
+        if (elementIndex > 0 || field.Size != field.ElementSize) {
+            return field.Type.Read(element);
+        }
+
+        return TryGetExtendedFieldValue(field, instance, element, out var value)
+            ? value
+            : field.Type.Read(element);
+    }
+
+    private bool TryGetExtendedFieldValue(FieldInfo field, ReadOnlySpan<byte> instance, ReadOnlySpan<byte> span,
+        [MaybeNullWhen(false)] out object value)
+    {
+        if (!FieldsByName.TryGetValue(field.Name, out var fieldCheck) || !ReferenceEquals(fieldCheck, field)) {
+            value = null;
+            return false;
+        }
+
+        if (field.Type is not FieldType.Pointer) {
+            value = null;
+            return false;
+        }
+
+        var pointer = MemoryMarshal.Read<nint>(span);
+        if (TryGetSuffixedProperty(field.Name, "Span", out var spanProperty)) {
+            if (spanProperty.Getter is not null) {
+                var csPointer = DynamicStructBox.WrapCsPointer(BestManagedType!, instance.GetAddress());
+                if (DynamicMemory.TryFrom(spanProperty.Getter.Invoke(null, [csPointer,]), out var memory)) {
+                    if (memory.Address == pointer) {
+                        value = memory;
+                        return true;
+                    }
+                }
+            }
+        }
+
+        value = null;
+        return false;
+    }
+
+    private bool TryGetSuffixedProperty(string name, string suffix, out (MethodInfo? Getter, MethodInfo? Setter) property)
+    {
+        if (PropertiesByName.TryGetValue(name + suffix, out property)) {
+            return true;
+        }
+
+        foreach (var singular in name.Singularize()) {
+            if (PropertiesByName.TryGetValue(singular + suffix, out property)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     public void SetFields(IEnumerable<FieldInfo> fields)
     {

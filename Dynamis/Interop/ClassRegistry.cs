@@ -5,6 +5,7 @@ using Dynamis.ClientStructs;
 using Dynamis.Interop.Win32;
 using Dynamis.Messaging;
 using Dynamis.Utility;
+using FFXIVClientStructs.Interop;
 using FFXIVClientStructs.STD;
 using Microsoft.Extensions.Logging;
 
@@ -51,10 +52,24 @@ public sealed partial class ClassRegistry(
     public static bool TryGetClientStructsClassName(Type type, out string className)
     {
         var typeName = type.FullName;
-        if (typeName is null || type.Assembly != typeof(StdString).Assembly
-                             || !typeName.StartsWith("FFXIVClientStructs.FFXIV.")) {
+        if (typeName is null || type.Assembly != typeof(StdString).Assembly) {
             className = string.Empty;
             return false;
+        }
+
+        if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Pointer<>)) {
+            var pointedType = type.GetGenericArguments()[0];
+            if (!TryGetClientStructsClassName(pointedType, out var pointedTypeName)) {
+                pointedTypeName = pointedType.FullName;
+            }
+
+            if (pointedTypeName is null) {
+                className = string.Empty;
+                return false;
+            }
+
+            className = pointedTypeName + "*";
+            return true;
         }
 
         className = typeName[25..].Replace(".", "::");
@@ -213,10 +228,10 @@ public sealed partial class ClassRegistry(
                             Name = prefix + reflField.Name,
                             Offset = offset + (uint)reflField.OffsetOf(),
                             Size = (uint)reflField.FieldType.SizeOf(),
+                            ManagedType = elementType,
                         };
                         if (elementFieldType.HasValue) {
                             field.Type = elementFieldType.Value;
-                            field.EnumType = elementType.IsEnum ? elementType : null;
                         } else {
                             field.Type = FieldType.ObjectArray;
                             field.ElementClass = FromManagedType(elementType);
@@ -246,7 +261,7 @@ public sealed partial class ClassRegistry(
                             Size =
                                 (uint)(reflField.FieldType.IsPointer ? nint.Size : reflField.FieldType.SizeOf()),
                             Type = fieldType.Value,
-                            EnumType = reflField.FieldType.IsEnum ? reflField.FieldType : null,
+                            ManagedType = reflField.FieldType,
                         };
                     } catch (Exception e) {
                         logger.LogError(

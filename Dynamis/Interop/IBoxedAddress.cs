@@ -59,6 +59,14 @@ public interface IBoxedAddress
         }
     }
 
+    public static bool CanUnbox(Type t)
+        => typeof(IBoxedAddress).IsAssignableFrom(t) || t == typeof(Pointer) || t == typeof(CStringPointer)
+        || t == typeof(void) || t == typeof(nint) || t == typeof(nuint)
+        || t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Pointer<>);
+
+    public static bool CanUnboxStrict(Type t)
+        => t != typeof(void) && t != typeof(nint) && t != typeof(nuint) && CanUnbox(t);
+
     private static unsafe nint Unbox<T>(Pointer<T> value) where T : unmanaged
         => (nint)value.Value;
 }

@@ -17,9 +17,7 @@ public sealed class DynamicStructBox(nint address, ClassInfo @class, BoxAccess a
         => @class;
 
     private object CsPointer
-        => typeof(DynamicStructBox).GetMethod(nameof(WrapCsPointer), BindingFlags.NonPublic | BindingFlags.Static)!
-                                   .MakeGenericMethod(@class.BestManagedType!)
-                                   .Invoke(null, [address,])!;
+        => WrapCsPointer(@class.BestManagedType!, address);
 
     public override IEnumerable<string> GetDynamicMemberNames()
     {
@@ -54,18 +52,34 @@ public sealed class DynamicStructBox(nint address, ClassInfo @class, BoxAccess a
                     return true;
                 case FieldType.ObjectArray:
                     result = new DynamicSpanBox(
-                        address + (nint)field.Offset, (int)(field.Size / field.ElementSize), field.ElementClass
+                        address + (nint)field.Offset, (int)field.ElementCount, field.ElementClass
                      ?? throw new InvalidOperationException($"Field {field.Name} doesn't have a class"), false,
                         access, factory
                     );
                     return true;
                 default:
-                    var bytes = new ReadOnlySpan<byte>((void*)(address + (nint)field.Offset), (int)field.Size);
-                    result = field.Type.Read(bytes);
+                    result = @class.GetFieldValues(field, new((void*)address, unchecked((int)@class.EstimatedSize)));
                     if (field.Type == FieldType.Pointer && result is nint ptr) {
                         result = factory.BoxStruct(
                             ptr, ptr >= address && ptr < address + @class.EstimatedSize ? access : access.Deep()
                         );
+                    } else if (field.Type == FieldType.Pointer && result is nint[] ptrs) {
+                        result = Array.ConvertAll(
+                            ptrs,
+                            item => factory.BoxStruct(
+                                item, item >= address && item < address + @class.EstimatedSize ? access : access.Deep()
+                            )
+                        );
+                    } else if (result is Array array) {
+                        var boxArray = Array.CreateInstance(
+                            DynamicBoxFactory.GetBoxType(array.GetType().GetElementType()!), array.Length
+                        );
+                        for (var i = 0; i < array.Length; ++i) {
+                            var item = array.GetValue(i);
+                            boxArray.SetValue(factory.Box(item, access.Deep(address, @class.EstimatedSize, item)), i);
+                        }
+
+                        result = boxArray;
                     } else {
                         result = factory.Box(result, access.Deep(address, @class.EstimatedSize, result));
                     }
@@ -365,7 +379,12 @@ public sealed class DynamicStructBox(nint address, ClassInfo @class, BoxAccess a
     object IDynamicBox.Unbox()
         => CsPointer;
 
-    private static unsafe Pointer<T> WrapCsPointer<T>(nint address) where T : unmanaged
+    public static object WrapCsPointer(Type pointedType, nint address)
+        => typeof(DynamicStructBox).GetMethod(nameof(DoWrapCsPointer), BindingFlags.NonPublic | BindingFlags.Static)!
+                                   .MakeGenericMethod(pointedType)
+                                   .Invoke(null, [address,])!;
+
+    private static unsafe Pointer<T> DoWrapCsPointer<T>(nint address) where T : unmanaged
         => (T*)address;
 
     private static object? Invoke(MethodBase method, object?[] args)

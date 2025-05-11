@@ -38,6 +38,32 @@ public static class PseudoClasses
         return classInfo;
     }
 
+    public static ClassInfo GenerateArray(ClassInfo elementClass, int length)
+    {
+        var classInfo = new ClassInfo()
+        {
+            Name = $"{elementClass.Name}[{length}]",
+            Kind = ClassKind.Regular,
+            EstimatedSize = elementClass.EstimatedSize * unchecked((uint)length),
+            SizeFromOuterContext = elementClass.EstimatedSize * unchecked((uint)length),
+        };
+
+        classInfo.SetFields(
+            [
+                new FieldInfo
+                {
+                    Name = "Elements",
+                    Offset = 0,
+                    Size = classInfo.EstimatedSize,
+                    Type = FieldType.ObjectArray,
+                    ElementClass = elementClass,
+                },
+            ]
+        );
+
+        return classInfo;
+    }
+
     public enum Template : uint
     {
         None        = 0,

@@ -143,6 +143,33 @@ internal static class TypeExtensions
             _                        => throw new ArgumentException($"Unrecognized FieldType {t}"),
         };
 
+    public static Array ReadAll(this FieldType t, ReadOnlySpan<byte> bytes)
+        => t switch
+        {
+            FieldType.Boolean    => Array.ConvertAll(bytes.ToArray(), b => b != 0),
+            FieldType.Byte       => bytes.ToArray(),
+            FieldType.SByte      => MemoryMarshal.Cast<byte, sbyte>(bytes).ToArray(),
+            FieldType.UInt16     => MemoryMarshal.Cast<byte, ushort>(bytes).ToArray(),
+            FieldType.Int16      => MemoryMarshal.Cast<byte, short>(bytes).ToArray(),
+            FieldType.UInt32     => MemoryMarshal.Cast<byte, uint>(bytes).ToArray(),
+            FieldType.Int32      => MemoryMarshal.Cast<byte, int>(bytes).ToArray(),
+            FieldType.UInt64     => MemoryMarshal.Cast<byte, ulong>(bytes).ToArray(),
+            FieldType.Int64      => MemoryMarshal.Cast<byte, long>(bytes).ToArray(),
+            FieldType.UIntPtr    => MemoryMarshal.Cast<byte, nuint>(bytes).ToArray(),
+            FieldType.IntPtr     => MemoryMarshal.Cast<byte, nint>(bytes).ToArray(),
+            FieldType.Char       => MemoryMarshal.Cast<byte, char>(bytes).ToArray(),
+            FieldType.Half       => MemoryMarshal.Cast<byte, Half>(bytes).ToArray(),
+            FieldType.Single     => MemoryMarshal.Cast<byte, float>(bytes).ToArray(),
+            FieldType.Double     => MemoryMarshal.Cast<byte, double>(bytes).ToArray(),
+            FieldType.Pointer    => MemoryMarshal.Cast<byte, nint>(bytes).ToArray(),
+            FieldType.ByteString => new[] { Encoding.UTF8.GetString(bytes.BeforeNull()) },
+            FieldType.CharString => new string[] { new(MemoryMarshal.Cast<byte, char>(bytes).BeforeNull()) },
+            FieldType.CStringPointer => Array.ConvertAll(
+                MemoryMarshal.Cast<byte, nint>(bytes).ToArray(), CStringSnapshot.FromAddress
+            ),
+            _ => throw new ArgumentException($"Unsupported FieldType {t}"),
+        };
+
     public static object Read(this FieldType t, ReadOnlySpan<byte> bytes)
         => t switch
         {
