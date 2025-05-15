@@ -1,3 +1,4 @@
+using Dynamis.Utility;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Kernel;
 using SharpDX.Direct3D;
 using SharpDX.Direct3D11;
@@ -9,10 +10,7 @@ namespace Dynamis.Interop;
 /// </summary>
 public sealed unsafe class TextureArraySlicer : IDisposable
 {
-    private const uint InitialTimeToLive = 2;
-
-    private readonly Dictionary<(nint XivTexture, byte SliceIndex), SliceState> _activeSlices = [];
-    private readonly HashSet<(nint XivTexture, byte SliceIndex)>                _expiredKeys  = [];
+    private readonly ShortLivedCache<(nint XivTexture, byte SliceIndex), ShaderResourceView> _activeSlices = new();
 
     /// <remarks> Caching this across frames will cause a crash to desktop. </remarks>
     public nint GetImGuiHandle(Texture* texture, byte sliceIndex)
@@ -28,9 +26,8 @@ public sealed unsafe class TextureArraySlicer : IDisposable
             );
         }
 
-        if (_activeSlices.TryGetValue(((nint)texture, sliceIndex), out var state)) {
-            state.Refresh();
-            return (nint)state.ShaderResourceView;
+        if (_activeSlices.TryGetValue(((nint)texture, sliceIndex), out var sliceSrv)) {
+            return (nint)sliceSrv;
         }
 
         var srv = (ShaderResourceView)(nint)texture->D3D11ShaderResourceView;
@@ -42,7 +39,7 @@ public sealed unsafe class TextureArraySlicer : IDisposable
             case ShaderResourceViewDimension.Texture3D:
             case ShaderResourceViewDimension.TextureCube:
                 // This function treats these as single-slice arrays.
-                // As per the range check above, the only valid slice (i. e. 0) has been requested, therefore there is nothing to do.
+                // As per the range check above, the only valid slice (i.e. 0) has been requested, therefore there is nothing to do.
                 break;
             case ShaderResourceViewDimension.Texture1DArray:
                 description.Texture1DArray.FirstArraySlice = sliceIndex;
@@ -66,60 +63,15 @@ public sealed unsafe class TextureArraySlicer : IDisposable
                 );
         }
 
-        state = new SliceState(new ShaderResourceView(srv.Device, srv.Resource, description));
-        _activeSlices.Add(((nint)texture, sliceIndex), state);
-        return (nint)state.ShaderResourceView;
+        sliceSrv = new(srv.Device, srv.Resource, description);
+        _activeSlices.Add(((nint)texture, sliceIndex), sliceSrv);
+        return (nint)sliceSrv;
     }
 
     public void Tick()
-    {
-        try {
-            foreach (var (key, slice) in _activeSlices) {
-                if (!slice.Tick()) {
-                    _expiredKeys.Add(key);
-                }
-            }
-
-            foreach (var key in _expiredKeys) {
-                _activeSlices.Remove(key);
-            }
-        } finally {
-            _expiredKeys.Clear();
-        }
-    }
+        => _activeSlices.Tick();
 
     public void Dispose()
-    {
-        foreach (var slice in _activeSlices.Values) {
-            slice.Dispose();
-        }
-    }
-
-    private sealed class SliceState(ShaderResourceView shaderResourceView) : IDisposable
-    {
-        public readonly ShaderResourceView ShaderResourceView = shaderResourceView;
-
-        private uint _timeToLive = InitialTimeToLive;
-
-        public void Refresh()
-        {
-            _timeToLive = InitialTimeToLive;
-        }
-
-        public bool Tick()
-        {
-            if (unchecked(_timeToLive--) > 0) {
-                return true;
-            }
-
-            ShaderResourceView.Dispose();
-            return false;
-        }
-
-        public void Dispose()
-        {
-            ShaderResourceView.Dispose();
-        }
-    }
+        => _activeSlices.Dispose();
 }
 

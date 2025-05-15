@@ -101,7 +101,7 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
             return new(AddressType.Function, mfName.ClassName, mfName.FunctionName);
         }
 
-        if (typeHint.HasFlag(AddressType.Function)
+        if (typeHint.HasFlag(AddressType.Global)
          && (Data.Globals?.TryGetValue(GetOriginalAddress(address), out var gName) ?? false)) {
             return new(AddressType.Global, string.Empty, gName);
         }
@@ -223,10 +223,13 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
         _virtualFunctions = new(() => MapData(CalculateVirtualFunctions));
     }
 
+    public static bool IsDataYamlConfigurationChanged(ConfigurationChangedMessage message)
+        => message.IsPropertyChanged(nameof(Configuration.Configuration.AutomaticDataYaml))
+        || message.IsPropertyChanged(nameof(Configuration.Configuration.DataYamlPath));
+
     public void HandleMessage(ConfigurationChangedMessage message)
     {
-        if (message.IsPropertyChanged(nameof(Configuration.Configuration.AutomaticDataYaml))
-         || message.IsPropertyChanged(nameof(Configuration.Configuration.DataYamlPath))) {
+        if (IsDataYamlConfigurationChanged(message)) {
             Refresh();
         }
     }

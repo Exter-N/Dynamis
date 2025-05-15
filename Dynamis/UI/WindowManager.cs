@@ -15,6 +15,8 @@ public sealed class WindowManager(
     FileDialogManager fileDialogManager,
     ContextMenu contextMenu,
     TextureArraySlicer textureArraySlicer,
+    ObjectInspector objectInspector,
+    AddressIdentifier addressIdentifier,
     IEnumerable<Lazy<Window>> windows)
     : IHostedService
 {
@@ -49,6 +51,8 @@ public sealed class WindowManager(
         fileDialogManager.Draw();
         contextMenu.Draw();
         textureArraySlicer.Tick();
+        objectInspector.Tick();
+        addressIdentifier.Tick();
     }
 
     private void OpenMainUi()

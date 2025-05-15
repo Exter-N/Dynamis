@@ -20,13 +20,19 @@ public sealed partial class ClassRegistry(
     DataYamlContainer dataYamlContainer)
     : IMessageObserver<ConfigurationChangedMessage>
 {
-    private readonly Dictionary<string, ClassInfo> _classCache = new();
+    private readonly Dictionary<ClassIdentifier, string> _classNameCache = new();
+    private readonly Dictionary<string, ClassInfo>       _classCache     = new();
 
     private unsafe T Read<T>(nint address, bool safe) where T : unmanaged
         => safe ? ipfd.Read<T>(address) : *(T*)address;
 
-    public ClassInfo GetClass(string className, nint vtbl, uint restOfPageSize)
+    public ClassInfo GetClass(ClassIdentifier classId, nint vtbl, uint restOfPageSize)
     {
+        if (!classId.Kind.IsObject()) {
+            throw new ArgumentException($"Unsupported class identifier kind {classId.Kind}");
+        }
+
+        var className = DetermineClassName(classId);
         ClassInfo? classInfo;
         lock (_classCache) {
             if (_classCache.TryGetValue(className, out classInfo)) {
@@ -369,9 +375,58 @@ public sealed partial class ClassRegistry(
         }
     }
 
+    private string DetermineClassName(ClassIdentifier classId)
+    {
+        switch (classId.Kind) {
+            case ClassIdentifierKind.WellKnownObject:
+                if (dataYamlContainer.ClassesByInstance?.TryGetValue(classId.Address, out var instanceName) ?? false) {
+                    return instanceName.ClassName;
+                }
+
+                return $"WkObj_{classId.Address}";
+            case ClassIdentifierKind.WellKnownObjectByPointer:
+                if (dataYamlContainer.ClassesByInstancePointer?.TryGetValue(classId.Address, out instanceName) ?? false) {
+                    return instanceName.ClassName;
+                }
+
+                return $"WkObjP_{classId.Address}";
+            case ClassIdentifierKind.ObjectWithVirtualTable:
+                if (dataYamlContainer.ClassesByVtbl?.TryGetValue(classId.Address, out var className) ?? false) {
+                    return className;
+                }
+
+                return $"Cls_{classId.Address}";
+            case ClassIdentifierKind.VirtualTable:
+                var baseName = DetermineClassName(
+                    classId with
+                    {
+                        Kind = ClassIdentifierKind.ObjectWithVirtualTable,
+                    }
+                );
+
+                return $"<Virtual Table> {baseName}";
+            case ClassIdentifierKind.Function:
+                lock (_classNameCache) {
+                    if (!_classNameCache.TryGetValue(classId, out className)) {
+                        var addressId = addressIdentifier.Identify(classId.Address, AddressType.Function);
+                        className = $"<Function> {addressId.GetFullName() ?? classId.Address.ToString("X")}";
+                        _classNameCache.Add(classId, className);
+                    }
+                }
+
+                return className;
+            default:
+                throw new ArgumentException($"Unsupported class identifier kind {classId.Kind}", nameof(classId));
+        }
+    }
+
     public void HandleMessage(ConfigurationChangedMessage message)
     {
-        if (message.IsPropertyChanged(nameof(Configuration.Configuration.DataYamlPath))) {
+        if (DataYamlContainer.IsDataYamlConfigurationChanged(message)) {
+            lock (_classNameCache) {
+                _classNameCache.Clear();
+            }
+
             lock (_classCache) {
                 _classCache.Clear();
             }

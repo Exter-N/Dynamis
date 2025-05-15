@@ -1,7 +1,9 @@
 using System.Runtime.InteropServices;
 using Dynamis.ClientStructs;
 using Dynamis.Interop.Win32;
+using Dynamis.Messaging;
 using Dynamis.UI;
+using Dynamis.Utility;
 using Microsoft.Extensions.Logging;
 
 namespace Dynamis.Interop;
@@ -14,7 +16,10 @@ public sealed class ObjectInspector(
     SymbolApi symbolApi,
     ClassRegistry classRegistry,
     Ipfd.Ipfd ipfd)
+    : IMessageObserver<ConfigurationChangedMessage>
 {
+    private readonly ShortLivedCache<nint, nint?> _instancePointers = new();
+
     private unsafe T Read<T>(nint address, bool safe) where T : unmanaged
         => safe ? ipfd.Read<T>(address) : *(T*)address;
 
@@ -134,10 +139,7 @@ public sealed class ObjectInspector(
                                              {
                                              } ownerSize) {
             // objectAddress is actually a vtbl and vtbl is actually a dtor
-            return (
-                classRegistry.GetVirtualTableClass(
-                    DetermineClassName(0, objectAddress).ClassName, objectAddress, ownerSize, safeReads
-                ), 0);
+            return (classRegistry.GetVirtualTableClass(objectAddress, ownerSize, safeReads), 0);
         }
 
         if (vtblProtection.CanRead()) {
@@ -149,30 +151,48 @@ public sealed class ObjectInspector(
             }
         }
 
-        return (classRegistry.GetClass(DetermineClassName(objectAddress, vtbl).ClassName, vtbl, restOfPageSize), 0);
+        return (classRegistry.GetClass(DetermineClassId(objectAddress, vtbl), vtbl, restOfPageSize), 0);
     }
 
-    private unsafe DataYamlContainer.InstanceName DetermineClassName(nint objectAddress, nint vtbl)
+    private unsafe ClassIdentifier DetermineClassId(nint objectAddress, nint vtbl)
     {
         if (dataYamlContainer.Data is not null) {
-            if (objectAddress != 0 && dataYamlContainer.ClassesByInstance!.TryGetValue(objectAddress, out var name)) {
-                return name;
+            if (objectAddress != 0 && dataYamlContainer.ClassesByInstance!.ContainsKey(objectAddress)) {
+                return new(ClassIdentifierKind.WellKnownObject, objectAddress);
             }
 
-            if (vtbl != 0 && dataYamlContainer.ClassesByVtbl!.TryGetValue(vtbl, out var className)) {
-                return new(className, null);
+            if (vtbl != 0 && dataYamlContainer.ClassesByVtbl!.ContainsKey(vtbl)) {
+                return new(ClassIdentifierKind.ObjectWithVirtualTable, vtbl);
             }
 
             if (objectAddress != 0) {
-                foreach (var (pointer, name2) in dataYamlContainer.ClassesByInstancePointer!) {
-                    if (VirtualMemory.GetProtection(pointer).CanRead() && *(nint*)pointer == objectAddress) {
-                        return name2;
+                bool foundPointer;
+                lock (_instancePointers) {
+                    foundPointer = _instancePointers.TryGetValue(objectAddress, out var pointer);
+                    if (foundPointer && pointer.HasValue) {
+                        return new(ClassIdentifierKind.WellKnownObjectByPointer, pointer.Value);
+                    }
+                }
+
+                if (!foundPointer) {
+                    foreach (var pointer in dataYamlContainer.ClassesByInstancePointer!.Keys) {
+                        if (VirtualMemory.GetProtection(pointer).CanRead() && *(nint*)pointer == objectAddress) {
+                            lock (_instancePointers) {
+                                _instancePointers.TryAdd(objectAddress, pointer);
+                            }
+
+                            return new(ClassIdentifierKind.WellKnownObjectByPointer, pointer);
+                        }
+                    }
+
+                    lock (_instancePointers) {
+                        _instancePointers.TryAdd(objectAddress, null);
                     }
                 }
             }
         }
 
-        return new($"Cls_{vtbl:X}", null);
+        return new(ClassIdentifierKind.ObjectWithVirtualTable, vtbl);
     }
 
     private void Highlight(ReadOnlySpan<byte> objectBytes, ClassInfo? classInfo, Span<byte> byteColors, bool safeReads = true)
@@ -330,4 +350,20 @@ public sealed class ObjectInspector(
                     ? HexViewerColor.Pointer
                     : HexViewerColor.LibraryObjectPointer,
         };
+
+    public void HandleMessage(ConfigurationChangedMessage message)
+    {
+        if (DataYamlContainer.IsDataYamlConfigurationChanged(message)) {
+            lock (_instancePointers) {
+                _instancePointers.Clear();
+            }
+        }
+    }
+
+    public void Tick()
+    {
+        lock (_instancePointers) {
+            _instancePointers.Tick();
+        }
+    }
 }

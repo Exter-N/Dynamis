@@ -7,8 +7,7 @@ public sealed partial class ClassRegistry
 {
     public ClassInfo GetFunctionClass(nint functionAddress, bool safeReads)
     {
-        var addressId = addressIdentifier.Identify(functionAddress, AddressType.Function);
-        var fnClassName = $"<Function> {addressId.GetFullName() ?? functionAddress.ToString("X")}";
+        var fnClassName = DetermineClassName(new(ClassIdentifierKind.Function, functionAddress));
         ClassInfo? classInfo;
         lock (_classCache) {
             if (_classCache.TryGetValue(fnClassName, out classInfo)) {
