@@ -4,6 +4,7 @@ using Dalamud.Interface;
 using Dalamud.Interface.Style;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
+using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using Dalamud.Utility;
 using Dynamis.Configuration;
@@ -29,7 +30,7 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
     public SettingsWindow(ConfigurationContainer configuration, ImGuiComponents imGuiComponents, IChatGui chatGui,
         MessageHub messageHub, Ipfd ipfd) : base(
         $"Dynamis {Assembly.GetExecutingAssembly().GetName().Version} Settings###DynamisSettings",
-        ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoDocking
+        ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoDocking
     )
     {
         _configuration = configuration;
@@ -38,24 +39,35 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
         _messageHub = messageHub;
         _ipfd = ipfd;
 
-        Size = new Vector2(512, 288);
-        SizeCondition = ImGuiCond.Always;
+        SizeConstraints = new WindowSizeConstraints
+        {
+            MinimumSize = new(512, 288),
+            MaximumSize = new(512, 16384),
+        };
 
         imGuiComponents.AddTitleBarButtons(this);
     }
 
     public override void Draw()
     {
-        if (ImGui.CollapsingHeader("Options", ImGuiTreeNodeFlags.DefaultOpen)) {
-            DrawOptions();
+        if (ImGui.CollapsingHeader("Behavior")) {
+            DrawBehavior();
         }
 
-        if (ImGui.CollapsingHeader("Colors")) {
+        if (ImGui.CollapsingHeader("Interface")) {
+            DrawInterface();
+        }
+
+        if (ImGui.CollapsingHeader("Data")) {
+            DrawData();
+        }
+
+        if (ImGui.CollapsingHeader("Object Inspector Colors")) {
             DrawColors();
         }
     }
 
-    private void DrawOptions()
+    private void DrawBehavior()
     {
         var inputWidth = ImGui.GetContentRegionAvail().X * (2.0f / 3.0f);
         var innerSpacing = ImGui.GetStyle().ItemInnerSpacing.X;
@@ -67,6 +79,118 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
             configuration.MinimumLogLevel = (int)logLevel;
             _configuration.Save(nameof(configuration.MinimumLogLevel));
         }
+
+        var enableIpfd = configuration.EnableIpfd;
+        if (ImGui.Checkbox("Enable IPFD (In-Process Faux Debugger)", ref enableIpfd)) {
+            configuration.EnableIpfd = enableIpfd;
+            _configuration.Save(nameof(configuration.EnableIpfd));
+        }
+
+        ImGui.SameLine(0.0f, innerSpacing);
+        DrawUnstableSettingWarning();
+
+        ImGui.SameLine();
+        using (ImRaii.Disabled(!_ipfd.Loaded)) {
+            if (ImGui.Button("Force Unload##ipfd")) {
+                _ipfd.Unload();
+            }
+        }
+
+        var symbolHandlerMode = configuration.SymbolHandlerMode;
+        if (Util.IsWine()) {
+            var enableWineSymbolHandler = symbolHandlerMode == SymbolHandlerMode.ForceInitialize;
+            if (ImGui.Checkbox("Enable Symbol Handler", ref enableWineSymbolHandler)) {
+                symbolHandlerMode = enableWineSymbolHandler
+                    ? SymbolHandlerMode.ForceInitialize
+                    : SymbolHandlerMode.Disable;
+                configuration.SymbolHandlerMode = symbolHandlerMode;
+                _configuration.Save(nameof(configuration.SymbolHandlerMode));
+            }
+        } else {
+            if (ImGuiComponents.ComboEnum(
+                    "Symbol Handler Mode", ref symbolHandlerMode, ConfigurationEnumExtensions.Label
+                )) {
+                configuration.SymbolHandlerMode = symbolHandlerMode;
+                _configuration.Save(nameof(configuration.SymbolHandlerMode));
+            }
+        }
+
+        ImGui.SameLine(0.0f, innerSpacing);
+        DrawUnstableSettingWarning();
+    }
+
+    private void DrawUnstableSettingWarning()
+    {
+        ImGuiComponents.NormalizedIcon(
+            FontAwesomeIcon.ExclamationTriangle,
+            StyleModel.GetFromCurrent().BuiltInColors!.DalamudOrange!.Value.ToUInt32()
+        );
+
+        if (ImGui.IsItemHovered()) {
+            using var _ = ImRaii.Tooltip();
+            ImGui.TextUnformatted("This setting may cause stability issues.");
+            ImGui.TextUnformatted(
+                $"Disabling it may then require hand-editing pluginConfigs{(Util.IsWine() ? '/' : '\\')}{_configuration.InternalName}.json."
+            );
+        }
+    }
+
+    private void DrawInterface()
+    {
+        using (var node = ImRaii.TreeNode("Memory Snapshots###Interface_MemorySnapshots", ImGuiTreeNodeFlags.DefaultOpen)) {
+            if (node) {
+                DrawInterface_MemorySnapshots();
+            }
+        }
+
+        using (var node = ImRaii.TreeNode("Miscellaneous###Interface_Miscellaneous")) {
+            if (node) {
+                DrawInterface_Miscellaneous();
+            }
+        }
+    }
+
+    private void DrawInterface_MemorySnapshots()
+    {
+        var configuration = _configuration.Configuration;
+
+        var snapshotsAnnotated = configuration.OpenSnapshotsAnnotated;
+        if (ImGuiComponents.Combo(
+                "Default Display Mode", ref snapshotsAnnotated, [null, false, true,],
+                DescribeSnapshotsAnnotated
+            )) {
+            configuration.OpenSnapshotsAnnotated = snapshotsAnnotated;
+            _configuration.Save(nameof(configuration.OpenSnapshotsAnnotated));
+        }
+    }
+
+    private static string DescribeSnapshotsAnnotated(bool? annotated)
+        => annotated switch
+        {
+            null  => "Inherit Last",
+            false => "Compact",
+            true  => "Annotated",
+        };
+
+    private void DrawInterface_Miscellaneous()
+    {
+        var configuration = _configuration.Configuration;
+
+        var serious = configuration.Serious;
+        if (ImGui.Checkbox("I don't like fun.", ref serious)) {
+            configuration.Serious = serious;
+            _configuration.Save(nameof(configuration.Serious));
+        }
+    }
+
+    private void DrawData()
+        => DrawDataYaml();
+
+    private void DrawDataYaml()
+    {
+        var inputWidth = ImGui.GetContentRegionAvail().X * (2.0f / 3.0f);
+        var innerSpacing = ImGui.GetStyle().ItemInnerSpacing.X;
+        var configuration = _configuration.Configuration;
 
         ImGui.SetNextItemWidth(
             inputWidth - innerSpacing * 2.0f - ImGuiComponents.NormalizedIconButtonSize(FontAwesomeIcon.Sync).X
@@ -127,60 +251,6 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
 
         ImGui.SameLine(0.0f, innerSpacing);
         ImGui.TextUnformatted("ClientStructs' data.yml");
-
-        var enableIpfd = configuration.EnableIpfd;
-        if (ImGui.Checkbox("Enable IPFD (In-Process Faux Debugger)", ref enableIpfd)) {
-            configuration.EnableIpfd = enableIpfd;
-            _configuration.Save(nameof(configuration.EnableIpfd));
-        }
-
-        ImGui.SameLine(0.0f, innerSpacing);
-        DrawUnstableSettingWarning();
-
-        ImGui.SameLine();
-        using (ImRaii.Disabled(!_ipfd.Loaded)) {
-            if (ImGui.Button("Force Unload##ipfd")) {
-                _ipfd.Unload();
-            }
-        }
-
-        var symbolHandlerMode = configuration.SymbolHandlerMode;
-        if (Util.IsWine()) {
-            var enableWineSymbolHandler = symbolHandlerMode == SymbolHandlerMode.ForceInitialize;
-            if (ImGui.Checkbox("Enable Symbol Handler", ref enableWineSymbolHandler)) {
-                symbolHandlerMode = enableWineSymbolHandler
-                    ? SymbolHandlerMode.ForceInitialize
-                    : SymbolHandlerMode.Disable;
-                configuration.SymbolHandlerMode = symbolHandlerMode;
-                _configuration.Save(nameof(configuration.SymbolHandlerMode));
-            }
-        } else {
-            if (ImGuiComponents.ComboEnum(
-                    "Symbol Handler Mode", ref symbolHandlerMode, ConfigurationEnumExtensions.Label
-                )) {
-                configuration.SymbolHandlerMode = symbolHandlerMode;
-                _configuration.Save(nameof(configuration.SymbolHandlerMode));
-            }
-        }
-
-        ImGui.SameLine(0.0f, innerSpacing);
-        DrawUnstableSettingWarning();
-    }
-
-    private static void DrawUnstableSettingWarning()
-    {
-        ImGuiComponents.NormalizedIcon(
-            FontAwesomeIcon.ExclamationTriangle,
-            StyleModel.GetFromCurrent().BuiltInColors!.DalamudOrange!.Value.ToUInt32()
-        );
-
-        if (ImGui.IsItemHovered()) {
-            using var _ = ImRaii.Tooltip();
-            ImGui.TextUnformatted("This setting may cause stability issues.");
-            ImGui.TextUnformatted(
-                $"Disabling it may then require hand-editing pluginConfigs{(Util.IsWine() ? '/' : '\\')}Dynamis.json."
-            );
-        }
     }
 
     private void DrawColors()

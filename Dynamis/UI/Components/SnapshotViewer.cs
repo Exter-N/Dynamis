@@ -22,8 +22,10 @@ public sealed class SnapshotViewer(
 {
     private ObjectSnapshot? _vmSnapshot;
 
-    private bool _vmAnnotated;
-    private int  _vmOffset;
+    private bool _vmAnnotated = configuration.Configuration.OpenSnapshotsAnnotated
+                             ?? configuration.Configuration.LastSnapshotAnnotated;
+
+    private int _vmOffset;
 
     public ObjectSnapshot? Snapshot
     {
@@ -42,12 +44,16 @@ public sealed class SnapshotViewer(
         ImGui.SetCursorPos(ImGui.GetCursorPos() - new Vector2(0.0f, offset));
         if (ImGui.RadioButton("Compact", !_vmAnnotated)) {
             _vmAnnotated = false;
+            configuration.Configuration.LastSnapshotAnnotated = false;
+            configuration.Save(nameof(configuration.Configuration.LastSnapshotAnnotated));
         }
 
         ImGui.SameLine(0.0f, itemInnerSpacing);
         ImGui.SetCursorPos(ImGui.GetCursorPos() - new Vector2(0.0f, offset));
         if (ImGui.RadioButton("Annotated", _vmAnnotated)) {
             _vmAnnotated = true;
+            configuration.Configuration.LastSnapshotAnnotated = true;
+            configuration.Save(nameof(configuration.Configuration.LastSnapshotAnnotated));
         }
     }
 

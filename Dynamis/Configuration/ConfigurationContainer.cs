@@ -11,6 +11,9 @@ public sealed class ConfigurationContainer : IDalamudLoggingConfiguration
     private readonly IDalamudPluginInterface _pluginInterface;
     private readonly Lazy<Configuration>     _configuration;
 
+    public string InternalName
+        => _pluginInterface.InternalName;
+
     public Configuration Configuration
         => _configuration.Value;
 

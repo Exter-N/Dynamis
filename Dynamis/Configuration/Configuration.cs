@@ -38,6 +38,12 @@ public sealed class Configuration : IPluginConfiguration
 
     public SymbolHandlerMode SymbolHandlerMode { get; set; } = SymbolHandlerMode.Default;
 
+    public bool? OpenSnapshotsAnnotated { get; set; } = null;
+
+    public bool LastSnapshotAnnotated { get; set; } = false;
+
+    public bool Serious { get; set; } = false;
+
     public uint[] GetHexViewerPalette()
     {
         var defaultPalette = GetDefaultHexViewerPalette();
