@@ -113,7 +113,7 @@ public static class StructPointerThunkGenerator
             }
         }
 
-        if (type.IsPointer) {
+        if (type.IsPointer || type.IsByRef) {
             var outerType = GetCsPointerType(type);
             return outerType == typeof(nint)
                 ? new BlitTypeInfo(outerType)
@@ -126,7 +126,7 @@ public static class StructPointerThunkGenerator
     private static Type GetCsPointerType(Type type)
         => type == typeof(void*)
             ? typeof(nint)
-            : type.IsPointer
+            : type.IsPointer || type.IsByRef
                 ? typeof(Pointer<>).MakeGenericType(GetCsPointerType(type.GetElementType()!))
                 : type;
 
