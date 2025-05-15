@@ -241,7 +241,9 @@ public sealed class SnapshotViewer(
             ImGui.SameLine(0.0f, 0.0f);
             ImGui.SetCursorScreenPos(min);
             var itemClicked = ImGui.InvisibleButton($"###A{fieldOffset:X}", max - min);
-            OnSnapshotHover(fieldOffset, ImGuiComponents.HexViewerPart.Annotation, itemClicked);
+            if (ImGui.IsItemHovered()) {
+                OnSnapshotHover(fieldOffset, ImGuiComponents.HexViewerPart.Annotation, itemClicked);
+            }
 
             return itemClicked;
         }
