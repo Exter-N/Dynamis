@@ -31,6 +31,8 @@ public sealed class Ipfd : IMessageObserver<ConfigurationChangedMessage>, IDispo
     public Ipfd(ResourceProvider resourceProvider, ILogger<Ipfd> logger, ConfigurationContainer configuration,
         IDtrBar dtrBar, MessageHub messageHub)
     {
+        _breakpoints = new Breakpoint?[4];
+
         _resourceProvider = resourceProvider;
         _logger = logger;
         _configuration = configuration;
@@ -40,8 +42,6 @@ public sealed class Ipfd : IMessageObserver<ConfigurationChangedMessage>, IDispo
             BuildSeString($"{UiGlow("Dynamis IPFD", Gold)} is currently loaded.\nClick to open settings.");
         _dtrEntry.OnClick += messageHub.Publish<OpenWindowMessage<SettingsWindow>>;
         _dtrEntry.Shown = false;
-
-        _breakpoints = new Breakpoint?[4];
     }
 
     ~Ipfd()
@@ -305,7 +305,7 @@ public sealed class Ipfd : IMessageObserver<ConfigurationChangedMessage>, IDispo
 
         _module?.Dispose();
         _module = null;
-        _dtrEntry.Shown = false;
+        _dtrEntry?.Shown = false;
     }
 
     public void Dispose()
@@ -318,7 +318,7 @@ public sealed class Ipfd : IMessageObserver<ConfigurationChangedMessage>, IDispo
     {
         lock (this) {
             FreeModuleNoLock(true);
-            _dtrEntry.Remove();
+            _dtrEntry?.Remove();
         }
     }
 
