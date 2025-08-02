@@ -8,10 +8,16 @@ public static partial class ProcessThreadApi
     public static partial uint GetCurrentThreadId();
 
     [LibraryImport("kernel32.dll")]
-    public static partial void GetCurrentThreadStackLimits(out nint lowLimit, out nint highLimit);
+    public static partial nint GetCurrentThread();
 
     [LibraryImport("kernel32.dll")]
-    public static partial nint GetCurrentThread();
+    public static partial void GetCurrentThreadStackLimits(out nint lowLimit, out nint highLimit);
+
+    [LibraryImport("ntdll.dll", EntryPoint = "RtlCaptureContext")]
+    public static partial void RtlCaptureContext(out Context contextRecord);
+
+    [LibraryImport("kernel32.dll")]
+    public static partial uint GetCurrentProcessId();
 
     [LibraryImport("kernel32.dll")]
     public static partial nint GetCurrentProcess();

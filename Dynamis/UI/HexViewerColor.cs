@@ -13,4 +13,5 @@ public enum HexViewerColor : byte
     BadPointer,
     VirtualTablePointer,
     LibraryObjectPointer,
+    StlContainer,
 }

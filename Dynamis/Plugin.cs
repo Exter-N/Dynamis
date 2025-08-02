@@ -19,6 +19,7 @@ using Dynamis.UI.Components;
 using Dynamis.UI.ObjectInspectors;
 using Dynamis.UI.Windows;
 using Dynamis.Utility;
+using Microsoft.Diagnostics.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -125,6 +126,17 @@ public sealed class Plugin : IDalamudPlugin
                         collection.AddImplementationSingletons<ISingletonWindow>(typeof(Plugin).Assembly);
 
                         collection.AddSingleton<Ipfd>();
+                        collection.AddSingleton<DataTarget>(_ => DataTarget.AttachToProcess(
+                                unchecked((int)ProcessThreadApi.GetCurrentProcessId()), false
+                            )
+                        );
+                        collection.AddSingleton<ClrRuntime>(p
+                            => p.GetRequiredService<DataTarget>()
+                                .ClrVersions.First(info => info.Version.Major == Environment.Version.Major)
+                                .CreateRuntime()
+                        );
+                        collection.AddSingleton<Lazy<ClrRuntime>>(p => new(p.GetRequiredService<ClrRuntime>));
+                        collection.AddSingleton<StackWalker>();
 
                         collection.AddSingleton<CommandHandler>();
                         collection.AddSingleton<LaunchButton>();

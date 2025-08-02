@@ -14,7 +14,7 @@ public sealed class ObjectInspector(
     MemoryHeuristics memoryHeuristics,
     AddressIdentifier addressIdentifier,
     ModuleAddressResolver moduleAddressResolver,
-    SymbolApi symbolApi,
+    StackWalker stackWalker,
     ClassRegistry classRegistry,
     Ipfd.Ipfd ipfd)
     : IMessageObserver<ConfigurationChangedMessage>
@@ -105,10 +105,56 @@ public sealed class ObjectInspector(
         context.AssociatedSnapshot = stack;
 
         var reader = new SnapshotReader(null);
-        reader.Mount(context);
-        context.StackTrace = symbolApi.StackWalk(in contextRecord, reader);
+        var contextOffset = unchecked(contextPointer - stack.Address!.Value);
+        if (contextOffset >= -context.Data.Length && contextOffset < stack.Data.Length) {
+            if (contextOffset >= 0 && contextOffset + context.Data.Length < stack.Data.Length) {
+                stack.Class!.SetFields(
+                    [
+                        new FieldInfo
+                        {
+                            Name = "Context",
+                            Offset = unchecked((uint)contextOffset),
+                            Size = unchecked((uint)context.Data.Length),
+                            Type = FieldType.Object,
+                            ElementClass = context.Class,
+                            ManagedType = typeof(Context),
+                        },
+                    ]
+                );
+            }
+
+            reader.Mount(stack);
+        } else {
+            reader.Mount(context);
+        }
+
+        context.StackTrace = stackWalker.StackWalk(in contextRecord, reader);
 
         return (threadId, context);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public unsafe (uint ThreadId, ObjectSnapshot Context) TakeCurrentThreadStateSnapshot()
+    {
+        ProcessThreadApi.RtlCaptureContext(out var contextRecord);
+        var endOfContext = (nint*)((Context*)Unsafe.AsPointer(ref Unsafe.AsRef(in contextRecord)) + 1);
+        var size = EstimateStackSize((nint)endOfContext) / (uint)sizeof(nint);
+        nint* returnAddress = null;
+        for (var i = 0; i < size; ++i) {
+            if (VirtualMemory.GetProtection(*(endOfContext + i)).CanExecute()) {
+                returnAddress = endOfContext + i;
+                break;
+            }
+        }
+
+        if (returnAddress is null) {
+            throw new Exception("Could not identify return address");
+        }
+
+        /*contextRecord.Rip = (ulong)*returnAddress;
+        contextRecord.Rsp = (ulong)(returnAddress + 1);
+        contextRecord.Rbp = (ulong)*(returnAddress - 1);*/
+        return TakeThreadStateSnapshot(in contextRecord);
     }
 
     public (ClassInfo Class, nuint Displacement) DetermineClassAndDisplacement(nint objectAddress, nint? vtblHint = null,

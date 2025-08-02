@@ -20,6 +20,7 @@ public sealed class Configuration : IPluginConfiguration
             0xFF0000FF,
             0xFFFF80C0,
             0xFFFFC080,
+            0xFF80C0FF,
         ];
 
     public int Version { get; set; } = 0;

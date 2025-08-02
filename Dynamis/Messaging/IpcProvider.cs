@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Ipc;
 using Dynamis.Interop;
+using Dynamis.Interop.Win32;
 using Dynamis.UI;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -31,6 +32,7 @@ public sealed class IpcProvider(
     private ICallGateProvider<(uint, uint, ulong)>?                     _getApiVersion;
     private ICallGateProvider<nint, object?>?                           _inspectObject;
     private ICallGateProvider<nint, uint, string, uint, uint, object?>? _inspectRegion;
+    private ICallGateProvider<object?>?                                 _inspectCurrentThreadState;
     private ICallGateProvider<nint, object?>?                           _imGuiDrawPointer;
     private ICallGateProvider<Action<nint>>?                            _getImGuiDrawPointerDelegate;
     private ICallGateProvider<nint, object?>?                           _imGuiDrawPointerTooltipDetails;
@@ -47,8 +49,13 @@ public sealed class IpcProvider(
             out _getApiVersion, "Dynamis.GetApiVersion", () => (ApiMajorVersion, ApiMinorVersion, ApiFeatureFlags)
         );
 
-        RegisterAction(out _inspectObject,    $"Dynamis.{nameof(InspectObject)}.V1",    InspectObject);
-        RegisterAction(out _inspectRegion,    $"Dynamis.{nameof(InspectRegion)}.V1",    InspectRegion);
+        RegisterAction(out _inspectObject, $"Dynamis.{nameof(InspectObject)}.V1", InspectObject);
+        RegisterAction(out _inspectRegion, $"Dynamis.{nameof(InspectRegion)}.V1", InspectRegion);
+
+        RegisterAction(
+            out _inspectCurrentThreadState, $"Dynamis.{nameof(InspectCurrentThreadState)}.V1", InspectCurrentThreadState
+        );
+
         RegisterAction(out _imGuiDrawPointer, $"Dynamis.{nameof(ImGuiDrawPointer)}.V1", ImGuiDrawPointer);
 
         RegisterFunc(
@@ -96,6 +103,7 @@ public sealed class IpcProvider(
         UnregisterFunc(ref _getImGuiDrawPointerDelegate);
 
         UnregisterAction(ref _imGuiDrawPointer);
+        UnregisterAction(ref _inspectCurrentThreadState);
         UnregisterAction(ref _inspectRegion);
         UnregisterAction(ref _inspectObject);
 
@@ -116,6 +124,24 @@ public sealed class IpcProvider(
                 address, PseudoClasses.Generate(typeName, size, (PseudoClasses.Template)typeTemplateId, (ClassKind)classKindId)
             )
         );
+
+    private void InspectCurrentThreadState()
+    {
+        var (_, context) = objectInspector.TakeCurrentThreadStateSnapshot();
+        ThreadPool.QueueUserWorkItem(EndInspectCurrentThreadState, context, false);
+    }
+
+    private void EndInspectCurrentThreadState(ObjectSnapshot context)
+    {
+        objectInspector.CompleteSnapshot(context);
+        if (context.AssociatedSnapshot is
+            {
+            } stack) {
+            objectInspector.CompleteSnapshot(stack);
+        }
+
+        messageHub.PublishOnFrameworkThread(new InspectObjectMessage(context));
+    }
 
     private void ImGuiDrawPointer(nint pointer)
         => imGuiComponents.DrawPointer(pointer, null);
