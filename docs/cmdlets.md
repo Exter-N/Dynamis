@@ -49,7 +49,7 @@ Gets the Dynamis-provided or Dalamud-provided service of the given type.
 Aliases: `shobj`, `sho`.
 
 ```powershell
-Show-Object [-Address] <Object>
+Show-Object [-Address] <Object> [[-Name] <String>]
 ```
 
 Opens an object inspector on the object at the given address, or, if there is already one, brings it to the front.

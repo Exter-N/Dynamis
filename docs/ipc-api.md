@@ -104,16 +104,18 @@ Minimum API version: `(1, 0, 0)`.
 
 ```csharp
 void "Dynamis.InspectObject.V1"(nint address);
+void "Dynamis.InspectObject.V2"(nint address, string? name);
 ```
 
 Opens an object inspector on the object at the given address, or, if there is already one, brings it to the front.
 
-Minimum API version: `(1, 0, 0)`.
+Minimum API version: `(1, 0, 0)` for v1, `(1, 4, 0)` for v2.
 
 ### `InspectRegion` function
 
 ```csharp
 void "Dynamis.InspectRegion.V1"(nint address, uint size, string typeName, uint typeTemplateId, uint classKindId);
+void "Dynamis.InspectRegion.V2"(nint address, uint size, string typeName, uint typeTemplateId, uint classKindId, string? name);
 ```
 
 Opens an object inspector on the given region.
@@ -123,7 +125,7 @@ Opens an object inspector on the given region.
 - `typeTemplateId` is a type template to use to auto-generate fields - pass 0 not to use this feature (see the `Template` nested enum in [PseudoClasses.cs](../Dynamis/Interop/PseudoClasses.cs)) ;
 - `classKindId` is a class kind that defines which additional inspectors are applicable - pass 0 not to use this feature (see [ClassKind.cs](../Dynamis/Interop/ClassKind.cs)).
 
-Minimum API version: `(1, 0, 0)`.
+Minimum API version: `(1, 0, 0)` for v1, `(1, 4, 0)` for v2.
 
 ## Native Reflection
 
