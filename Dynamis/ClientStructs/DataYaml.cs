@@ -202,7 +202,7 @@ public sealed class DataYaml
 
         public string? Name { get; set; }
 
-        public bool Pointer { get; set; } = true;
+        public bool Pointer { get; set; }
 
         public static bool TryParse(YamlNode node, [NotNullWhen(true)] out Instance? instance, string? className = null,
             ILogger? logger = null)
