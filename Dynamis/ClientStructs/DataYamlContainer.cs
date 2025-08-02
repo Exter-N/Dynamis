@@ -83,34 +83,41 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
 
         if (typeHint.HasFlag(AddressType.Instance)
          && (ClassesByInstance?.TryGetValue(address, out var name) ?? false)) {
-            return new(AddressType.Instance, name.ClassName, name.Name);
+            return new(
+                AddressType.Instance, name.ClassName, new(ClassIdentifierKind.WellKnownObject, address), name.Name
+            );
         }
 
         if (typeHint.HasFlag(AddressType.VirtualTable)
          && (ClassesByVtbl?.TryGetValue(address, out var clsName) ?? false)) {
-            return new(AddressType.VirtualTable, clsName, null);
+            return new(AddressType.VirtualTable, clsName, new(ClassIdentifierKind.VirtualTable, address), null);
         }
 
         if (typeHint.HasFlag(AddressType.Function)
          && (Data.Functions?.TryGetValue(GetOriginalAddress(address), out var fnName) ?? false)) {
-            return new(AddressType.Function, string.Empty, fnName);
+            return new(AddressType.Function, string.Empty, new(ClassIdentifierKind.Function, address), fnName);
         }
 
         if (typeHint.HasFlag(AddressType.Function)
          && (MemberFunctions?.TryGetValue(address, out var mfName) ?? false)) {
-            return new(AddressType.Function, mfName.ClassName, mfName.FunctionName);
+            return new(
+                AddressType.Function, mfName.ClassName, new(ClassIdentifierKind.Function, address), mfName.FunctionName
+            );
         }
 
         if (typeHint.HasFlag(AddressType.Global)
          && (Data.Globals?.TryGetValue(GetOriginalAddress(address), out var gName) ?? false)) {
-            return new(AddressType.Global, string.Empty, gName);
+            return new(AddressType.Global, string.Empty, null, gName);
         }
 
         if (address != 0) {
             if (typeHint.HasFlag(AddressType.Instance) && ClassesByInstancePointer is not null) {
                 foreach (var (pointer, name2) in ClassesByInstancePointer) {
                     if (VirtualMemory.GetProtection(pointer).CanRead() && *(nint*)pointer == address) {
-                        return new(AddressType.Instance, name2.ClassName, name2.Name);
+                        return new(
+                            AddressType.Instance, name2.ClassName,
+                            new(ClassIdentifierKind.WellKnownObjectByPointer, pointer), name2.Name
+                        );
                     }
                 }
             }
@@ -118,7 +125,10 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
             if (typeHint.HasFlag(AddressType.Function) && VirtualFunctions is not null) {
                 foreach (var (pointer, vfName) in VirtualFunctions) {
                     if (VirtualMemory.GetProtection(pointer).CanRead() && *(nint*)pointer == address) {
-                        return new(AddressType.Function, vfName.ClassName, vfName.FunctionName);
+                        return new(
+                            AddressType.Function, vfName.ClassName, new(ClassIdentifierKind.Function, address),
+                            vfName.FunctionName
+                        );
                     }
                 }
             }
@@ -127,19 +137,19 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
         return AddressIdentification.Default;
     }
 
-    public unsafe nint Resolve(DataYaml.Instance instance)
+    public unsafe (nint Address, ClassIdentifier? ClassIdentifierHint) Resolve(DataYaml.Instance instance)
     {
         var ea = GetLiveAddress(instance.Ea);
         if (!instance.Pointer) {
-            return ea;
+            return (ea, new(ClassIdentifierKind.WellKnownObject, ea));
         }
 
         if (!VirtualMemory.GetProtection(ea).CanRead()) {
             _logger.LogError("Cannot dereference ea pointer 0x{Ea:X}, returning nullptr", ea);
-            return 0;
+            return (0, null);
         }
 
-        return *(nint*)ea;
+        return (*(nint*)ea, new(ClassIdentifierKind.WellKnownObjectByPointer, ea));
     }
 
     public IEnumerable<KeyValuePair<nint, AddressIdentification>> GetWellKnownAddresses(AddressType types)
@@ -161,13 +171,13 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
 
         if (types.HasFlag(AddressType.Global) && Data.Globals is not null) {
             foreach (var (ea, name) in Data.Globals) {
-                yield return new(GetLiveAddress(ea), new(AddressType.Global, string.Empty, name));
+                yield return new(GetLiveAddress(ea), new(AddressType.Global, string.Empty, null, name));
             }
         }
 
         if (types.HasFlag(AddressType.Function) && Data.Functions is not null) {
             foreach (var (ea, name) in Data.Functions) {
-                yield return new(GetLiveAddress(ea), new(AddressType.Function, string.Empty, name));
+                yield return new(GetLiveAddress(ea), new(AddressType.Function, string.Empty, null, name));
             }
         }
 
@@ -178,23 +188,30 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
         foreach (var (className, @class) in Data.Classes) {
             if (types.HasFlag(AddressType.Instance) && @class.Instances is not null) {
                 foreach (var instance in @class.Instances) {
-                    var ea = Resolve(instance);
+                    var (ea, classIdHint) = Resolve(instance);
                     if (ea != 0) {
-                        yield return new(ea, new(AddressType.Instance, className, instance.Name));
+                        yield return new(ea, new(AddressType.Instance, className, classIdHint, instance.Name));
                     }
                 }
             }
 
             if (types.HasFlag(AddressType.VirtualTable) && @class.Vtbls is not null) {
                 foreach (var vtbl in @class.Vtbls) {
-                    yield return new(GetLiveAddress(vtbl.Ea), new(AddressType.VirtualTable, className, null));
+                    var ea = GetLiveAddress(vtbl.Ea);
+                    yield return new(
+                        ea, new(AddressType.VirtualTable, className, new(ClassIdentifierKind.VirtualTable, ea), null)
+                    );
                 }
             }
 
             if (types.HasFlag(AddressType.Function)) {
                 if (@class.Funcs is not null) {
                     foreach (var (ea, name) in @class.Funcs) {
-                        yield return new(GetLiveAddress(ea), new(AddressType.Function, className, name));
+                        var liveEa = GetLiveAddress(ea);
+                        yield return new(
+                            liveEa,
+                            new(AddressType.Function, className, new(ClassIdentifierKind.Function, liveEa), name)
+                        );
                     }
                 }
 
@@ -203,7 +220,9 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
                     foreach (var (index, name) in @class.Vfuncs) {
                         var ea = ReadVfuncAddress(GetLiveAddress(vtbl0.Ea), index);
                         if (ea != 0) {
-                            yield return new(ea, new(AddressType.Function, className, name));
+                            yield return new(
+                                ea, new(AddressType.Function, className, new(ClassIdentifierKind.Function, ea), name)
+                            );
                         }
                     }
                 }

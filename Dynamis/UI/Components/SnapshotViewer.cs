@@ -413,20 +413,23 @@ public sealed class SnapshotViewer(
                     {
                     } @class && @class.Class.Kind == ClassKind.VirtualTable) {
                     if (ImGui.Selectable("Inspect virtual table")) {
-                        messageHub.Publish(new InspectObjectMessage(FieldInfo.GetAddress(value), @class.Class));
+                        messageHub.Publish(new InspectObjectMessage(FieldInfo.GetAddress(value), @class.Class, null, null));
                         ret = true;
                     }
 
                     if (ea is
                         {
                         } eoAddress && ImGui.Selectable("Inspect embedded object")) {
-                        messageHub.Publish(new InspectObjectMessage(eoAddress, null));
+                        messageHub.Publish(new InspectObjectMessage(eoAddress, null, null, null));
                         ret = true;
                     }
                 } else {
                     if (ImGui.Selectable("Inspect object")) {
                         messageHub.Publish(
-                            new InspectObjectMessage(FieldInfo.GetAddress(value) - (nint)(_class?.Displacement ?? 0), _class?.Class)
+                            new InspectObjectMessage(
+                                FieldInfo.GetAddress(value) - (nint)(_class?.Displacement ?? 0), _class?.Class, null,
+                                null
+                            )
                         );
                         ret = true;
                     }

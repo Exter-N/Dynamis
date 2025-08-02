@@ -1,8 +1,12 @@
 namespace Dynamis.Interop;
 
-public readonly record struct AddressIdentification(AddressType Type, string ClassName, string? Name)
+public readonly record struct AddressIdentification(
+    AddressType Type,
+    string ClassName,
+    ClassIdentifier? ClassIdentifierHint,
+    string? Name)
 {
-    public static readonly AddressIdentification Default = new(0, string.Empty, null);
+    public static readonly AddressIdentification Default = new(0, string.Empty, null, null);
 
     public string? GetFullName()
     {

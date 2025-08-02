@@ -17,7 +17,7 @@ public sealed class IpcProvider(
     : IHostedService
 {
     public const uint  ApiMajorVersion = 1;
-    public const uint  ApiMinorVersion = 3;
+    public const uint  ApiMinorVersion = 4;
     public const ulong ApiFeatureFlags = SmaApiFeatureFlag;
 
 #if WITH_SMA
@@ -26,17 +26,19 @@ public sealed class IpcProvider(
     private const ulong SmaApiFeatureFlag = 0;
 #endif
 
-    private ICallGateProvider<uint, uint, ulong, Version, object?>?     _apiInitialized;
-    private ICallGateProvider<object?>?                                 _apiDisposing;
-    private ICallGateProvider<(uint, uint, ulong)>?                     _getApiVersion;
-    private ICallGateProvider<nint, object?>?                           _inspectObject;
-    private ICallGateProvider<nint, uint, string, uint, uint, object?>? _inspectRegion;
-    private ICallGateProvider<nint, object?>?                           _imGuiDrawPointer;
-    private ICallGateProvider<Action<nint>>?                            _getImGuiDrawPointerDelegate;
-    private ICallGateProvider<nint, object?>?                           _imGuiDrawPointerTooltipDetails;
-    private ICallGateProvider<nint, (string, Type?, uint, uint)>?       _getClass;
-    private ICallGateProvider<nint, string?, Type?, (bool, uint)>?      _isInstanceOf;
-    private ICallGateProvider<object?>?                                 _preloadDataYaml;
+    private ICallGateProvider<uint, uint, ulong, Version, object?>?              _apiInitialized;
+    private ICallGateProvider<object?>?                                          _apiDisposing;
+    private ICallGateProvider<(uint, uint, ulong)>?                              _getApiVersion;
+    private ICallGateProvider<nint, object?>?                                    _inspectObjectV1;
+    private ICallGateProvider<nint, string?, object?>?                           _inspectObjectV2;
+    private ICallGateProvider<nint, uint, string, uint, uint, object?>?          _inspectRegionV1;
+    private ICallGateProvider<nint, uint, string, uint, uint, string?, object?>? _inspectRegionV2;
+    private ICallGateProvider<nint, object?>?                                    _imGuiDrawPointer;
+    private ICallGateProvider<Action<nint>>?                                     _getImGuiDrawPointerDelegate;
+    private ICallGateProvider<nint, object?>?                                    _imGuiDrawPointerTooltipDetails;
+    private ICallGateProvider<nint, (string, Type?, uint, uint)>?                _getClass;
+    private ICallGateProvider<nint, string?, Type?, (bool, uint)>?               _isInstanceOf;
+    private ICallGateProvider<object?>?                                          _preloadDataYaml;
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -47,8 +49,10 @@ public sealed class IpcProvider(
             out _getApiVersion, "Dynamis.GetApiVersion", () => (ApiMajorVersion, ApiMinorVersion, ApiFeatureFlags)
         );
 
-        RegisterAction(out _inspectObject,    $"Dynamis.{nameof(InspectObject)}.V1",    InspectObject);
-        RegisterAction(out _inspectRegion,    $"Dynamis.{nameof(InspectRegion)}.V1",    InspectRegion);
+        RegisterAction(out _inspectObjectV1,  $"Dynamis.InspectObject.V1",              InspectObjectV1);
+        RegisterAction(out _inspectObjectV2,  $"Dynamis.InspectObject.V2",              InspectObjectV2);
+        RegisterAction(out _inspectRegionV1,  $"Dynamis.InspectRegion.V1",              InspectRegionV1);
+        RegisterAction(out _inspectRegionV2,  $"Dynamis.InspectRegion.V2",              InspectRegionV2);
         RegisterAction(out _imGuiDrawPointer, $"Dynamis.{nameof(ImGuiDrawPointer)}.V1", ImGuiDrawPointer);
 
         RegisterFunc(
@@ -96,8 +100,10 @@ public sealed class IpcProvider(
         UnregisterFunc(ref _getImGuiDrawPointerDelegate);
 
         UnregisterAction(ref _imGuiDrawPointer);
-        UnregisterAction(ref _inspectRegion);
-        UnregisterAction(ref _inspectObject);
+        UnregisterAction(ref _inspectRegionV2);
+        UnregisterAction(ref _inspectRegionV1);
+        UnregisterAction(ref _inspectObjectV2);
+        UnregisterAction(ref _inspectObjectV1);
 
         UnregisterFunc(ref _getApiVersion);
 
@@ -107,13 +113,22 @@ public sealed class IpcProvider(
         return Task.CompletedTask;
     }
 
-    private void InspectObject(nint address)
-        => messageHub.PublishOnFrameworkThread(new InspectObjectMessage(address, null));
+    private void InspectObjectV1(nint address)
+        => InspectObjectV2(address, null);
 
-    private void InspectRegion(nint address, uint size, string typeName, uint typeTemplateId, uint classKindId)
+    private void InspectObjectV2(nint address, string? name)
+        => messageHub.PublishOnFrameworkThread(new InspectObjectMessage(address, null, null, name));
+
+    private void InspectRegionV1(nint address, uint size, string typeName, uint typeTemplateId, uint classKindId)
+        => InspectRegionV2(address, size, typeName, typeTemplateId, classKindId, null);
+
+    private void InspectRegionV2(nint address, uint size, string typeName, uint typeTemplateId, uint classKindId,
+        string? name)
         => messageHub.PublishOnFrameworkThread(
             new InspectObjectMessage(
-                address, PseudoClasses.Generate(typeName, size, (PseudoClasses.Template)typeTemplateId, (ClassKind)classKindId)
+                address,
+                PseudoClasses.Generate(typeName, size, (PseudoClasses.Template)typeTemplateId, (ClassKind)classKindId),
+                null, name
             )
         );
 
@@ -231,10 +246,38 @@ public sealed class IpcProvider(
         }
     }
 
-    private void RegisterAction<T1, T2, T3, T4, T5>(out ICallGateProvider<T1, T2, T3, T4, T5, object?>? provider, string name, Action<T1, T2, T3, T4, T5> action)
+    private void RegisterAction<T1, T2>(out ICallGateProvider<T1, T2, object?>? provider, string name,
+        Action<T1, T2> action)
+    {
+        try {
+            var prov = pi.GetIpcProvider<T1, T2, object?>(name);
+            prov.RegisterAction(action);
+            provider = prov;
+        } catch (Exception e) {
+            provider = null;
+            logger.LogError(e, "Error while registering IPC provider for {Name}", name);
+        }
+    }
+
+    private void RegisterAction<T1, T2, T3, T4, T5>(out ICallGateProvider<T1, T2, T3, T4, T5, object?>? provider,
+        string name, Action<T1, T2, T3, T4, T5> action)
     {
         try {
             var prov = pi.GetIpcProvider<T1, T2, T3, T4, T5, object?>(name);
+            prov.RegisterAction(action);
+            provider = prov;
+        } catch (Exception e) {
+            provider = null;
+            logger.LogError(e, "Error while registering IPC provider for {Name}", name);
+        }
+    }
+
+    private void RegisterAction<T1, T2, T3, T4, T5, T6>(
+        out ICallGateProvider<T1, T2, T3, T4, T5, T6, object?>? provider, string name,
+        Action<T1, T2, T3, T4, T5, T6> action)
+    {
+        try {
+            var prov = pi.GetIpcProvider<T1, T2, T3, T4, T5, T6, object?>(name);
             prov.RegisterAction(action);
             provider = prov;
         } catch (Exception e) {
@@ -267,7 +310,8 @@ public sealed class IpcProvider(
         }
     }
 
-    private void RegisterFunc<T1, T2, T3, TRet>(out ICallGateProvider<T1, T2, T3, TRet>? provider, string name, Func<T1, T2, T3, TRet> func)
+    private void RegisterFunc<T1, T2, T3, TRet>(out ICallGateProvider<T1, T2, T3, TRet>? provider, string name,
+        Func<T1, T2, T3, TRet> func)
     {
         try {
             var prov = pi.GetIpcProvider<T1, T2, T3, TRet>(name);

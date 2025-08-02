@@ -6,9 +6,9 @@ namespace Dynamis.Interop;
 
 public sealed class DynamicBoxFactory(ObjectInspector objectInspector, ClassRegistry classRegistry)
 {
-    public DynamicStructBox BoxStruct(nint address, BoxAccess access)
+    public DynamicStructBox BoxStruct(nint address, ClassIdentifier? classIdHint, BoxAccess access)
     {
-        var (@class, displacement) = objectInspector.DetermineClassAndDisplacement(address);
+        var (@class, displacement) = objectInspector.DetermineClassAndDisplacement(address, null, classIdHint);
         return new(address - (nint)displacement, @class, access, this);
     }
 
@@ -20,7 +20,7 @@ public sealed class DynamicBoxFactory(ObjectInspector objectInspector, ClassRegi
         }
 
         if (IBoxedAddress.TryUnboxStrict(obj, out var address)) {
-            return BoxStruct(address, access);
+            return BoxStruct(address, null, access);
         }
 
         if (obj is DynamicMemory memory) {

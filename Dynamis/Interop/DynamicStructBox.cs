@@ -61,13 +61,14 @@ public sealed class DynamicStructBox(nint address, ClassInfo @class, BoxAccess a
                     result = @class.GetFieldValues(field, new((void*)address, unchecked((int)@class.EstimatedSize)));
                     if (field.Type == FieldType.Pointer && result is nint ptr) {
                         result = factory.BoxStruct(
-                            ptr, ptr >= address && ptr < address + @class.EstimatedSize ? access : access.Deep()
+                            ptr, null, ptr >= address && ptr < address + @class.EstimatedSize ? access : access.Deep()
                         );
                     } else if (field.Type == FieldType.Pointer && result is nint[] ptrs) {
                         result = Array.ConvertAll(
                             ptrs,
                             item => factory.BoxStruct(
-                                item, item >= address && item < address + @class.EstimatedSize ? access : access.Deep()
+                                item, null,
+                                item >= address && item < address + @class.EstimatedSize ? access : access.Deep()
                             )
                         );
                     } else if (result is Array array) {
@@ -281,7 +282,7 @@ public sealed class DynamicStructBox(nint address, ClassInfo @class, BoxAccess a
         => Write(offset, value);
 
     public DynamicStructBox ReadPointer(int offset)
-        => factory.BoxStruct(Read<nint>(offset), access.Deep());
+        => factory.BoxStruct(Read<nint>(offset), null, access.Deep());
 
     public void WritePointer(int offset, object? value)
     {
@@ -363,7 +364,7 @@ public sealed class DynamicStructBox(nint address, ClassInfo @class, BoxAccess a
             throw new ArgumentOutOfRangeException(nameof(offset));
         }
 
-        var obj = factory.BoxStruct(address + offset, access);
+        var obj = factory.BoxStruct(address + offset, null, access);
         if (offset + obj.Class.EstimatedSize > @class.EstimatedSize) {
             throw new ArgumentOutOfRangeException(nameof(offset));
         }

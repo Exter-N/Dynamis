@@ -166,7 +166,7 @@ public sealed class FunctionInspector(MessageHub messageHub, ContextMenu context
                 } operandAddress) {
                 separator = true;
                 if (ImGui.Selectable("Inspect operand")) {
-                    messageHub.Publish(new InspectObjectMessage(operandAddress, null));
+                    messageHub.Publish(new InspectObjectMessage(operandAddress, null, null, null));
                     ret = true;
                 }
 

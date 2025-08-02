@@ -24,24 +24,26 @@ public sealed class ObjectInspector(
     private unsafe T Read<T>(nint address, bool safe) where T : unmanaged
         => safe ? ipfd.Read<T>(address) : *(T*)address;
 
-    public ObjectSnapshot TakeSnapshot(nint objectAddress, ClassInfo? @class = null, string? name = null,
-        bool safeReads = true)
+    public ObjectSnapshot TakeSnapshot(nint objectAddress, ClassInfo? @class = null,
+        ClassIdentifier? classIdHint = null, string? name = null, bool safeReads = true)
     {
-        var snapshot = TakeMinimalSnapshot(objectAddress, @class, safeReads);
+        var snapshot = TakeMinimalSnapshot(objectAddress, @class, classIdHint, safeReads);
         snapshot.Name = name;
         CompleteSnapshot(snapshot, safeReads);
         return snapshot;
     }
 
-    public unsafe ObjectSnapshot TakeMinimalSnapshot(nint objectAddress, ClassInfo? @class = null, bool safeReads = true)
+    public unsafe ObjectSnapshot TakeMinimalSnapshot(nint objectAddress, ClassInfo? @class = null,
+        ClassIdentifier? classIdHint = null, bool safeReads = true)
     {
         nuint displacement = 0;
         if (@class is null) {
-            var classAndDisplacement = DetermineClassAndDisplacement(objectAddress, null, safeReads);
+            var classAndDisplacement = DetermineClassAndDisplacement(objectAddress, null, classIdHint, safeReads);
             @class = classAndDisplacement.Class;
             displacement = classAndDisplacement.Displacement;
             objectAddress -= (nint)displacement;
         }
+
         var data = new byte[@class.EstimatedSize];
         if (safeReads) {
             ipfd.Copy<byte>(objectAddress, data.Length, data);
@@ -82,7 +84,7 @@ public sealed class ObjectInspector(
     {
         var threadId = ProcessThreadApi.GetCurrentThreadId();
         var contextPointer = (nint)Unsafe.AsPointer(ref Unsafe.AsRef(in contextRecord));
-        var context = TakeMinimalSnapshot(contextPointer, classRegistry.FromManagedType(typeof(Context)), false);
+        var context = TakeMinimalSnapshot(contextPointer, classRegistry.FromManagedType(typeof(Context)), null, false);
         context.Name = $"Context of thread {threadId}";
         context.Live = false;
 
@@ -96,6 +98,7 @@ public sealed class ObjectInspector(
                 PseudoClasses.Template.None,
                 ClassKind.ThreadStack
             ),
+            null,
             false
         );
         stack.Name = $"Stack of thread {threadId}";
@@ -111,8 +114,8 @@ public sealed class ObjectInspector(
         return (threadId, context);
     }
 
-    public (ClassInfo Class, nuint Displacement) DetermineClassAndDisplacement(nint objectAddress, nint? vtblHint = null,
-        bool safeReads = true)
+    public (ClassInfo Class, nuint Displacement) DetermineClassAndDisplacement(nint objectAddress,
+        nint? vtblHint = null, ClassIdentifier? classIdHint = null, bool safeReads = true)
     {
         var protection = VirtualMemory.GetProtection(objectAddress);
         if (!protection.CanRead()) {
@@ -147,16 +150,21 @@ public sealed class ObjectInspector(
             return (classRegistry.GetVirtualTableClass(objectAddress, ownerSize, safeReads), 0);
         }
 
+        var classId = classIdHint ?? DetermineClassId(objectAddress, vtbl);
+        if (classId.Kind is ClassIdentifierKind.WellKnownObject or ClassIdentifierKind.WellKnownObjectByPointer) {
+            return (classRegistry.GetClass(classId, vtbl, restOfPageSize), 0);
+        }
+
         if (vtblProtection.CanRead()) {
             var dtor = Read<nint>(vtbl, safeReads);
             var displacement = memoryHeuristics.EstimateDisplacementFromVfunc(dtor);
             if (displacement != 0) {
-                var actual = DetermineClassAndDisplacement(objectAddress - (nint)displacement, null, safeReads);
+                var actual = DetermineClassAndDisplacement(objectAddress - (nint)displacement, null, null, safeReads);
                 return (actual.Class, actual.Displacement + displacement);
             }
         }
 
-        return (classRegistry.GetClass(DetermineClassId(objectAddress, vtbl), vtbl, restOfPageSize), 0);
+        return (classRegistry.GetClass(classId, vtbl, restOfPageSize), 0);
     }
 
     private unsafe ClassIdentifier DetermineClassId(nint objectAddress, nint vtbl)
@@ -269,7 +277,7 @@ public sealed class ObjectInspector(
                                 color = (byte)HexViewerColor.BadPointer;
                             } else {
                                 color = (byte)GetClassColor(
-                                    DetermineClassAndDisplacement(value, null, safeReads).Class
+                                    DetermineClassAndDisplacement(value, null, null, safeReads).Class
                                 );
                             }
                         }
@@ -292,7 +300,7 @@ public sealed class ObjectInspector(
                                 color = (byte)HexViewerColor.Text;
                             } else {
                                 color = (byte)GetClassColor(
-                                    DetermineClassAndDisplacement(value, null, safeReads).Class
+                                    DetermineClassAndDisplacement(value, null, null, safeReads).Class
                                 );
                             }
                         }
@@ -336,7 +344,7 @@ public sealed class ObjectInspector(
                 } else if (!protect.CanRead()) {
                     color = (byte)HexViewerColor.Default;
                 } else {
-                    color = (byte)GetClassColor(DetermineClassAndDisplacement(value, null, safeReads).Class);
+                    color = (byte)GetClassColor(DetermineClassAndDisplacement(value, null, null, safeReads).Class);
                 }
             }
 

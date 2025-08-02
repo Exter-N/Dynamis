@@ -121,7 +121,7 @@ public sealed partial class ImGuiComponents(
 
         nuint displacement = 0;
         if (@class is null) {
-            (@class, displacement) = objectInspector.DetermineClassAndDisplacement(pointer, null, false);
+            (@class, displacement) = objectInspector.DetermineClassAndDisplacement(pointer, null, null, false);
         }
 
         if (@class.Known && @class.Name != wellKnown.ClassName) {
@@ -155,7 +155,7 @@ public sealed partial class ImGuiComponents(
         {
             var ret = false;
             if (pointer != 0 && ImGui.Selectable("Inspect object")) {
-                messageHub.Publish(new InspectObjectMessage(pointer, @class?.Invoke()));
+                messageHub.Publish(new InspectObjectMessage(pointer, @class?.Invoke(), null, null));
                 ret = true;
             }
 

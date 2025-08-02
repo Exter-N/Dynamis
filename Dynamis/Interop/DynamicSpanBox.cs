@@ -45,7 +45,7 @@ public sealed class DynamicSpanBox(
             var elementAddress = GetElementAddress(index);
             if (pointers) {
                 var element = VirtualMemory.GetProtection(elementAddress).CanRead() ? *(nint*)elementAddress : 0;
-                return element != 0 ? factory.BoxStruct(element, access.Deep()) : null;
+                return element != 0 ? factory.BoxStruct(element, null, access.Deep()) : null;
             } else {
                 return new DynamicStructBox(elementAddress, elementClass, access, factory);
             }

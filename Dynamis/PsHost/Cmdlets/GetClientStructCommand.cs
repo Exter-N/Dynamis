@@ -27,18 +27,19 @@ public sealed class GetClientStructCommand : Cmdlet
     protected override void BeginProcessing()
     {
         var factory = CommandRuntime.GetServiceProvider().GetRequiredService<DynamicBoxFactory>();
-        WriteObject(factory.BoxStruct(GetAddress(), Access));
+        var (address, classIdHint) = GetAddress();
+        WriteObject(factory.BoxStruct(address, classIdHint, Access));
     }
 
-    private nint GetAddress()
+    private (nint Address, ClassIdentifier? ClassIdentifierHint) GetAddress()
     {
         if (Type is null) {
-            return CastAddress(Address is PSObject psObject ? psObject.BaseObject : Address);
+            return (CastAddress(Address is PSObject psObject ? psObject.BaseObject : Address), null);
         }
 
         var getInstance = Type.GetMethod("Instance", BindingFlags.Static | BindingFlags.Public);
         if (getInstance is not null) {
-            return CastAddress(getInstance.Invoke(null, null));
+            return (CastAddress(getInstance.Invoke(null, null)), null);
         }
 
         if (ClassRegistry.TryGetClientStructsClassName(Type, out var className)) {

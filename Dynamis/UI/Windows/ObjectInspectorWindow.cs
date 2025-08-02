@@ -61,10 +61,10 @@ public sealed class ObjectInspectorWindow : IndexedWindow
         imGuiComponents.AddTitleBarButtons(this);
     }
 
-    public void Inspect(nint address, ClassInfo? @class)
+    public void Inspect(nint address, ClassInfo? @class, ClassIdentifier? classIdHint, string? name)
     {
         _vmAddress = address;
-        RunInspection(@class);
+        RunInspection(@class, classIdHint, name);
     }
 
     public void Inspect(ObjectSnapshot snapshot)
@@ -88,10 +88,10 @@ public sealed class ObjectInspectorWindow : IndexedWindow
         return vm;
     }
 
-    private void RunInspection(ClassInfo? @class)
+    private void RunInspection(ClassInfo? @class, ClassIdentifier? classIdHint, string? name)
     {
         try {
-            _vmSnapshot = _objectInspector.TakeSnapshot(_vmAddress, @class);
+            _vmSnapshot = _objectInspector.TakeSnapshot(_vmAddress, @class, classIdHint, name);
             _vmAddress = _vmSnapshot.Address ?? _vmAddress;
             _vmStatus = 1;
         } catch (Exception e) {
@@ -116,7 +116,7 @@ public sealed class ObjectInspectorWindow : IndexedWindow
         var refreshButtonWidth = ImGuiComponents.NormalizedIconButtonSize(FontAwesomeIcon.Sync).X;
         ImGui.SetNextItemWidth(ImGui.CalcItemWidth() - itemInnerSpacing - refreshButtonWidth - ImGui.GetFrameHeight());
         if (ImGuiComponents.InputPointer("Object Address", ref _vmAddress, ImGuiInputTextFlags.EnterReturnsTrue, false)) {
-            RunInspection(null);
+            RunInspection(null, null, null);
         }
 
         if (!ImGui.IsItemActive() && _vmSnapshot?.Name is not null) {
@@ -146,7 +146,7 @@ public sealed class ObjectInspectorWindow : IndexedWindow
                          _dataYamlContainer.GetWellKnownAddresses(AddressType.Instance)) {
                     if (ImGui.Selectable(identification.Describe(), address == _vmAddress)) {
                         _vmAddress = address;
-                        RunInspection(null);
+                        RunInspection(null, identification.ClassIdentifierHint, identification.Describe());
                     }
                 }
             }
@@ -156,7 +156,7 @@ public sealed class ObjectInspectorWindow : IndexedWindow
             ImGui.SameLine(0.0f, itemInnerSpacing);
             if (ImGuiComponents.NormalizedIconButton(FontAwesomeIcon.Sync)) {
                 _vmAddress = _vmSnapshot?.Address ?? _vmAddress;
-                RunInspection(_vmSnapshot?.Class);
+                RunInspection(_vmSnapshot?.Class, null, _vmSnapshot?.Name);
             }
 
             if (ImGui.IsItemHovered()) {

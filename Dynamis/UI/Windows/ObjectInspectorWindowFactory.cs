@@ -50,7 +50,7 @@ public sealed class ObjectInspectorWindowFactory(
         if (message.Snapshot is not null) {
             window.Inspect(message.Snapshot);
         } else {
-            window.Inspect(message.ObjectAddress, message.Class);
+            window.Inspect(message.ObjectAddress, message.Class, message.ClassIdentifierHint, message.Name);
         }
     }
 
@@ -79,6 +79,6 @@ public sealed class ObjectInspectorWindowFactory(
             return;
         }
 
-        CreateWindow()!.Inspect(address, null);
+        CreateWindow()!.Inspect(address, null, null, null);
     }
 }
