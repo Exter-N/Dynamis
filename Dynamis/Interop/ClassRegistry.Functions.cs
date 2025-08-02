@@ -27,7 +27,7 @@ public sealed partial class ClassRegistry
                 FunctionBody = body.Instructions,
             };
 
-            classInfo.SizeFromOuterContext = classInfo.EstimatedSize;
+            classInfo.SizeFromContext = classInfo.EstimatedSize;
 
             _classCache.Add(fnClassName, classInfo);
         }

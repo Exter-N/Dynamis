@@ -47,7 +47,7 @@ public sealed partial class ClassRegistry
             };
 
             classInfo.SetFields(fields);
-            classInfo.SizeFromOuterContext = classInfo.EstimatedSize;
+            classInfo.SizeFromContext = classInfo.EstimatedSize;
 
             _classCache.Add(vtblClassName, classInfo);
         }

@@ -27,10 +27,10 @@ public sealed class ClassInfo
 
     public (string Name, DataYaml.Class Class)[] DataYamlParents { get; set; } = [];
 
-    public uint  EstimatedSize        { get; set; }
-    public uint? SizeFromDtor         { get; set; }
-    public uint? SizeFromManagedType  { get; set; }
-    public uint? SizeFromOuterContext { get; set; }
+    public uint  EstimatedSize       { get; set; }
+    public uint? SizeFromDtor        { get; set; }
+    public uint? SizeFromManagedType { get; set; }
+    public uint? SizeFromContext     { get; set; }
 
     public ImmutableArray<FieldInfo> AllScalars { get; private set; } = [];
     public ImmutableArray<FieldInfo> Fields     { get; private set; } = [];

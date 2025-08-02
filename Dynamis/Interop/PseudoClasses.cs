@@ -9,7 +9,7 @@ public static class PseudoClasses
             Name = name,
             Kind = kind,
             EstimatedSize = size,
-            SizeFromOuterContext = size,
+            SizeFromContext = size,
         };
 
         switch (template) {
@@ -45,7 +45,7 @@ public static class PseudoClasses
             Name = $"{elementClass.Name}[{length}]",
             Kind = ClassKind.Regular,
             EstimatedSize = elementClass.EstimatedSize * unchecked((uint)length),
-            SizeFromOuterContext = elementClass.EstimatedSize * unchecked((uint)length),
+            SizeFromContext = elementClass.EstimatedSize * unchecked((uint)length),
         };
 
         classInfo.SetFields(

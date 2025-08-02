@@ -305,8 +305,8 @@ public sealed class ObjectInspectorWindow : IndexedWindow
                           && @class.SizeFromDtor.Value == @class.EstimatedSize;
         var sizeIsFromManaged = @class.SizeFromManagedType.HasValue
                         && @class.SizeFromManagedType.Value == @class.EstimatedSize;
-        var sizeIsFromCtx = @class.SizeFromOuterContext.HasValue
-                         && @class.SizeFromOuterContext.Value == @class.EstimatedSize;
+        var sizeIsFromCtx = @class.SizeFromContext.HasValue
+                         && @class.SizeFromContext.Value == @class.EstimatedSize;
         if (sizeIsFromCtx) {
             ImGui.SameLine();
             using (ImRaii.PushColor(ImGuiCol.Text, StyleModel.GetFromCurrent().BuiltInColors!.ParsedBlue!.Value)) {
