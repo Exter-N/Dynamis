@@ -108,10 +108,10 @@ public sealed class IpcProvider(
     }
 
     private void InspectObject(nint address)
-        => messageHub.Publish(new InspectObjectMessage(address, null));
+        => messageHub.PublishOnFrameworkThread(new InspectObjectMessage(address, null));
 
     private void InspectRegion(nint address, uint size, string typeName, uint typeTemplateId, uint classKindId)
-        => messageHub.Publish(
+        => messageHub.PublishOnFrameworkThread(
             new InspectObjectMessage(
                 address, PseudoClasses.Generate(typeName, size, (PseudoClasses.Template)typeTemplateId, (ClassKind)classKindId)
             )

@@ -16,23 +16,34 @@ public sealed partial class SymbolApi : IMessageObserver<ConfigurationChangedMes
     private readonly ILogger<SymbolApi>      _logger;
     private readonly ConfigurationContainer  _configuration;
 
-    private bool _initialized;
-    private bool _forceInitialized;
+    private          bool   _initialized;
+    private readonly bool[] _forceInitialized;
 
     public SymbolApi(IDalamudPluginInterface pi, ILogger<SymbolApi> logger, ConfigurationContainer configuration)
     {
+#pragma warning disable CA1861
+        _forceInitialized = pi.GetOrCreateData("Dynamis.SymbolApi.ForceInitialized", () => new[] { false, });
+#pragma warning restore CA1861
         _pi = pi;
         _logger = logger;
         _configuration = configuration;
-        switch (configuration.Configuration.SymbolHandlerMode) {
+        InitializeIfNeeded();
+    }
+
+    private void InitializeIfNeeded()
+    {
+        switch (_configuration.Configuration.SymbolHandlerMode) {
             case SymbolHandlerMode.ForceInitialize:
-                InitSymbolHandler(pi, logger);
+                if (!_forceInitialized[0]) {
+                    InitSymbolHandler(_pi, _logger);
+                    _forceInitialized[0] = true;
+                }
+
                 _initialized = true;
-                _forceInitialized = true;
                 break;
             case SymbolHandlerMode.Default:
                 // On Windows, Dalamud will have initialized this at boot.
-                _initialized = !Util.IsWine();
+                _initialized |= _forceInitialized[0] || !Util.IsWine();
                 break;
         }
     }
@@ -65,18 +76,7 @@ public sealed partial class SymbolApi : IMessageObserver<ConfigurationChangedMes
             return;
         }
 
-        switch (_configuration.Configuration.SymbolHandlerMode) {
-            case SymbolHandlerMode.ForceInitialize:
-                if (!_forceInitialized) {
-                    InitSymbolHandler(_pi, _logger);
-                    _initialized = true;
-                    _forceInitialized = true;
-                }
-                break;
-            case SymbolHandlerMode.Default:
-                _initialized |= !Util.IsWine();
-                break;
-        }
+        InitializeIfNeeded();
     }
 
     [LibraryImport(
@@ -137,7 +137,7 @@ public sealed partial class SymbolApi : IMessageObserver<ConfigurationChangedMes
         return (new(symInfo->Name, 0, (int)symInfo->NameLen), *symInfo, unchecked((nint)displacement));
     }
 
-    public unsafe StackFrame[] StackWalk(Context context, ReadProcessMemoryRoutine? readProcessMemory)
+    public unsafe StackFrame[] StackWalk(ref readonly Context context, ReadProcessMemoryRoutine? readProcessMemory)
     {
         if (!_initialized) {
             return [];
@@ -153,7 +153,7 @@ public sealed partial class SymbolApi : IMessageObserver<ConfigurationChangedMes
         var getModuleBaseRoutine = dbghelp.GetProcAddress("SymGetModuleBase64");
         var trace = new List<StackFrame>();
         var writableContext = stackalloc Context[1];
-        *writableContext = context;
+        new ReadOnlySpan<Context>(in context).CopyTo(new(writableContext, 1));
         var stackFrame = stackalloc StackFrame[1];
         stackFrame->AddrPC.Offset = context.Rip;
         stackFrame->AddrPC.Mode = StackFrame.AddressMode.AddrModeFlat;

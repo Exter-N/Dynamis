@@ -305,7 +305,12 @@ public sealed class Ipfd : IMessageObserver<ConfigurationChangedMessage>, IDispo
 
         _module?.Dispose();
         _module = null;
-        _dtrEntry?.Shown = false;
+        var dtrEntry = _dtrEntry;
+        // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+        // This may be null in case of an initialization failure.
+        if (dtrEntry is not null) {
+            _dtrEntry.Shown = false;
+        }
     }
 
     public void Dispose()

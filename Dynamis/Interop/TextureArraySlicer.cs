@@ -15,7 +15,7 @@ public sealed unsafe class TextureArraySlicer : IDisposable
     /// <remarks> Caching this across frames will cause a crash to desktop. </remarks>
     public nint GetImGuiHandle(Texture* texture, byte sliceIndex)
     {
-        if (texture == null) {
+        if (texture is null) {
             throw new ArgumentNullException(nameof(texture));
         }
 

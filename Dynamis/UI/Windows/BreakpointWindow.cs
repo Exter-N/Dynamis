@@ -290,7 +290,7 @@ public sealed class BreakpointWindow : IndexedWindow
         }
 
         var time = DateTime.Now;
-        var (threadId, context) = _objectInspector.TakeThreadStateSnapshot(e.ExceptionInfo);
+        var (threadId, context) = _objectInspector.TakeThreadStateSnapshot(in *e.ExceptionInfo->ContextRecord);
         var record = new SnapshotRecord(time, threadId, e.Address, @this, typeOfThis, context);
         ThreadPool.QueueUserWorkItem(ProcessSnapshot, record, false);
     }

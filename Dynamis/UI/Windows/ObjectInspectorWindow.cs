@@ -310,7 +310,7 @@ public sealed class ObjectInspectorWindow : IndexedWindow
         if (sizeIsFromCtx) {
             ImGui.SameLine();
             using (ImRaii.PushColor(ImGuiCol.Text, StyleModel.GetFromCurrent().BuiltInColors!.ParsedBlue!.Value)) {
-                ImGui.TextUnformatted("(from outer context)");
+                ImGui.TextUnformatted("(from context)");
             }
         } else if (sizeIsFromDtor && sizeIsFromManaged) {
             ImGui.SameLine();

@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Dynamis.ClientStructs;
 using Dynamis.Interop.Win32;
@@ -69,25 +70,29 @@ public sealed class ObjectInspector(
         snapshot.HighlightColors = colors;
     }
 
-    public unsafe (uint ThreadId, ObjectSnapshot Context) TakeThreadStateSnapshot(ExceptionPointers* exceptionInfo)
+    private static uint EstimateStackSize(nint stackPointer)
+    {
+        ProcessThreadApi.GetCurrentThreadStackLimits(out var stackLowLimit, out var stackHighLimit);
+        return stackPointer >= stackLowLimit && stackPointer <= stackHighLimit
+            ? (uint)(stackHighLimit - stackPointer).ToInt32()
+            : (uint)(MemoryHeuristics.NextPage(stackPointer) - stackPointer).ToInt32();
+    }
+
+    public unsafe (uint ThreadId, ObjectSnapshot Context) TakeThreadStateSnapshot(ref readonly Context contextRecord)
     {
         var threadId = ProcessThreadApi.GetCurrentThreadId();
-        var context = TakeMinimalSnapshot(
-            (nint)exceptionInfo->ContextRecord, classRegistry.FromManagedType(typeof(Context)), false
-        );
+        var contextPointer = (nint)Unsafe.AsPointer(ref Unsafe.AsRef(in contextRecord));
+        var context = TakeMinimalSnapshot(contextPointer, classRegistry.FromManagedType(typeof(Context)), false);
         context.Name = $"Context of thread {threadId}";
         context.Live = false;
 
-        var stackPointer = unchecked((nint)exceptionInfo->ContextRecord->Rsp & -8);
-        var stackDisplacement = unchecked((nuint)((nint)exceptionInfo->ContextRecord->Rsp - stackPointer));
-        ProcessThreadApi.GetCurrentThreadStackLimits(out var stackLowLimit, out var stackHighLimit);
+        var stackPointer = unchecked((nint)contextRecord.Rsp & -8);
+        var stackDisplacement = unchecked((nuint)((nint)contextRecord.Rsp - stackPointer));
         var stack = TakeMinimalSnapshot(
             stackPointer,
             PseudoClasses.Generate(
                 "<Thread Stack>",
-                stackPointer >= stackLowLimit && stackPointer <= stackHighLimit
-                    ? (uint)(stackHighLimit - stackPointer).ToInt32()
-                    : (uint)(MemoryHeuristics.NextPage(stackPointer) - stackPointer).ToInt32(),
+                EstimateStackSize(stackPointer),
                 PseudoClasses.Template.None,
                 ClassKind.ThreadStack
             ),
@@ -101,7 +106,7 @@ public sealed class ObjectInspector(
 
         var reader = new SnapshotReader(null);
         reader.Mount(context);
-        context.StackTrace = symbolApi.StackWalk(*exceptionInfo->ContextRecord, reader);
+        context.StackTrace = symbolApi.StackWalk(in contextRecord, reader);
 
         return (threadId, context);
     }
@@ -206,7 +211,7 @@ public sealed class ObjectInspector(
 
     private void HighlightInstance(ReadOnlySpan<byte> objectBytes, ClassInfo classInfo, Span<byte> byteColors, bool safeReads)
     {
-        foreach (var fieldInfo in classInfo.AllScalars) {
+        foreach (var fieldInfo in classInfo.Fields) {
             switch (fieldInfo.Type) {
                 case FieldType.Boolean:
                 case FieldType.Byte:

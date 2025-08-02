@@ -1,8 +1,9 @@
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Dynamis.Utility;
 
-public static class StringExtensions
+public static partial class StringExtensions
 {
     public static IEnumerable<(string Line, bool AppendEndOfLine)> Lines(this string text, bool appendEndOfLine = false)
     {
@@ -138,4 +139,19 @@ public static class StringExtensions
             yield return value[..^6];
         }
     }
+
+    public static string ToPascalCase(this string value)
+        => SnakeCaseStartOfWord().Replace(value, match => match.Groups[1].Value.ToUpperInvariant());
+
+    public static string ToSnakeCase(this string value)
+        => PascalCaseStartOfWord()
+           .Replace(
+                value, match => match.Index > 0 ? $"_{match.Value.ToLowerInvariant()}" : match.Value.ToLowerInvariant()
+            );
+
+    [GeneratedRegex(@"\p{Lu}")]
+    private static partial Regex PascalCaseStartOfWord();
+
+    [GeneratedRegex(@"(?:^|_)(\p{Ll})")]
+    private static partial Regex SnakeCaseStartOfWord();
 }

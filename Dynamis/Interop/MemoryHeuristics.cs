@@ -34,13 +34,13 @@ public sealed class MemoryHeuristics
     public static IEnumerable<Instruction> GetFunctionInstructions(Decoder decoder)
     {
         var branchTargets = new HashSet<nint>();
-        var shallStop = false;
+        var shallStopAfter = 0UL;
         var buffer = new List<Instruction>(16);
         foreach (var instr in decoder) {
-            if (!shallStop) {
+            if (shallStopAfter == 0UL) {
                 yield return instr;
             } else if (branchTargets.Contains(unchecked((nint)decoder.IP))) {
-                shallStop = false;
+                shallStopAfter = 0UL;
                 foreach (var bufferedInstr in buffer) {
                     yield return bufferedInstr;
                 }
@@ -48,7 +48,7 @@ public sealed class MemoryHeuristics
                 buffer.Clear();
                 yield return instr;
             } else {
-                if (0 == (decoder.IP & 0xF)) {
+                if (decoder.IP >= shallStopAfter) {
                     break;
                 }
 
@@ -66,7 +66,7 @@ public sealed class MemoryHeuristics
                         break;
                     }
 
-                    shallStop = true;
+                    shallStopAfter = (decoder.IP & ~0xFUL) + 0x10UL;
                 }
             }
         }

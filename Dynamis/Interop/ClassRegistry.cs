@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -55,22 +56,25 @@ public sealed partial class ClassRegistry(
         return classInfo;
     }
 
-    public static bool TryGetClientStructsClassName(Type type, out string className)
+    public static bool TryGetClientStructsClassName(Type type, [MaybeNullWhen(false)] out string className)
     {
         var typeName = type.FullName;
         if (typeName is null || type.Assembly != typeof(StdString).Assembly) {
-            className = string.Empty;
+            className = typeName;
             return false;
         }
 
-        if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Pointer<>)) {
-            var pointedType = type.GetGenericArguments()[0];
-            if (!TryGetClientStructsClassName(pointedType, out var pointedTypeName)) {
-                pointedTypeName = pointedType.FullName;
-            }
+        if (!type.IsGenericType) {
+            return TryResolveNativeClassName(typeName, out className);
+        }
 
+        var definition = type.GetGenericTypeDefinition();
+        var arguments = type.GetGenericArguments();
+        if (definition == typeof(Pointer<>)) {
+            var pointedType = arguments[0];
+            TryGetClientStructsClassName(pointedType, out var pointedTypeName);
             if (pointedTypeName is null) {
-                className = string.Empty;
+                className = null;
                 return false;
             }
 
@@ -78,18 +82,47 @@ public sealed partial class ClassRegistry(
             return true;
         }
 
-        className = typeName[25..].Replace(".", "::");
-        return true;
+        typeName = definition.FullName;
+        if (typeName is null) {
+            className = null;
+            return false;
+        }
+
+        var argNames = new string?[arguments.Length];
+        for (var i = 0; i < arguments.Length; ++i) {
+            TryGetClientStructsClassName(arguments[i], out argNames[i]);
+            if (argNames[i] is null) {
+                className = null;
+                return false;
+            }
+        }
+
+        var result = TryResolveNativeClassName(typeName, out className);
+        className += $"<{string.Join(", ", argNames)}>";
+        return result;
+    }
+
+    private static bool TryResolveNativeClassName(string typeName, out string className)
+    {
+        if (typeName.StartsWith("FFXIVClientStructs.FFXIV.")) {
+            className = typeName[25..].Replace(".", "::");
+            return true;
+        }
+
+        if (typeName.StartsWith("FFXIVClientStructs.STD.Std")) {
+            className = "std::" + typeName[26..].ToSnakeCase().Replace(".", "::");
+            return true;
+        }
+
+        className = typeName;
+        return false;
     }
 
     public ClassInfo FromManagedType(Type type)
     {
         var isClientStruct = TryGetClientStructsClassName(type, out var className);
-        if (!isClientStruct) {
-            className = type.FullName;
-            if (className is null) {
-                throw new ArgumentException($"Invalid type {type}");
-            }
+        if (className is null) {
+            throw new ArgumentException($"Invalid type {type}");
         }
 
         ClassInfo? classInfo;
@@ -204,7 +237,54 @@ public sealed partial class ClassRegistry(
     }
 
     private static Type? ResolveClientStructsType(string className)
-        => typeof(StdString).Assembly.GetType("FFXIVClientStructs.FFXIV." + className.Replace("::", "."));
+    {
+        if (className.EndsWith('>')) {
+            if (!className.TryParseGenericType(out var baseClass, out var arguments)) {
+                return null;
+            }
+
+            var resolvedClassName = ResolveClientStructsClassName(baseClass);
+            Type? baseType = null;
+            foreach (var type in typeof(StdString).Assembly.GetExportedTypes()) {
+                if (type.IsGenericTypeDefinition && type.FullName == resolvedClassName
+                                                 && type.GetGenericArguments().Length == 1) {
+                    baseType = type;
+                    break;
+                }
+            }
+
+            if (baseType is null) {
+                return null;
+            }
+
+            var typeArguments = new Type[arguments.Length];
+            var i = 0;
+            foreach (var arg in arguments) {
+                var typeArg = ResolveClientStructsType(arg);
+                if (typeArg is null) {
+                    return null;
+                }
+
+                typeArguments[i++] = typeArg;
+            }
+
+            return baseType.MakeGenericType(typeArguments);
+        }
+
+        if (className.EndsWith('*')) {
+            var elementType = ResolveClientStructsType(className[..^1].TrimEnd());
+            return elementType is null
+                ? null
+                : typeof(Pointer<>).MakeGenericType(elementType);
+        }
+
+        return typeof(StdString).Assembly.GetType(ResolveClientStructsClassName(className));
+    }
+
+    private static string ResolveClientStructsClassName(string className)
+        => className.StartsWith("std::")
+            ? "FFXIVClientStructs.STD.Std" + className.ToPascalCase()
+            : "FFXIVClientStructs.FFXIV." + className.Replace("::", ".");
 
     private IEnumerable<FieldInfo> GetFieldsFromManagedType(Type type, uint offset = 0, string prefix = "",
         bool isInherited = false)

@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -8,6 +9,8 @@ namespace Dynamis.Interop;
 // Parts from FFXIVClientStructs
 public static class ReflectionExtensions
 {
+    private static readonly SearchValues<char> GenericTypePunctuation = SearchValues.Create(',', '<', '>');
+
     public static nint OffsetOf(this ReflFieldInfo field)
     {
         var t = field.ReflectedType;
@@ -82,5 +85,67 @@ public static class ReflectionExtensions
 
         var fields = type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         return fields.Max(t => Math.Min(pack, t.FieldType.PackSize()));
+    }
+
+    public static bool TryParseGenericType(this string fullType, out string baseType, out string[] typeArguments)
+    {
+        var typeArgumentsStart = fullType.IndexOf('<');
+        if (typeArgumentsStart < 0) {
+            baseType = fullType;
+            typeArguments = [];
+            return true;
+        }
+
+        baseType = fullType[..typeArgumentsStart].TrimEnd();
+        if (!fullType.EndsWith('>')) {
+            typeArguments = [];
+            return false;
+        }
+
+        var typeArgumentsList = new List<string>();
+        var end = fullType.Length - 1;
+        var nesting = 0u;
+        var argumentStart = typeArgumentsStart + 1;
+        var punctuation = typeArgumentsStart;
+        while ((punctuation = fullType.AsSpan(punctuation + 1).IndexOfAny(GenericTypePunctuation) + punctuation + 1)
+            != end) {
+            switch (punctuation) {
+                case '<':
+                    ++nesting;
+                    break;
+                case '>':
+                    if (nesting == 0) {
+                        typeArguments = [];
+                        return false;
+                    }
+
+                    --nesting;
+                    break;
+                case ',':
+                    if (nesting == 0) {
+                        typeArgumentsList.Add(fullType[argumentStart..punctuation].Trim());
+                        argumentStart = punctuation + 1;
+                    }
+
+                    break;
+                default:
+                    throw new($"Character in {nameof(GenericTypePunctuation)} not handled by {nameof(TryParseGenericType)}");
+            }
+        }
+
+        if (nesting != 0) {
+            typeArguments = [];
+            return false;
+        }
+
+        if (end > argumentStart) {
+            var lastArgument = fullType[argumentStart..end].Trim();
+            if (lastArgument.Length > 0) {
+                typeArgumentsList.Add(lastArgument);
+            }
+        }
+
+        typeArguments = typeArgumentsList.ToArray();
+        return true;
     }
 }
