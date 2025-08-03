@@ -32,7 +32,6 @@ public sealed class ClassInfo
     public uint? SizeFromManagedType { get; set; }
     public uint? SizeFromContext     { get; set; }
 
-    public ImmutableArray<FieldInfo> AllScalars { get; private set; } = [];
     public ImmutableArray<FieldInfo> Fields     { get; private set; } = [];
 
     public FrozenDictionary<string, FieldInfo> FieldsByName { get; private set; } =
@@ -141,7 +140,6 @@ public sealed class ClassInfo
         fieldList.Sort();
         Fields = [..fieldList.Where(field => !field.Name.Contains('.') && !field.Name.Contains('[')),];
         FieldsByName = Fields.ToFrozenDictionary(field => field.Name, field => field);
-        AllScalars = [..fieldList.Where(field => field.Type.IsScalar()),];
     }
 
     public void SetProperties(IEnumerable<(string Name, MethodInfo? Getter, MethodInfo? Setter)> properties)

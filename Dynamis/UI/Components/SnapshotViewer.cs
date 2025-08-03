@@ -149,53 +149,14 @@ public sealed class SnapshotViewer(
             return null;
         }
 
-        var fields = _vmSnapshot?.Class?.AllScalars.Where(field
-            => offset <= field.Offset && (uint)(offset + length) >= field.Offset + field.Size
-        ) ?? [];
-
-        int? clicked = null;
-        var palette = configuration.Configuration.GetHexViewerPalette();
-        var first = true;
-        foreach (var field in fields) {
-            var elementCount = field.ElementCount;
-            var firstElement = true;
-            for (var i = 0u; i < elementCount; ++i) {
-                var elementOffset = field.Offset + i * field.ElementSize;
-                var annotation = GetValueAnnotation(elementOffset, field.ElementSize, field);
-                if (string.IsNullOrEmpty(annotation)) {
-                    continue;
-                }
-
-                if (firstElement) {
-                    if (first) {
-                        ImGui.SameLine();
-                        first = false;
-                    } else {
-                        ImGui.TextUnformatted(" - ");
-                        ImGui.SameLine(0.0f, 0.0f);
-                    }
-
-                    ImGui.TextUnformatted($"{field.Name.AfterLast('.')}: ");
-                    firstElement = false;
-                } else {
-                    ImGui.TextUnformatted(", ");
-                    ImGui.SameLine(0.0f, 0.0f);
-                }
-
-                ImGui.SameLine(0.0f, 0.0f);
-                using (ImRaii.PushColor(
-                           ImGuiCol.Text, palette[_vmSnapshot!.HighlightColors?[elementOffset] ?? 0]
-                       )) {
-                    ImGui.TextUnformatted(annotation);
-                }
-
-                if (HandleHover(unchecked((int)elementOffset))) {
-                    clicked = unchecked((int)elementOffset);
-                }
-
-                ImGui.SameLine(0.0f, 0.0f);
-            }
+        var @class = _vmSnapshot?.Class;
+        if (@class is null) {
+            return null;
         }
+
+        var first = true;
+        var palette = configuration.Configuration.GetHexViewerPalette();
+        var clicked = AnnotateSnapshotRow(offset, length, @class, 0u, palette, ref first);
 
         if (!first || _vmSnapshot?.HighlightColors is null) {
             return clicked;
@@ -212,7 +173,7 @@ public sealed class SnapshotViewer(
             return clicked;
         }
 
-        var ptrAnnotation = GetValueAnnotation(unchecked((uint)offset), unchecked((uint)length), null);
+        var ptrAnnotation = GetValueAnnotation(unchecked((uint)offset), unchecked((uint)length), null, 0u);
         if (!string.IsNullOrEmpty(ptrAnnotation)) {
             ImGui.SameLine();
             ImGui.TextUnformatted($"Unk_{offset:X}: ");
@@ -221,7 +182,7 @@ public sealed class SnapshotViewer(
                 ImGui.TextUnformatted(ptrAnnotation);
             }
 
-            if (HandleHover(offset)) {
+            if (HandleAnnotationHover(offset)) {
                 clicked = offset;
             }
 
@@ -229,38 +190,116 @@ public sealed class SnapshotViewer(
         }
 
         return clicked;
-
-        bool HandleHover(int fieldOffset)
-        {
-            var min = ImGui.GetItemRectMin();
-            var max = ImGui.GetItemRectMax();
-            if (!ImGui.IsMouseHoveringRect(min, max)) {
-                return false;
-            }
-
-            ImGui.SameLine(0.0f, 0.0f);
-            ImGui.SetCursorScreenPos(min);
-            var itemClicked = ImGui.InvisibleButton($"###A{fieldOffset:X}", max - min);
-            if (ImGui.IsItemHovered()) {
-                OnSnapshotHover(fieldOffset, ImGuiComponents.HexViewerPart.Annotation, itemClicked);
-            }
-
-            return itemClicked;
-        }
     }
 
-    private string GetValueAnnotation(uint offset, uint size, FieldInfo? field)
+    private int? AnnotateSnapshotRow(int offset, int length, ClassInfo @class, uint classOffset, uint[] palette,
+        ref bool first)
+    {
+        var fields = @class.Fields.Where(field
+            => offset < field.Offset + field.Size && field.Offset < offset + length
+        );
+
+        int? clicked = null;
+        foreach (var field in fields) {
+            var elementCount = field.ElementCount;
+            var startElement = unchecked((uint)Math.Max(0, (offset - (int)field.Offset) / (int)field.ElementSize));
+            var endElement = unchecked((uint)Math.Min(
+                elementCount,
+                (offset + length + (int)field.ElementSize - 1 - (int)field.Offset) / (int)field.ElementSize
+            ));
+            var firstElement = true;
+            for (var i = startElement; i < endElement; ++i) {
+                var elementOffset = field.Offset + i * field.ElementSize;
+                if (field.ElementClass is not null) {
+                    var subClicked = AnnotateSnapshotRow(
+                        offset - unchecked((int)elementOffset), length, field.ElementClass, classOffset + elementOffset,
+                        palette,                                ref first
+                    );
+                    if (subClicked is not null) {
+                        clicked = subClicked + unchecked((int)elementOffset);
+                    }
+
+                    continue;
+                }
+
+                var annotation = GetValueAnnotation(classOffset + elementOffset, field.ElementSize, field, classOffset);
+                if (string.IsNullOrEmpty(annotation)) {
+                    continue;
+                }
+
+                if (firstElement) {
+                    if (first) {
+                        ImGui.SameLine();
+                        first = false;
+                    } else {
+                        ImGui.TextUnformatted(" - ");
+                        ImGui.SameLine(0.0f, 0.0f);
+                    }
+
+                    if (elementCount > 1 && (startElement != 0 || endElement != elementCount)) {
+                        ImGui.TextUnformatted(
+                            endElement == startElement + 1
+                                ? $"{field.Name.AfterLast('.')}[{startElement}]: "
+                                : $"{field.Name.AfterLast('.')}[{startElement}..{endElement}]: "
+                        );
+                    } else {
+                        ImGui.TextUnformatted($"{field.Name.AfterLast('.')}: ");
+                    }
+
+                    firstElement = false;
+                } else {
+                    ImGui.TextUnformatted(", ");
+                    ImGui.SameLine(0.0f, 0.0f);
+                }
+
+                ImGui.SameLine(0.0f, 0.0f);
+                using (ImRaii.PushColor(
+                           ImGuiCol.Text, palette[_vmSnapshot!.HighlightColors?[elementOffset + classOffset] ?? 0]
+                       )) {
+                    ImGui.TextUnformatted(annotation);
+                }
+
+                if (HandleAnnotationHover(unchecked((int)(elementOffset + classOffset)))) {
+                    clicked = unchecked((int)elementOffset);
+                }
+
+                ImGui.SameLine(0.0f, 0.0f);
+            }
+        }
+
+        return clicked;
+    }
+
+    private bool HandleAnnotationHover(int fieldOffset)
+    {
+        var min = ImGui.GetItemRectMin();
+        var max = ImGui.GetItemRectMax();
+        if (!ImGui.IsMouseHoveringRect(min, max)) {
+            return false;
+        }
+
+        ImGui.SameLine(0.0f, 0.0f);
+        ImGui.SetCursorScreenPos(min);
+        var itemClicked = ImGui.InvisibleButton($"###A{fieldOffset:X}", max - min);
+        if (ImGui.IsItemHovered()) {
+            OnSnapshotHover(fieldOffset, ImGuiComponents.HexViewerPart.Annotation, itemClicked);
+        }
+
+        return itemClicked;
+    }
+
+    private string GetValueAnnotation(uint offset, uint size, FieldInfo? field, uint classOffset)
     {
         if (_vmSnapshot is null) {
             return string.Empty;
         }
 
-        var valueSpan = _vmSnapshot.Data.AsSpan(unchecked((int)offset), unchecked((int)size));
         object value;
         FieldType type;
         if (field is not null) {
             value = _vmSnapshot.Class!.GetFieldValue(
-                field, _vmSnapshot.Data, (offset - field.Offset) / field.ElementSize
+                field, _vmSnapshot.Data.AsSpan(unchecked((int)classOffset)),
+                (offset - field.Offset - classOffset) / field.ElementSize
             );
             if (field.ManagedType is not null && field.ManagedType.IsEnum) {
                 value = Enum.GetName(field.ManagedType, value) ?? value;
@@ -268,6 +307,7 @@ public sealed class SnapshotViewer(
 
             type = field.Type;
         } else {
+            var valueSpan = _vmSnapshot.Data.AsSpan(unchecked((int)offset), unchecked((int)size));
             value = MemoryMarshal.Read<nint>(valueSpan);
             type = FieldType.Pointer;
         }
@@ -306,7 +346,7 @@ public sealed class SnapshotViewer(
 
     private static ValuePath GetValuePath(ClassInfo? @class, uint offset)
     {
-        var field = @class?.AllScalars
+        var field = @class?.Fields
                            .LastOrDefault(field => offset >= field.Offset && offset < field.Offset + field.Size);
         if (field is null) {
             return ValuePath.Default;

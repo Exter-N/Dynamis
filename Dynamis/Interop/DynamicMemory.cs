@@ -50,10 +50,10 @@ public readonly record struct DynamicMemory(nint Address, int Length, Type Eleme
     }
 
     private static unsafe DynamicMemory FromMemory<T>(Memory<T> memory) where T : unmanaged
-        => new(memory.GetAddress(), memory.Length, typeof(T), true);
+        => new(memory.Length > 0 ? memory.GetAddress() : 0, memory.Length, typeof(T), true);
 
     private static unsafe DynamicMemory FromReadOnlyMemory<T>(ReadOnlyMemory<T> memory) where T : unmanaged
-        => new(memory.GetAddress(), memory.Length, typeof(T), false);
+        => new(memory.Length > 0 ? memory.GetAddress() : 0, memory.Length, typeof(T), false);
 
     private static unsafe Memory<T> ToMemory<T>(DynamicMemory memory) where T : unmanaged
         => new BorrowedUnmanagedMemory<T>((T*)memory.Address, memory.Length).Memory;
