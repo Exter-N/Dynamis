@@ -27,7 +27,7 @@ public sealed unsafe class ConstantBufferInspector(ImGuiComponents imGuiComponen
             () => PseudoClasses.Generate(
                 "<Constant Buffer Contents>", (uint)pointer->ByteSize, PseudoClasses.Template.SingleArray,
                 ClassKind.ConstantBufferContents
-            )
+            ), null
         );
     }
 

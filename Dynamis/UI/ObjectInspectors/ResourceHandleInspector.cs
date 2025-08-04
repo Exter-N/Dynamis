@@ -52,12 +52,13 @@ public sealed unsafe class ResourceHandleInspector : IObjectInspector<ResourceHa
 
         ImGui.TextUnformatted("Resource Contents:");
         ImGui.SameLine(0.0f, ImGui.GetStyle().ItemInnerSpacing.X);
+        var fileName = pointer->FileName.ToString();
         _imGuiComponents.DrawPointer(
             (nint)data,
             () => PseudoClasses.Generate(
-                $"<Resource Contents> {pointer->FileName}", (uint)length, PseudoClasses.Template.None,
+                $"<Resource Contents> {fileName}", (uint)length, PseudoClasses.Template.None,
                 ClassKind.ResourceContents
-            )
+            ), () => $"Contents of {fileName}"
         );
 
         if (ImGui.Button("Save to File")) {

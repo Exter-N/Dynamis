@@ -78,12 +78,12 @@ public sealed partial class ImGuiComponents(
         }
     }
 
-    public void DrawPointer(nint pointer, Func<ClassInfo?>? @class)
+    public void DrawPointer(nint pointer, Func<ClassInfo?>? @class, Func<string?>? name)
     {
         using (ImRaii.PushFont(UiBuilder.MonoFont, pointer != 0)) {
             if (ImGui.Selectable(pointer == 0 ? "nullptr" : $"0x{pointer:X}")) {
                 contextMenu.Open(
-                    new PointerContextMenu(messageHub, pointer, moduleAddressResolver.Resolve(pointer), @class)
+                    new PointerContextMenu(messageHub, pointer, moduleAddressResolver.Resolve(pointer), @class, name)
                 );
             }
         }
@@ -149,13 +149,14 @@ public sealed partial class ImGuiComponents(
         MessageHub messageHub,
         nint pointer,
         ModuleAddress? moduleAddress,
-        Func<ClassInfo?>? @class) : IDrawable
+        Func<ClassInfo?>? @class,
+        Func<string?>? name) : IDrawable
     {
         public bool Draw()
         {
             var ret = false;
             if (pointer != 0 && ImGui.Selectable("Inspect object")) {
-                messageHub.Publish(new InspectObjectMessage(pointer, @class?.Invoke(), null, null));
+                messageHub.Publish(new InspectObjectMessage(pointer, @class?.Invoke(), null, name?.Invoke()));
                 ret = true;
             }
 

@@ -60,6 +60,7 @@ Minimum API version: `(1, 3, 0)`.
 
 ```csharp
 void "Dynamis.ImGuiDrawPointer.V1"(nint pointer);
+void "Dynamis.ImGuiDrawPointer.V2"(nint pointer, Func<string?>? name);
 ```
 
 Draws a pointer in hexadecimal in a monospace font (or "nullptr").
@@ -72,17 +73,18 @@ On click, offers several actions, such as copying the address to the clipboard, 
 
 If Dynamis' API is unavailable, a minimal fallback implementation **SHOULD** be used by the caller instead.
 
-Minimum API version: `(1, 0, 0)`.
+Minimum API version: `(1, 0, 0)` for v1, `(1, 5, 0)` for v2.
 
 ```csharp
 Action<nint> "Dynamis.GetImGuiDrawPointerDelegate.V1"();
+Action<nint, Func<string?>?> "Dynamis.GetImGuiDrawPointerDelegate.V2"();
 ```
 
 Obtains a delegate for the `ImGuiDrawPointer` function, to avoid the IPC overhead if you want to draw a lot of pointers (in a list/table for example).
 
 The obtained delegate either **MUST NOT** be cached across frames, or **MUST** be discarded in response to the `ApiDisposing` event, in order not to cause plugin unloading issues.
 
-Minimum API version: `(1, 3, 0)`.
+Minimum API version: `(1, 3, 0)` for v1, `(1, 5, 0)` for v2.
 
 ### `ImGuiDrawPointerTooltipDetails` function
 

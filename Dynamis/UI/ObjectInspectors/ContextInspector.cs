@@ -19,11 +19,11 @@ public sealed class ContextInspector(ImGuiComponents imGuiComponents, ModuleAddr
     {
         ImGui.TextUnformatted("Instruction Pointer: ");
         ImGui.SameLine(0.0f, ImGui.GetStyle().ItemInnerSpacing.X);
-        imGuiComponents.DrawPointer((nint)pointer->Rip, null);
+        imGuiComponents.DrawPointer((nint)pointer->Rip, null, null);
 
         ImGui.TextUnformatted("This Argument: ");
         ImGui.SameLine(0.0f, ImGui.GetStyle().ItemInnerSpacing.X);
-        imGuiComponents.DrawPointer((nint)pointer->Rcx, null);
+        imGuiComponents.DrawPointer((nint)pointer->Rcx, null, null);
 
         ImGui.TextUnformatted("Stack Pointer: ");
         ImGui.SameLine(0.0f, ImGui.GetStyle().ItemInnerSpacing.X);

@@ -17,7 +17,7 @@ public sealed class IpcProvider(
     : IHostedService
 {
     public const uint  ApiMajorVersion = 1;
-    public const uint  ApiMinorVersion = 4;
+    public const uint  ApiMinorVersion = 5;
     public const ulong ApiFeatureFlags = SmaApiFeatureFlag;
 
 #if WITH_SMA
@@ -33,8 +33,10 @@ public sealed class IpcProvider(
     private ICallGateProvider<nint, string?, object?>?                           _inspectObjectV2;
     private ICallGateProvider<nint, uint, string, uint, uint, object?>?          _inspectRegionV1;
     private ICallGateProvider<nint, uint, string, uint, uint, string?, object?>? _inspectRegionV2;
-    private ICallGateProvider<nint, object?>?                                    _imGuiDrawPointer;
-    private ICallGateProvider<Action<nint>>?                                     _getImGuiDrawPointerDelegate;
+    private ICallGateProvider<nint, object?>?                                    _imGuiDrawPointerV1;
+    private ICallGateProvider<nint, Func<string?>?, object?>?                    _imGuiDrawPointerV2;
+    private ICallGateProvider<Action<nint>>?                                     _getImGuiDrawPointerDelegateV1;
+    private ICallGateProvider<Action<nint, Func<string?>?>>?                     _getImGuiDrawPointerDelegateV2;
     private ICallGateProvider<nint, object?>?                                    _imGuiDrawPointerTooltipDetails;
     private ICallGateProvider<nint, (string, Type?, uint, uint)>?                _getClass;
     private ICallGateProvider<nint, string?, Type?, (bool, uint)>?               _isInstanceOf;
@@ -49,15 +51,20 @@ public sealed class IpcProvider(
             out _getApiVersion, "Dynamis.GetApiVersion", () => (ApiMajorVersion, ApiMinorVersion, ApiFeatureFlags)
         );
 
-        RegisterAction(out _inspectObjectV1,  $"Dynamis.InspectObject.V1",              InspectObjectV1);
-        RegisterAction(out _inspectObjectV2,  $"Dynamis.InspectObject.V2",              InspectObjectV2);
-        RegisterAction(out _inspectRegionV1,  $"Dynamis.InspectRegion.V1",              InspectRegionV1);
-        RegisterAction(out _inspectRegionV2,  $"Dynamis.InspectRegion.V2",              InspectRegionV2);
-        RegisterAction(out _imGuiDrawPointer, $"Dynamis.{nameof(ImGuiDrawPointer)}.V1", ImGuiDrawPointer);
+        RegisterAction(out _inspectObjectV1,    $"Dynamis.InspectObject.V1",    InspectObjectV1);
+        RegisterAction(out _inspectObjectV2,    $"Dynamis.InspectObject.V2",    InspectObjectV2);
+        RegisterAction(out _inspectRegionV1,    $"Dynamis.InspectRegion.V1",    InspectRegionV1);
+        RegisterAction(out _inspectRegionV2,    $"Dynamis.InspectRegion.V2",    InspectRegionV2);
+        RegisterAction(out _imGuiDrawPointerV1, $"Dynamis.ImGuiDrawPointer.V1", ImGuiDrawPointerV1);
+        RegisterAction(out _imGuiDrawPointerV2, $"Dynamis.ImGuiDrawPointer.V2", ImGuiDrawPointerV2);
 
         RegisterFunc(
-            out _getImGuiDrawPointerDelegate, $"Dynamis.Get{nameof(ImGuiDrawPointer)}Delegate.V1",
-            () => ImGuiDrawPointer
+            out _getImGuiDrawPointerDelegateV1, $"Dynamis.GetImGuiDrawPointerDelegate.V1",
+            () => ImGuiDrawPointerV1
+        );
+        RegisterFunc(
+            out _getImGuiDrawPointerDelegateV2, $"Dynamis.GetImGuiDrawPointerDelegate.V2",
+            () => ImGuiDrawPointerV2
         );
 
         RegisterAction(
@@ -97,9 +104,11 @@ public sealed class IpcProvider(
 
         UnregisterAction(ref _imGuiDrawPointerTooltipDetails);
 
-        UnregisterFunc(ref _getImGuiDrawPointerDelegate);
+        UnregisterFunc(ref _getImGuiDrawPointerDelegateV2);
+        UnregisterFunc(ref _getImGuiDrawPointerDelegateV1);
 
-        UnregisterAction(ref _imGuiDrawPointer);
+        UnregisterAction(ref _imGuiDrawPointerV2);
+        UnregisterAction(ref _imGuiDrawPointerV1);
         UnregisterAction(ref _inspectRegionV2);
         UnregisterAction(ref _inspectRegionV1);
         UnregisterAction(ref _inspectObjectV2);
@@ -132,8 +141,11 @@ public sealed class IpcProvider(
             )
         );
 
-    private void ImGuiDrawPointer(nint pointer)
-        => imGuiComponents.DrawPointer(pointer, null);
+    private void ImGuiDrawPointerV1(nint pointer)
+        => imGuiComponents.DrawPointer(pointer, null, null);
+
+    private void ImGuiDrawPointerV2(nint pointer, Func<string?>? name)
+        => imGuiComponents.DrawPointer(pointer, null, name);
 
     private void ImGuiDrawPointerTooltipDetails(nint pointer)
         => imGuiComponents.DrawPointerTooltipDetails(pointer, null);

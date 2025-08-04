@@ -192,7 +192,7 @@ public sealed class BreakpointWindow : IndexedWindow
                 ImGuiComponents.DrawCopyable($"{record.ThreadId}", false);
 
                 ImGui.TableNextColumn();
-                _imGuiComponents.DrawPointer(record.ExceptionAddress, null);
+                _imGuiComponents.DrawPointer(record.ExceptionAddress, null, null);
 
                 ImGui.TableNextColumn();
                 ImGuiComponents.DrawCopyable(
