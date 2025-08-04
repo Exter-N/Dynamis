@@ -113,6 +113,12 @@ public static class StructPointerThunkGenerator
             }
         }
 
+        if (type.IsByRefLike) {
+            throw new NotSupportedException(
+                $"Unsupported parameter/return type for pointer thunk generation: {type.FullName}"
+            );
+        }
+
         if (type.IsPointer || type.IsByRef) {
             var outerType = GetCsPointerType(type);
             return outerType == typeof(nint)
@@ -124,11 +130,23 @@ public static class StructPointerThunkGenerator
     }
 
     private static Type GetCsPointerType(Type type)
-        => type == typeof(void*)
-            ? typeof(nint)
-            : type.IsPointer || type.IsByRef
-                ? typeof(Pointer<>).MakeGenericType(GetCsPointerType(type.GetElementType()!))
-                : type;
+    {
+        if (type == typeof(void*)) {
+            return typeof(nint);
+        }
+
+        if (type.IsPointer || type.IsByRef) {
+            return typeof(Pointer<>).MakeGenericType(GetCsPointerType(type.GetElementType()!));
+        }
+
+        if (!type.IsValueType) {
+            throw new NotSupportedException(
+                $"Unsupported type within pointer/reference for pointer thunk generation: {type.FullName}"
+            );
+        }
+
+        return type;
+    }
 
     private abstract class OuterTypeInfo
     {

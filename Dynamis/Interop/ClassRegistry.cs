@@ -417,17 +417,37 @@ public sealed partial class ClassRegistry(
                 continue;
             }
 
-            var getter = property.GetGetMethod() is
-            {
-            } get
-                ? StructPointerThunkGenerator.GeneratePointerThunk(get)
-                : null;
-            var setter = property.GetSetMethod() is
-            {
-            } set
-                ? StructPointerThunkGenerator.GeneratePointerThunk(set)
-                : null;
-            yield return (property.Name, getter, setter);
+            MethodInfo? getter;
+            try {
+                getter = property.GetGetMethod() is
+                {
+                } get
+                    ? StructPointerThunkGenerator.GeneratePointerThunk(get)
+                    : null;
+            } catch (NotSupportedException ex) {
+                logger.LogWarning(
+                    ex, "Cannot generate pointer thunk for getter {Type}.{Property}", type.FullName, property.Name
+                );
+                getter = null;
+            }
+
+            MethodInfo? setter;
+            try {
+                setter = property.GetSetMethod() is
+                {
+                } set
+                    ? StructPointerThunkGenerator.GeneratePointerThunk(set)
+                    : null;
+            } catch (NotSupportedException ex) {
+                logger.LogWarning(
+                    ex, "Cannot generate pointer thunk for setter {Type}.{Property}", type.FullName, property.Name
+                );
+                setter = null;
+            }
+
+            if (getter is not null || setter is not null) {
+                yield return (property.Name, getter, setter);
+            }
         }
     }
 
@@ -442,7 +462,17 @@ public sealed partial class ClassRegistry(
                 continue;
             }
 
-            yield return (method.Name, StructPointerThunkGenerator.GeneratePointerThunk(method));
+            MethodInfo thunk;
+            try {
+                thunk = StructPointerThunkGenerator.GeneratePointerThunk(method);
+            } catch (NotSupportedException ex) {
+                logger.LogWarning(
+                    ex, "Cannot generate pointer thunk for method {Type}.{Method}", type.FullName, method.Name
+                );
+                continue;
+            }
+
+            yield return (method.Name, thunk);
         }
     }
 
