@@ -109,7 +109,7 @@ public static class ReflectionExtensions
         var punctuation = typeArgumentsStart;
         while ((punctuation = fullType.AsSpan(punctuation + 1).IndexOfAny(GenericTypePunctuation) + punctuation + 1)
             != end) {
-            switch (punctuation) {
+            switch (fullType[punctuation]) {
                 case '<':
                     ++nesting;
                     break;
