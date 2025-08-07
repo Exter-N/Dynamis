@@ -6,6 +6,7 @@ using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
 using Dalamud.Utility;
+using Dynamis.ClientStructs;
 using Dynamis.Configuration;
 using Dynamis.Interop.Ipfd;
 using Dynamis.Messaging;
@@ -249,6 +250,41 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
 
         ImGui.SameLine(0.0f, innerSpacing);
         ImGui.TextUnformatted("ClientStructs' data.yml");
+
+        DrawDisableLogCategoryCheckbox(typeof(DataYamlContainer), "Silence data.yml-related logs");
+    }
+
+    private void DrawDisableLogCategoryCheckbox(Type type, ImU8String label)
+    {
+        var typeName = type.FullName;
+        if (typeName is null) {
+            return;
+        }
+
+        var configuration = _configuration.Configuration;
+        var disabledCategories = configuration.DisabledLogCategories;
+        var index = Array.IndexOf(configuration.DisabledLogCategories, typeName);
+        var disabled = index >= 0;
+        if (ImGui.Checkbox(label, ref disabled)) {
+            if (disabled) {
+                if (index >= 0) {
+                    return;
+                }
+
+                Array.Resize(ref disabledCategories, disabledCategories.Length + 1);
+                disabledCategories[^1] = typeName;
+            } else {
+                if (index < 0) {
+                    return;
+                }
+
+                disabledCategories[index] = disabledCategories[^1];
+                Array.Resize(ref disabledCategories, disabledCategories.Length - 1);
+            }
+
+            configuration.DisabledLogCategories = disabledCategories;
+            _configuration.Save(nameof(configuration.DisabledLogCategories));
+        }
     }
 
     private void DrawColors()

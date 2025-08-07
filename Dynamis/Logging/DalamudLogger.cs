@@ -8,6 +8,8 @@ namespace Dynamis.Logging;
 internal sealed class DalamudLogger(string name, Lazy<IDalamudLoggingConfiguration> configuration, IPluginLog pluginLog)
     : ILogger
 {
+    private readonly string _shortName = ToShortName(name);
+
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull
         => null;
 
@@ -21,30 +23,44 @@ internal sealed class DalamudLogger(string name, Lazy<IDalamudLoggingConfigurati
             return;
         }
 
-        if (logLevel == LogLevel.Trace) {
-            pluginLog.Verbose($"[{name}]{{{(int)logLevel}}} {state}");
-        } else if (logLevel == LogLevel.Debug) {
-            pluginLog.Debug($"[{name}]{{{(int)logLevel}}} {state}");
-        } else if (logLevel == LogLevel.Information) {
-            pluginLog.Information($"[{name}]{{{(int)logLevel}}} {state}");
-        } else {
-            StringBuilder sb = new();
-            sb.AppendLine($"[{name}]{{{(int)logLevel}}} {state}: {exception?.Message}");
-            sb.AppendLine(exception?.StackTrace);
-            var innerException = exception?.InnerException;
-            while (innerException is not null) {
-                sb.AppendLine($"InnerException {innerException}: {innerException.Message}");
-                sb.AppendLine(innerException.StackTrace);
-                innerException = innerException.InnerException;
-            }
-
-            if (logLevel == LogLevel.Warning) {
-                pluginLog.Warning(sb.ToString());
-            } else if (logLevel == LogLevel.Error) {
-                pluginLog.Error(sb.ToString());
-            } else {
-                pluginLog.Fatal(sb.ToString());
+        var sb = new StringBuilder();
+        sb.Append($"[{_shortName}]{{{(int)logLevel}}} {state}");
+        if (exception is not null) {
+            sb.AppendLine($": {exception.Message}");
+            sb.AppendLine(exception.StackTrace);
+            for (var inner = exception.InnerException; inner is not null; inner = inner.InnerException) {
+                sb.AppendLine($"Inner exception: {inner.Message}");
+                sb.AppendLine(inner.StackTrace);
             }
         }
+
+        switch (logLevel) {
+            case LogLevel.Trace:
+                pluginLog.Verbose(sb.ToString());
+                break;
+            case LogLevel.Debug:
+                pluginLog.Debug(sb.ToString());
+                break;
+            case LogLevel.Information:
+                pluginLog.Information(sb.ToString());
+                break;
+            case LogLevel.Warning:
+                pluginLog.Warning(sb.ToString());
+                break;
+            case LogLevel.Error:
+                pluginLog.Error(sb.ToString());
+                break;
+            case LogLevel.Critical:
+                pluginLog.Fatal(sb.ToString());
+                break;
+        }
+    }
+
+    private static string ToShortName(string name)
+    {
+        var shortName = name.Split(".", StringSplitOptions.RemoveEmptyEntries).Last();
+        return shortName.Length > 15
+            ? shortName[..7] + "…" + shortName[^7..]
+            : shortName.PadLeft(15, ' ');
     }
 }

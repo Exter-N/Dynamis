@@ -21,16 +21,7 @@ public sealed class DalamudLoggingProvider : ILoggerProvider
     }
 
     public ILogger CreateLogger(string categoryName)
-    {
-        var catName = categoryName.Split(".", StringSplitOptions.RemoveEmptyEntries).Last();
-        if (catName.Length > 15) {
-            catName = catName[..7] + "…" + catName[^7..];
-        } else {
-            catName = catName.PadLeft(15, ' ');
-        }
-
-        return _loggers.GetOrAdd(catName, name => new(name, _configuration, _pluginLog));
-    }
+        => _loggers.GetOrAdd(categoryName, name => new(name, _configuration, _pluginLog));
 
     public void Dispose()
     {

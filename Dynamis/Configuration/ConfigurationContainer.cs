@@ -35,5 +35,6 @@ public sealed class ConfigurationContainer : IDalamudLoggingConfiguration
     }
 
     public bool IsEnabled(string name, LogLevel logLevel)
-        => (int)logLevel >= Configuration.MinimumLogLevel;
+        => (int)logLevel >= Configuration.MinimumLogLevel
+        && Array.IndexOf(Configuration.DisabledLogCategories, name) < 0;
 }
