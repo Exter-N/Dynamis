@@ -293,6 +293,13 @@ public sealed class Ipfd : IMessageObserver<ConfigurationChangedMessage>, IDispo
 
     private void FreeModuleNoLock(bool force)
     {
+        if (_breakpoints is null) {
+            Plugin.Log?.Error(
+                $"{nameof(Ipfd)}.{nameof(FreeModuleNoLock)}: {nameof(_breakpoints)} is null, this should not be possible."
+            );
+            return;
+        }
+
         if (force) {
             foreach (var breakpoint in _breakpoints) {
                 breakpoint?.Dispose();
