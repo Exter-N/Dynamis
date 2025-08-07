@@ -1,15 +1,13 @@
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Style;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
-using Dynamis.Configuration;
 using Dynamis.Interop;
 using Dynamis.Interop.Ipfd;
 using Dynamis.Interop.Win32;
 using Dynamis.Messaging;
 using Dynamis.Utility;
-using ImGuiNET;
-using Microsoft.Extensions.Logging;
 
 namespace Dynamis.UI.Windows;
 

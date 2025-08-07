@@ -1,12 +1,12 @@
 using System.Numerics;
 using System.Text;
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Utility.Raii;
 using Dynamis.Interop;
 using Dynamis.Messaging;
 using Dynamis.UI.Windows;
 using Iced.Intel;
-using ImGuiNET;
 
 namespace Dynamis.UI.ObjectInspectors;
 

@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
+using Dalamud.Utility;
 
 namespace Dynamis.Utility;
 
@@ -68,8 +69,7 @@ public static class SeStringUtility
         => SeString.CreateItemLink(itemId, isHq, displayNameOverride);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static SeString ItemLink(uint itemId, ItemPayload.ItemKind kind = ItemPayload.ItemKind.Normal,
-        string? displayNameOverride = null)
+    public static SeString ItemLink(uint itemId, ItemKind kind = ItemKind.Normal, string? displayNameOverride = null)
         => SeString.CreateItemLink(itemId, kind, displayNameOverride);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

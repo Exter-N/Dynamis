@@ -1,17 +1,15 @@
-﻿using System.Numerics;
-using System.Reflection;
+﻿using System.Reflection;
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Style;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
-using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using Dalamud.Utility;
 using Dynamis.Configuration;
 using Dynamis.Interop.Ipfd;
 using Dynamis.Messaging;
 using Dynamis.Utility;
-using ImGuiNET;
 using Microsoft.Extensions.Logging;
 using static Dynamis.Utility.ChatGuiUtility;
 using static Dynamis.Utility.SeStringUtility;
@@ -203,7 +201,7 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
             using (ImRaii.Disabled()) {
                 var dummy = "Automatically download from GitHub";
                 ImGui.InputText(
-                    "###dataYamlPathDummy", ref dummy, (uint)dummy.Length + 1, ImGuiInputTextFlags.ReadOnly
+                    "###dataYamlPathDummy", ref dummy, dummy.Length + 1, ImGuiInputTextFlags.ReadOnly
                 );
             }
 

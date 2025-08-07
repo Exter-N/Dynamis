@@ -3,13 +3,14 @@ using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.Management.Automation;
 using System.Management.Automation.Host;
+using System.Numerics;
 using System.Reflection;
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Style;
 using Dalamud.Interface.Utility.Raii;
 using Dynamis.UI.Components;
 using Dynamis.Utility;
-using ImGuiNET;
 
 namespace Dynamis.UI.PsHost.Input;
 
@@ -121,7 +122,7 @@ public sealed class FormPrompt(
     }
 
     private static FormItem CompileScalar<T>(FieldDescription description)
-        where T : unmanaged
+        where T : unmanaged, IBinaryNumber<T>
     {
         var label = $"{description.Label.ParseAccelerator().Label}###{description.Name}";
         T initialValue;

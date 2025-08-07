@@ -1,8 +1,8 @@
 #if WITH_SMA
 using System.Text;
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility.Raii;
 using Dynamis.Utility;
-using ImGuiNET;
 
 namespace Dynamis.UI.PsHost.Input;
 
@@ -36,7 +36,7 @@ public class LinePrompt : IPrompt<string>
         ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
 
         if (_finished) {
-            DrawInput(_value, (uint)_value.Length, ImGuiInputTextFlags.ReadOnly);
+            DrawInput(_value, ImGuiInputTextFlags.ReadOnly);
             return true;
         }
 
@@ -45,7 +45,7 @@ public class LinePrompt : IPrompt<string>
             focus = false;
         }
 
-        if (!DrawInput(_value, (uint)_value.Length, ImGuiInputTextFlags.EnterReturnsTrue)) {
+        if (!DrawInput(_value, ImGuiInputTextFlags.EnterReturnsTrue)) {
             return false;
         }
 
@@ -53,23 +53,23 @@ public class LinePrompt : IPrompt<string>
         return true;
     }
 
-    protected virtual bool DrawInput(byte[] buffer, uint length, ImGuiInputTextFlags flags)
-        => ImGui.InputText("###LinePrompt", buffer, length, flags);
+    protected virtual bool DrawInput(byte[] buffer, ImGuiInputTextFlags flags)
+        => ImGui.InputText("###LinePrompt", buffer, flags);
 
     public void Cancel()
         => _finished = true;
 
-    protected static unsafe void SetText(ImGuiInputTextCallbackData* data, ReadOnlySpan<char> text)
+    protected static void SetText(scoped ref ImGuiInputTextCallbackData data, ReadOnlySpan<char> text)
     {
-        data->BufTextLen = text.WriteNullTerminated(new Span<byte>(data->Buf, data->BufSize));
-        data->BufDirty = 1;
+        data.BufTextLen = text.WriteNullTerminated(data.BufSpan);
+        data.BufDirty = 1;
     }
 
-    protected static unsafe void MoveCursor(ImGuiInputTextCallbackData* data, int position)
+    protected static void MoveCursor(scoped ref ImGuiInputTextCallbackData data, int position)
     {
-        data->CursorPos = position;
-        data->SelectionStart = position;
-        data->SelectionEnd = position;
+        data.CursorPos = position;
+        data.SelectionStart = position;
+        data.SelectionEnd = position;
     }
 }
 #endif

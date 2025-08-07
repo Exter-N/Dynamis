@@ -1,3 +1,4 @@
+using Dalamud.Bindings.ImGui;
 using Dynamis.Utility;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Kernel;
 using SharpDX.Direct3D;
@@ -13,7 +14,7 @@ public sealed unsafe class TextureArraySlicer : IDisposable
     private readonly ShortLivedCache<(nint XivTexture, byte SliceIndex), ShaderResourceView> _activeSlices = new();
 
     /// <remarks> Caching this across frames will cause a crash to desktop. </remarks>
-    public nint GetImGuiHandle(Texture* texture, byte sliceIndex)
+    public ImTextureID GetImGuiHandle(Texture* texture, byte sliceIndex)
     {
         if (texture is null) {
             throw new ArgumentNullException(nameof(texture));
@@ -27,7 +28,7 @@ public sealed unsafe class TextureArraySlicer : IDisposable
         }
 
         if (_activeSlices.TryGetValue(((nint)texture, sliceIndex), out var sliceSrv)) {
-            return (nint)sliceSrv;
+            return new((nint)sliceSrv);
         }
 
         var srv = (ShaderResourceView)(nint)texture->D3D11ShaderResourceView;
@@ -65,7 +66,7 @@ public sealed unsafe class TextureArraySlicer : IDisposable
 
         sliceSrv = new(srv.Device, srv.Resource, description);
         _activeSlices.Add(((nint)texture, sliceIndex), sliceSrv);
-        return (nint)sliceSrv;
+        return new((nint)sliceSrv);
     }
 
     public void Tick()

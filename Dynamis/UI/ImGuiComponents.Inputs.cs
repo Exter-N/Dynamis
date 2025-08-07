@@ -1,9 +1,9 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Utility.Raii;
-using ImGuiNET;
 
 namespace Dynamis.UI;
 
@@ -73,7 +73,7 @@ partial class ImGuiComponents
     }
 
     public static unsafe bool InputText(string label, Span<char> charSpan, bool forceNullTerminator,
-        ImGuiInputTextFlags flags = 0, ImGuiInputTextCallback? callback = null, nint userData = 0)
+        ImGuiInputTextFlags flags = 0)
     {
         var refExpectedBytes = Encoding.UTF8.GetByteCount(charSpan);
         byte* refByteBuffer;
@@ -102,9 +102,66 @@ partial class ImGuiComponents
                 var byteSpan = new Span<byte>(byteBuffer, expectedBytes + 1);
                 refByteSpan.CopyTo(byteSpan);
 
-                var ret = ImGui.InputText(
-                    label, (nint)byteBuffer, (uint)(expectedBytes + 1), flags, callback, userData
-                );
+                var ret = ImGui.InputText(label, new(byteBuffer, expectedBytes + 1), flags);
+
+                if (!refByteSpan.SequenceEqual(byteSpan[..refByteSpan.Length])) {
+                    var terminator = byteSpan.IndexOf((byte)0);
+                    if (terminator >= 0) {
+                        byteSpan = byteSpan[..terminator];
+                    }
+
+                    var nChars = Encoding.UTF8.GetChars(byteSpan, charSpan);
+                    if (nChars < charSpan.Length) {
+                        charSpan[nChars] = '\0';
+                    } else if (forceNullTerminator) {
+                        charSpan[^1] = '\0';
+                    }
+                }
+
+                return ret;
+            } finally {
+                if (expectedBytes > 2048) {
+                    Marshal.FreeHGlobal((nint)byteBuffer);
+                }
+            }
+        } finally {
+            if (refExpectedBytes > 2048) {
+                Marshal.FreeHGlobal((nint)refByteBuffer);
+            }
+        }
+    }
+
+    public static unsafe bool InputText<TContext>(string label, Span<char> charSpan, bool forceNullTerminator,
+        ImGuiInputTextFlags flags, ImGui.ImGuiInputTextCallbackInContextDelegate<TContext> callback, TContext userData)
+    {
+        var refExpectedBytes = Encoding.UTF8.GetByteCount(charSpan);
+        byte* refByteBuffer;
+        if (refExpectedBytes <= 2048) {
+            var refAlloc = stackalloc byte[refExpectedBytes + 1];
+            refByteBuffer = refAlloc;
+        } else {
+            refByteBuffer = (byte*)Marshal.AllocHGlobal(refExpectedBytes + 1);
+        }
+
+        try {
+            var nBytes = Encoding.UTF8.GetBytes(charSpan, new(refByteBuffer, refExpectedBytes));
+            refByteBuffer[nBytes] = 0;
+            var refByteSpan = new ReadOnlySpan<byte>(refByteBuffer, nBytes + 1);
+
+            var expectedBytes = Math.Max(nBytes, charSpan.Length);
+            byte* byteBuffer;
+            if (expectedBytes <= 2048) {
+                var alloc = stackalloc byte[expectedBytes + 1];
+                byteBuffer = alloc;
+            } else {
+                byteBuffer = (byte*)Marshal.AllocHGlobal(expectedBytes + 1);
+            }
+
+            try {
+                var byteSpan = new Span<byte>(byteBuffer, expectedBytes + 1);
+                refByteSpan.CopyTo(byteSpan);
+
+                var ret = ImGui.InputText(label, new(byteBuffer, expectedBytes + 1), flags, callback, userData);
 
                 if (!refByteSpan.SequenceEqual(byteSpan[..refByteSpan.Length])) {
                     var terminator = byteSpan.IndexOf((byte)0);
@@ -144,7 +201,7 @@ partial class ImGuiComponents
         using (ImRaii.PushFont(UiBuilder.MonoFont)) {
             fixed (nint* pValue = &value) {
                 changed = ImGui.InputScalar(
-                    "###pointer", config.DataType, new(pValue), 0, 0, config.CFormat,
+                    "###pointer", config.DataType, new(pValue, 1), 0, 0, config.CFormat,
                     ImGuiInputTextFlags.CharsHexadecimal | flags
                 );
             }

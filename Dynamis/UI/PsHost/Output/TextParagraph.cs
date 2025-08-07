@@ -1,8 +1,7 @@
 #if WITH_SMA
+using Dalamud.Bindings.ImGui;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Interface.Utility;
-using Dalamud.Utility;
-using ImGuiNET;
 
 namespace Dynamis.UI.PsHost.Output;
 

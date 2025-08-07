@@ -1,9 +1,9 @@
 using System.Numerics;
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility.Raii;
 using Dynamis.Interop;
 using Dynamis.Interop.Win32;
 using Dynamis.UI.Windows;
-using ImGuiNET;
 
 namespace Dynamis.UI.ObjectInspectors;
 

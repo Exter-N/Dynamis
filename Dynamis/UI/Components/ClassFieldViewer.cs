@@ -1,7 +1,7 @@
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility.Raii;
 using Dynamis.Interop;
 using Dynamis.Utility;
-using ImGuiNET;
 
 namespace Dynamis.UI.Components;
 
@@ -69,17 +69,19 @@ public sealed class ClassFieldViewer
                     var itemWidth = ImGui.CalcItemWidth();
                     for (var i = 0; i < count; ++i) {
                         ImGui.SetNextItemWidth(itemWidth);
-                        anyChanged |= ImGui.InputScalar(
-                            CalculateElementLabel(i), dataType, address + i * elementSize, 0, 0, format,
-                            writable ? 0 : ImGuiInputTextFlags.ReadOnly
+                        // HACK ImGui will honor dataType rather than the Span element type
+                        anyChanged |= ImGui.InputScalar<long>(
+                            CalculateElementLabel(i), dataType, new((void*)(address + i * elementSize), 1), 0, 0,
+                            format, writable ? 0 : ImGuiInputTextFlags.ReadOnly
                         );
                     }
 
                     return anyChanged;
                 }
 
-                return ImGui.InputScalar(
-                    CalculateSingleLabel(), dataType, address, 0, 0, format,
+                // HACK ImGui will honor dataType rather than the Span element type
+                return ImGui.InputScalar<long>(
+                    CalculateSingleLabel(), dataType, new((void*)address, 1), 0, 0, format,
                     writable ? 0 : ImGuiInputTextFlags.ReadOnly
                 );
             case FieldType.Boolean:
@@ -155,7 +157,8 @@ public sealed class ClassFieldViewer
                 return false;
             case FieldType.ByteString:
                 return ImGui.InputText(
-                    CalculateSingleLabel(), address, field.Size, writable ? 0 : ImGuiInputTextFlags.ReadOnly
+                    CalculateSingleLabel(), new((void*)address, (int)field.Size),
+                    writable ? 0 : ImGuiInputTextFlags.ReadOnly
                 );
             case FieldType.CharString:
                 return ImGuiComponents.InputText(

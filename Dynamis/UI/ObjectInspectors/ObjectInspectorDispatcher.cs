@@ -1,9 +1,9 @@
 using System.Runtime.CompilerServices;
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Style;
 using Dalamud.Interface.Utility.Raii;
 using Dynamis.Interop;
 using Dynamis.UI.Windows;
-using ImGuiNET;
 using Microsoft.Extensions.Logging;
 
 namespace Dynamis.UI.ObjectInspectors;

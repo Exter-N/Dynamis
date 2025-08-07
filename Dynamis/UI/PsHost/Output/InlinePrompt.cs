@@ -1,6 +1,6 @@
 #if WITH_SMA
+using Dalamud.Bindings.ImGui;
 using Dynamis.UI.PsHost.Input;
-using ImGuiNET;
 
 namespace Dynamis.UI.PsHost.Output;
 

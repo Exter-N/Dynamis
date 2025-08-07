@@ -1,8 +1,8 @@
 using System.Runtime.InteropServices;
 using System.Text;
+using Dalamud.Bindings.ImGui;
 using Dynamis.Interop;
 using FFXIVClientStructs.Interop;
-using ImGuiNET;
 using InteropGenerator.Runtime;
 
 namespace Dynamis.Utility;

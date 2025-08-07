@@ -1,5 +1,5 @@
 using System.Text;
-using ImGuiNET;
+using Dalamud.Bindings.ImGui;
 
 namespace Dynamis.UI.Components;
 
@@ -15,13 +15,12 @@ public class TextInput(string label, int capacity) : IInput<string>
         }
     }
 
-    public unsafe bool Draw(ImGuiInputTextFlags flags = ImGuiInputTextFlags.None,
-        ImGuiInputTextCallback? callback = null, nint userData = 0)
-    {
-        fixed (byte* buffer = _buffer) {
-            return ImGui.InputText(label, (nint)buffer, (uint)_buffer.Length, flags, callback, userData);
-        }
-    }
+    public bool Draw(ImGuiInputTextFlags flags = ImGuiInputTextFlags.None)
+        => ImGui.InputText(label, _buffer, flags);
+
+    public bool Draw<TContext>(ImGuiInputTextFlags flags,
+        ImGui.ImGuiInputTextCallbackInContextDelegate<TContext> callback, TContext userData)
+        => ImGui.InputText(label, _buffer, flags, callback, userData);
 
     bool IInput.Draw(ImGuiInputTextFlags flags)
         => Draw(flags);

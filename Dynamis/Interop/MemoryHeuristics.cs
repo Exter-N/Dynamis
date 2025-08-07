@@ -8,7 +8,8 @@ public sealed class MemoryHeuristics
 {
     private readonly Ipfd.Ipfd _ipfd;
 
-    [Signature("E8 ?? ?? ?? ?? 48 C7 04")] private nint _freeMemory = 0;
+    [Signature("E8 ?? ?? ?? ?? 48 89 5D A0 48 8B 4D B0")]
+    private nint _freeMemory = 0;
 
     [Signature("E8 ?? ?? ?? ?? 48 8B C3 48 83 C4 ?? 5F 5D")]
     private nint _freeMemory2 = 0;

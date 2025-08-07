@@ -1,3 +1,4 @@
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Style;
@@ -8,7 +9,6 @@ using Dynamis.Interop.Win32;
 using Dynamis.Messaging;
 using Dynamis.UI.ObjectInspectors;
 using Dynamis.UI.Windows;
-using ImGuiNET;
 
 namespace Dynamis.UI;
 

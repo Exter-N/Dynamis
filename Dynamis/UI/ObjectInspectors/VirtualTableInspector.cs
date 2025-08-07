@@ -1,6 +1,6 @@
+using Dalamud.Bindings.ImGui;
 using Dynamis.Interop;
 using Dynamis.UI.Windows;
-using ImGuiNET;
 
 namespace Dynamis.UI.ObjectInspectors;
 

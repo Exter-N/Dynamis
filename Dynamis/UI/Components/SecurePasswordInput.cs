@@ -2,8 +2,8 @@ using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Security;
 using System.Text;
+using Dalamud.Bindings.ImGui;
 using Dynamis.Utility;
-using ImGuiNET;
 
 namespace Dynamis.UI.Components;
 
@@ -24,17 +24,12 @@ public sealed class SecurePasswordInput(string label, int capacity) : IInput<Sec
     private void Dispose(bool disposing)
         => _buffer.Dispose();
 
-    public unsafe bool Draw(ImGuiInputTextFlags flags = ImGuiInputTextFlags.None,
-        ImGuiInputTextCallback? callback = null, nint userData = 0)
-    {
-        var buffer = _buffer.Memory;
-        using var pinnedBuffer = buffer.Pin();
-        return ImGui.InputText(
-            label, (nint)pinnedBuffer.Pointer, (uint)buffer.Length,
-            flags | ImGuiInputTextFlags.Password,
-            callback, userData
-        );
-    }
+    public bool Draw(ImGuiInputTextFlags flags = ImGuiInputTextFlags.None)
+        => ImGui.InputText(label, _buffer.Memory.Span, flags | ImGuiInputTextFlags.Password);
+
+    public bool Draw<TContext>(ImGuiInputTextFlags flags,
+        ImGui.ImGuiInputTextCallbackInContextDelegate<TContext> callback, TContext userData)
+        => ImGui.InputText(label, _buffer.Memory.Span, flags | ImGuiInputTextFlags.Password, callback, userData);
 
     bool IInput.Draw(ImGuiInputTextFlags flags)
         => Draw(flags);

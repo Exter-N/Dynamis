@@ -40,7 +40,7 @@ public sealed class Ipfd : IMessageObserver<ConfigurationChangedMessage>, IDispo
         _dtrEntry = dtrBar.Get("Dynamis IPFD", BuildSeString($"{UiGlow("IPFD", Gold)} Loaded"));
         _dtrEntry.Tooltip =
             BuildSeString($"{UiGlow("Dynamis IPFD", Gold)} is currently loaded.\nClick to open settings.");
-        _dtrEntry.OnClick += messageHub.Publish<OpenWindowMessage<SettingsWindow>>;
+        _dtrEntry.OnClick += _ => messageHub.Publish<OpenWindowMessage<SettingsWindow>>();
         _dtrEntry.Shown = false;
     }
 

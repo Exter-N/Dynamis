@@ -1,5 +1,5 @@
 using System.Runtime.CompilerServices;
-using ImGuiNET;
+using Dalamud.Bindings.ImGui;
 
 namespace Dynamis.UI;
 
@@ -39,9 +39,9 @@ public ref struct ImRaiiListClipper
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public unsafe ImRaiiListClipper(int itemsCount, float itemsHeight)
+    public ImRaiiListClipper(int itemsCount, float itemsHeight)
     {
-        ClipperPtr = new ImGuiListClipperPtr(ImGuiNative.ImGuiListClipper_ImGuiListClipper());
+        ClipperPtr = ImGui.ImGuiListClipper();
         ClipperPtr.Begin(itemsCount, itemsHeight);
     }
 

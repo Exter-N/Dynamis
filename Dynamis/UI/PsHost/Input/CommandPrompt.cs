@@ -2,7 +2,7 @@
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Text;
-using ImGuiNET;
+using Dalamud.Bindings.ImGui;
 
 namespace Dynamis.UI.PsHost.Input;
 
@@ -40,35 +40,35 @@ public sealed class CommandPrompt(string prompt, IList<string> commandHistory, R
         return base.Draw(ref focus);
     }
 
-    protected override unsafe bool DrawInput(byte[] buffer, uint length, ImGuiInputTextFlags flags)
+    protected override unsafe bool DrawInput(byte[] buffer, ImGuiInputTextFlags flags)
         => ImGui.InputText(
-            "###CommandPrompt", buffer, length,
+            "###CommandPrompt", buffer,
             flags | ImGuiInputTextFlags.CallbackHistory | ImGuiInputTextFlags.CallbackCompletion, InputCallback
         ) && buffer[0] != 0;
 
-    private unsafe int InputCallback(ImGuiInputTextCallbackData* data)
+    private unsafe int InputCallback(scoped ref ImGuiInputTextCallbackData data)
     {
-        if (data->EventFlag.HasFlag(ImGuiInputTextFlags.CallbackHistory)) {
-            return InputCallbackHistory(data);
+        if (data.EventFlag.HasFlag(ImGuiInputTextFlags.CallbackHistory)) {
+            return InputCallbackHistory(ref data);
         }
 
-        if (data->EventFlag.HasFlag(ImGuiInputTextFlags.CallbackCompletion)) {
-            return InputCallbackCompletion(data);
+        if (data.EventFlag.HasFlag(ImGuiInputTextFlags.CallbackCompletion)) {
+            return InputCallbackCompletion(ref data);
         }
 
         return 0;
     }
 
-    private unsafe int InputCallbackHistory(ImGuiInputTextCallbackData* data)
+    private unsafe int InputCallbackHistory(scoped ref ImGuiInputTextCallbackData data)
     {
-        switch (data->EventKey) {
+        switch (data.EventKey) {
             case ImGuiKey.UpArrow:
                 if (_historyCursor <= 0) {
                     return 0;
                 }
 
                 if (_historyCursor == commandHistory.Count) {
-                    _currentCommand = Encoding.UTF8.GetString(new ReadOnlySpan<byte>(data->Buf, data->BufTextLen));
+                    _currentCommand = Encoding.UTF8.GetString(data.BufTextSpan);
                 }
 
                 --_historyCursor;
@@ -86,20 +86,20 @@ public sealed class CommandPrompt(string prompt, IList<string> commandHistory, R
 
         var newCommand = _historyCursor < commandHistory.Count ? commandHistory[_historyCursor] : _currentCommand;
 
-        SetText(data, newCommand);
-        MoveCursor(data, data->BufTextLen);
+        SetText(ref data, newCommand);
+        MoveCursor(ref data, data.BufTextLen);
 
         return 0;
     }
 
-    private unsafe int InputCallbackCompletion(ImGuiInputTextCallbackData* data)
+    private unsafe int InputCallbackCompletion(scoped ref ImGuiInputTextCallbackData data)
     {
-        var command = Encoding.UTF8.GetString(new ReadOnlySpan<byte>(data->Buf, data->BufTextLen));
-        if (!string.Equals(command, _completionCommand) || data->CursorPos != _completionBytePosition
+        var command = Encoding.UTF8.GetString(data.BufTextSpan);
+        if (!string.Equals(command, _completionCommand) || data.CursorPos != _completionBytePosition
                                                         || _completionResult is null) {
             _completionCommand = command;
-            _completionBytePosition = data->CursorPos;
-            _completionCharPosition = Encoding.UTF8.GetCharCount(data->Buf, data->CursorPos);
+            _completionBytePosition = data.CursorPos;
+            _completionCharPosition = Encoding.UTF8.GetCharCount(data.Buf, data.CursorPos);
             using var ps = PowerShell.Create();
             ps.RunspacePool = runspacePool;
             _completionResult = CommandCompletion.CompleteInput(_completionCommand, _completionCharPosition, [], ps);
@@ -125,8 +125,8 @@ public sealed class CommandPrompt(string prompt, IList<string> commandHistory, R
         _completionCharPosition = _completionReplacementEnd;
         _completionBytePosition = Encoding.UTF8.GetByteCount(command.AsSpan(.._completionCharPosition));
 
-        SetText(data, command);
-        MoveCursor(data, _completionBytePosition);
+        SetText(ref data, command);
+        MoveCursor(ref data, _completionBytePosition);
 
         return 0;
     }

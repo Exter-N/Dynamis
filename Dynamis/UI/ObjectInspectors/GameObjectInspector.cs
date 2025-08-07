@@ -1,7 +1,7 @@
+using Dalamud.Bindings.ImGui;
 using Dynamis.Interop;
 using Dynamis.UI.Windows;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
-using ImGuiNET;
 
 namespace Dynamis.UI.ObjectInspectors;
 
