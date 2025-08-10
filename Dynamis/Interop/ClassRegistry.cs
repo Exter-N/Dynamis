@@ -243,11 +243,12 @@ public sealed partial class ClassRegistry(
                 return null;
             }
 
-            var resolvedClassName = ResolveClientStructsClassName(baseClass);
+            var (resolvedNamespace, resolvedBaseName) =
+                $"{ResolveClientStructsClassName(baseClass)}`{arguments.Length}".SplitOverLast('.');
             Type? baseType = null;
             foreach (var type in typeof(StdString).Assembly.GetExportedTypes()) {
-                if (type.IsGenericTypeDefinition && type.FullName == resolvedClassName
-                                                 && type.GetGenericArguments().Length == 1) {
+                if (type.IsGenericTypeDefinition && type.DeclaringType is null && type.Namespace == resolvedNamespace
+                 && type.Name == resolvedBaseName && type.GetGenericArguments().Length == arguments.Length) {
                     baseType = type;
                     break;
                 }

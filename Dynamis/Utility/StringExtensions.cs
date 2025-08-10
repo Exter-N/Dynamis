@@ -125,6 +125,22 @@ public static partial class StringExtensions
             : value[(pos + substr.Length)..];
     }
 
+    public static (string? Before, string After) SplitOverLast(this string value, char ch)
+    {
+        var pos = value.LastIndexOf(ch);
+        return pos < 0
+            ? (null, value)
+            : (value[..pos], value[(pos + 1)..]);
+    }
+
+    public static (string? Before, string After) SplitOverLast(this string value, string substr)
+    {
+        var pos = value.LastIndexOf(substr, StringComparison.Ordinal);
+        return pos < 0
+            ? (null, value)
+            : (value[..pos], value[(pos + substr.Length)..]);
+    }
+
     public static IEnumerable<string> Singularize(this string value)
     {
         if (value.EndsWith('s')) {
