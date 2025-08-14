@@ -1,4 +1,6 @@
+using System.Numerics;
 using System.Runtime.CompilerServices;
+using Dalamud.Bindings.ImGui;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Ipc;
 using Dynamis.Interop;
@@ -17,7 +19,7 @@ public sealed class IpcProvider(
     : IHostedService
 {
     public const uint  ApiMajorVersion = 1;
-    public const uint  ApiMinorVersion = 5;
+    public const uint  ApiMinorVersion = 6;
     public const ulong ApiFeatureFlags = SmaApiFeatureFlag;
 
 #if WITH_SMA
@@ -26,21 +28,24 @@ public sealed class IpcProvider(
     private const ulong SmaApiFeatureFlag = 0;
 #endif
 
-    private ICallGateProvider<uint, uint, ulong, Version, object?>?              _apiInitialized;
-    private ICallGateProvider<object?>?                                          _apiDisposing;
-    private ICallGateProvider<(uint, uint, ulong)>?                              _getApiVersion;
-    private ICallGateProvider<nint, object?>?                                    _inspectObjectV1;
-    private ICallGateProvider<nint, string?, object?>?                           _inspectObjectV2;
-    private ICallGateProvider<nint, uint, string, uint, uint, object?>?          _inspectRegionV1;
-    private ICallGateProvider<nint, uint, string, uint, uint, string?, object?>? _inspectRegionV2;
-    private ICallGateProvider<nint, object?>?                                    _imGuiDrawPointerV1;
-    private ICallGateProvider<nint, Func<string?>?, object?>?                    _imGuiDrawPointerV2;
-    private ICallGateProvider<Action<nint>>?                                     _getImGuiDrawPointerDelegateV1;
-    private ICallGateProvider<Action<nint, Func<string?>?>>?                     _getImGuiDrawPointerDelegateV2;
-    private ICallGateProvider<nint, object?>?                                    _imGuiDrawPointerTooltipDetails;
-    private ICallGateProvider<nint, (string, Type?, uint, uint)>?                _getClass;
-    private ICallGateProvider<nint, string?, Type?, (bool, uint)>?               _isInstanceOf;
-    private ICallGateProvider<object?>?                                          _preloadDataYaml;
+    private ICallGateProvider<uint, uint, ulong, Version, object?>?                    _apiInitialized;
+    private ICallGateProvider<object?>?                                                _apiDisposing;
+    private ICallGateProvider<(uint, uint, ulong)>?                                    _getApiVersion;
+    private ICallGateProvider<nint, object?>?                                          _inspectObjectV1;
+    private ICallGateProvider<nint, string?, object?>?                                 _inspectObjectV2;
+    private ICallGateProvider<nint, uint, string, uint, uint, object?>?                _inspectRegionV1;
+    private ICallGateProvider<nint, uint, string, uint, uint, string?, object?>?       _inspectRegionV2;
+    private ICallGateProvider<nint, object?>?                                          _imGuiDrawPointerV1;
+    private ICallGateProvider<nint, Func<string?>?, object?>?                          _imGuiDrawPointerV2;
+    private ICallGateProvider<nint, Func<string?>?, string?, ulong, Vector2, object?>? _imGuiDrawPointerV3;
+    private ICallGateProvider<Action<nint>>?                                           _getImGuiDrawPointerDelegateV1;
+    private ICallGateProvider<Action<nint, Func<string?>?>>?                           _getImGuiDrawPointerDelegateV2;
+    private ICallGateProvider<Action<nint, Func<string?>?, string?, ulong, Vector2>>?  _getImGuiDrawPointerDelegateV3;
+    private ICallGateProvider<nint, object?>?                                          _imGuiDrawPointerTooltipDetails;
+    private ICallGateProvider<nint, Func<string?>?, object?>?                          _imGuiOpenPointerContextMenu;
+    private ICallGateProvider<nint, (string, Type?, uint, uint)>?                      _getClass;
+    private ICallGateProvider<nint, string?, Type?, (bool, uint)>?                     _isInstanceOf;
+    private ICallGateProvider<object?>?                                                _preloadDataYaml;
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -51,12 +56,13 @@ public sealed class IpcProvider(
             out _getApiVersion, "Dynamis.GetApiVersion", () => (ApiMajorVersion, ApiMinorVersion, ApiFeatureFlags)
         );
 
-        RegisterAction(out _inspectObjectV1,    $"Dynamis.InspectObject.V1",    InspectObjectV1);
-        RegisterAction(out _inspectObjectV2,    $"Dynamis.InspectObject.V2",    InspectObjectV2);
-        RegisterAction(out _inspectRegionV1,    $"Dynamis.InspectRegion.V1",    InspectRegionV1);
-        RegisterAction(out _inspectRegionV2,    $"Dynamis.InspectRegion.V2",    InspectRegionV2);
-        RegisterAction(out _imGuiDrawPointerV1, $"Dynamis.ImGuiDrawPointer.V1", ImGuiDrawPointerV1);
-        RegisterAction(out _imGuiDrawPointerV2, $"Dynamis.ImGuiDrawPointer.V2", ImGuiDrawPointerV2);
+        RegisterAction(out _inspectObjectV1,    "Dynamis.InspectObject.V1",    InspectObjectV1);
+        RegisterAction(out _inspectObjectV2,    "Dynamis.InspectObject.V2",    InspectObjectV2);
+        RegisterAction(out _inspectRegionV1,    "Dynamis.InspectRegion.V1",    InspectRegionV1);
+        RegisterAction(out _inspectRegionV2,    "Dynamis.InspectRegion.V2",    InspectRegionV2);
+        RegisterAction(out _imGuiDrawPointerV1, "Dynamis.ImGuiDrawPointer.V1", ImGuiDrawPointerV1);
+        RegisterAction(out _imGuiDrawPointerV2, "Dynamis.ImGuiDrawPointer.V2", ImGuiDrawPointerV2);
+        RegisterAction(out _imGuiDrawPointerV3, "Dynamis.ImGuiDrawPointer.V3", ImGuiDrawPointerV3);
 
         RegisterFunc(
             out _getImGuiDrawPointerDelegateV1, $"Dynamis.GetImGuiDrawPointerDelegate.V1",
@@ -66,10 +72,18 @@ public sealed class IpcProvider(
             out _getImGuiDrawPointerDelegateV2, $"Dynamis.GetImGuiDrawPointerDelegate.V2",
             () => ImGuiDrawPointerV2
         );
+        RegisterFunc(
+            out _getImGuiDrawPointerDelegateV3, $"Dynamis.GetImGuiDrawPointerDelegate.V3",
+            () => ImGuiDrawPointerV3
+        );
 
         RegisterAction(
             out _imGuiDrawPointerTooltipDetails, $"Dynamis.{nameof(ImGuiDrawPointerTooltipDetails)}.V1",
             ImGuiDrawPointerTooltipDetails
+        );
+        RegisterAction(
+            out _imGuiOpenPointerContextMenu, $"Dynamis.{nameof(ImGuiOpenPointerContextMenu)}.V1",
+            ImGuiOpenPointerContextMenu
         );
 
         RegisterFunc(out _getClass,     $"Dynamis.{nameof(GetClass)}.V1",     GetClass);
@@ -102,11 +116,14 @@ public sealed class IpcProvider(
         UnregisterFunc(ref _isInstanceOf);
         UnregisterFunc(ref _getClass);
 
+        UnregisterAction(ref _imGuiOpenPointerContextMenu);
         UnregisterAction(ref _imGuiDrawPointerTooltipDetails);
 
+        UnregisterFunc(ref _getImGuiDrawPointerDelegateV3);
         UnregisterFunc(ref _getImGuiDrawPointerDelegateV2);
         UnregisterFunc(ref _getImGuiDrawPointerDelegateV1);
 
+        UnregisterAction(ref _imGuiDrawPointerV3);
         UnregisterAction(ref _imGuiDrawPointerV2);
         UnregisterAction(ref _imGuiDrawPointerV1);
         UnregisterAction(ref _inspectRegionV2);
@@ -147,8 +164,17 @@ public sealed class IpcProvider(
     private void ImGuiDrawPointerV2(nint pointer, Func<string?>? name)
         => imGuiComponents.DrawPointer(pointer, null, name);
 
+    private void ImGuiDrawPointerV3(nint pointer, Func<string?>? name, string? customText, ulong flags, Vector2 size)
+        => imGuiComponents.DrawPointer(
+            pointer, null, name, customText, (ImGuiComponents.DrawPointerFlags)unchecked((uint)flags),
+            (ImGuiSelectableFlags)(uint)(flags >> 32), size
+        );
+
     private void ImGuiDrawPointerTooltipDetails(nint pointer)
         => imGuiComponents.DrawPointerTooltipDetails(pointer, null);
+
+    private void ImGuiOpenPointerContextMenu(nint pointer, Func<string?>? name)
+        => imGuiComponents.OpenPointerContextMenu(pointer, null, name);
 
     private (string, Type?, uint, uint) GetClass(nint pointer)
     {

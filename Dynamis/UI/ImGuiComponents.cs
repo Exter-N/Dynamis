@@ -1,3 +1,4 @@
+using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.ImGuiFileDialog;
@@ -78,13 +79,23 @@ public sealed partial class ImGuiComponents(
         }
     }
 
-    public void DrawPointer(nint pointer, Func<ClassInfo?>? @class, Func<string?>? name)
+    public void DrawPointer(nint pointer, Func<ClassInfo?>? @class, Func<string?>? name, string? customText = null,
+        DrawPointerFlags flags = DrawPointerFlags.None,
+        ImGuiSelectableFlags selectableFlags = ImGuiSelectableFlags.None, Vector2 size = default)
     {
-        using (ImRaii.PushFont(UiBuilder.MonoFont, pointer != 0)) {
-            if (ImGui.Selectable(pointer == 0 ? "nullptr" : $"0x{pointer:X}")) {
-                contextMenu.Open(
-                    new PointerContextMenu(messageHub, pointer, moduleAddressResolver.Resolve(pointer), @class, name)
-                );
+        {
+            using var font = ImRaii.PushFont(
+                UiBuilder.MonoFont, customText is null ? pointer != 0 : flags.HasFlag(DrawPointerFlags.MonoFont)
+            );
+            using var color = ImRaii.PushStyle(
+                ImGuiStyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5f,
+                customText is null ? pointer == 0 : flags.HasFlag(DrawPointerFlags.Semitransparent)
+            );
+            if (ImGui.Selectable(
+                    customText ?? (pointer == 0 ? "nullptr" : $"0x{pointer:X}"),
+                    flags.HasFlag(DrawPointerFlags.Selected), selectableFlags, size
+                )) {
+                OpenPointerContextMenu(pointer, @class, name);
             }
         }
 
@@ -104,6 +115,29 @@ public sealed partial class ImGuiComponents(
             ImGui.Separator();
             ImGui.TextUnformatted("Click for options.");
         }
+    }
+
+    [Flags]
+    public enum DrawPointerFlags : uint
+    {
+        None = 0,
+
+        /// <summary>
+        /// Draws the ImGui selectable as selected.
+        /// </summary>
+        Selected = 1,
+
+        /// <summary>
+        /// Draws the supplied custom text in a monospace font.
+        /// Applied to the default text if the pointer is not null.
+        /// </summary>
+        MonoFont = 2,
+
+        /// <summary>
+        /// Draws the supplied custom text with halved opacity.
+        /// Applied to the default text if the pointer is null.
+        /// </summary>
+        Semitransparent = 4,
     }
 
     public void DrawPointerTooltipDetails(nint pointer, ClassInfo? @class)
@@ -144,6 +178,11 @@ public sealed partial class ImGuiComponents(
             inspector.DrawAdditionalTooltipDetails(pointer - (nint)displacement, @class);
         }
     }
+
+    public void OpenPointerContextMenu(nint pointer, Func<ClassInfo?>? @class, Func<string?>? name)
+        => contextMenu.Open(
+            new PointerContextMenu(messageHub, pointer, moduleAddressResolver.Resolve(pointer), @class, name)
+        );
 
     private sealed class PointerContextMenu(
         MessageHub messageHub,

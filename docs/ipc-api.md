@@ -61,30 +61,40 @@ Minimum API version: `(1, 3, 0)`.
 ```csharp
 void "Dynamis.ImGuiDrawPointer.V1"(nint pointer);
 void "Dynamis.ImGuiDrawPointer.V2"(nint pointer, Func<string?>? name);
+void "Dynamis.ImGuiDrawPointer.V3"(nint pointer, Func<string?>? name, string? customText, ulong flags, Vector2 size);
 ```
 
-Draws a pointer in hexadecimal in a monospace font (or "nullptr").
+Draws a pointer in hexadecimal in a monospace font (or "nullptr" in semitransparent text), or a custom textual representation of that pointer.
 
-On hover, displays a tooltip with various info about the object behind that pointer, if possible.
+On hover, displays a tooltip with various info about the object behind that pointer, if possible - see `ImGuiDrawPointerTooltipDetails`.
 
-On click, offers several actions, such as copying the address to the clipboard, or inspecting the object.
+On click, offers several actions, such as copying the address to the clipboard, or inspecting the object - see `ImGuiOpenPointerContextMenu`.
+
+`name` will be shown in the object inspector if the user requests inspection.
+
+`customText` overrides the textual representation of the pointer.
+
+The lower 32 bits of `flags`, along with `size`, are passed to the ImGui `Selectable`.
+
+The upper 32 bits of `flags` are defined by [`ImGuiComponents.DrawPointerFlags`](../Dynamis/UI/ImGuiComponents.cs). Some are relevant only with a `customText`.
 
 **MUST** be called from a valid ImGui context.
 
 If Dynamis' API is unavailable, a minimal fallback implementation **SHOULD** be used by the caller instead.
 
-Minimum API version: `(1, 0, 0)` for v1, `(1, 5, 0)` for v2.
+Minimum API version: `(1, 0, 0)` for v1, `(1, 5, 0)` for v2, `(1, 6, 0)` for v3.
 
 ```csharp
 Action<nint> "Dynamis.GetImGuiDrawPointerDelegate.V1"();
 Action<nint, Func<string?>?> "Dynamis.GetImGuiDrawPointerDelegate.V2"();
+Action<nint, Func<string?>?, string?, ulong, Vector2> "Dynamis.GetImGuiDrawPointerDelegate.V3"();
 ```
 
 Obtains a delegate for the `ImGuiDrawPointer` function, to avoid the IPC overhead if you want to draw a lot of pointers (in a list/table for example).
 
 The obtained delegate either **MUST NOT** be cached across frames, or **MUST** be discarded in response to the `ApiDisposing` event, in order not to cause plugin unloading issues.
 
-Minimum API version: `(1, 3, 0)` for v1, `(1, 5, 0)` for v2.
+Minimum API version: `(1, 3, 0)` for v1, `(1, 5, 0)` for v2, `(1, 6, 0)` for v3.
 
 ### `ImGuiDrawPointerTooltipDetails` function
 
@@ -92,13 +102,25 @@ Minimum API version: `(1, 3, 0)` for v1, `(1, 5, 0)` for v2.
 void "Dynamis.ImGuiDrawPointerTooltipDetails.V1"(nint pointer);
 ```
 
-Draws various info about the object behind the given pointer, if possible.
+Draws various info about the object behind the given pointer, if possible. This is most of what is shown by `ImGuiDrawPointer`'s tooltip.
 
 No interactivity is provided, as this is designed to be displayed in a tooltip.
 
 **MUST** be called from a valid ImGui context.
 
 Minimum API version: `(1, 0, 0)`.
+
+### `ImGuiOpenPointerContextMenu` function
+
+```csharp
+void "Dynamis.ImGuiOpenPointerContextMenu.V1"(nint pointer, Func<string?>? name);
+```
+
+Opens an ImGui context menu for the given pointer, as if `ImGuiDrawPointer` was clicked.
+
+`name` will be shown in the object inspector if the user requests inspection.
+
+Minimum API version: `(1, 6, 0)`.
 
 ## Windows
 
