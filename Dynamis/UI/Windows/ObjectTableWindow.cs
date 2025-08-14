@@ -88,10 +88,16 @@ public sealed class ObjectTableWindow : Window, ISingletonWindow, IMessageObserv
             ImGuiComponents.DrawCopyable(entry.Name, false);
 
             ImGui.TableNextColumn();
-            _imGuiComponents.DrawPointer(entry.GameObjectAddress, null, () => $"Game object of {entry.Name}");
+            _imGuiComponents.DrawPointer(
+                entry.GameObjectAddress, null, () => $"Game object of {entry.Name}",
+                flags: ImGuiComponents.DrawPointerFlags.RightAligned
+            );
 
             ImGui.TableNextColumn();
-            _imGuiComponents.DrawPointer(entry.DrawObjectAddress, null, () => $"Draw object of {entry.Name}");
+            _imGuiComponents.DrawPointer(
+                entry.DrawObjectAddress, null, () => $"Draw object of {entry.Name}",
+                flags: ImGuiComponents.DrawPointerFlags.RightAligned
+            );
 
             ImGui.TableNextColumn();
             ImGuiComponents.DrawCopyable($"{entry.Position.X:F2}, {entry.Position.Y:F2}, {entry.Position.Z:F2}", true);

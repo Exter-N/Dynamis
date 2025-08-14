@@ -111,7 +111,9 @@ public sealed class SigScannerWindow : Window, ISingletonWindow, IMessageObserve
 
             ImGui.TableNextColumn();
             if (result.Success) {
-                _imGuiComponents.DrawPointer(result.Address, null, null);
+                _imGuiComponents.DrawPointer(
+                    result.Address, null, null, flags: ImGuiComponents.DrawPointerFlags.RightAligned
+                );
             } else {
                 using (ImRaii.PushColor(ImGuiCol.Text, StyleModel.GetFromCurrent().BuiltInColors!.DalamudRed!.Value)) {
                     if (result.Exception is not null) {

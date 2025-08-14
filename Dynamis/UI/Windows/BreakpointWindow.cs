@@ -190,7 +190,9 @@ public sealed class BreakpointWindow : IndexedWindow
                 ImGuiComponents.DrawCopyable($"{record.ThreadId}", false);
 
                 ImGui.TableNextColumn();
-                _imGuiComponents.DrawPointer(record.ExceptionAddress, null, null);
+                _imGuiComponents.DrawPointer(
+                    record.ExceptionAddress, null, null, flags: ImGuiComponents.DrawPointerFlags.RightAligned
+                );
 
                 ImGui.TableNextColumn();
                 ImGuiComponents.DrawCopyable(

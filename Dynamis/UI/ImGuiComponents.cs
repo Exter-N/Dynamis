@@ -87,9 +87,13 @@ public sealed partial class ImGuiComponents(
             using var font = ImRaii.PushFont(
                 UiBuilder.MonoFont, customText is null ? pointer != 0 : flags.HasFlag(DrawPointerFlags.MonoFont)
             );
-            using var color = ImRaii.PushStyle(
+            using var style = ImRaii.PushStyle(
                 ImGuiStyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5f,
                 customText is null ? pointer == 0 : flags.HasFlag(DrawPointerFlags.Semitransparent)
+            );
+            style.Push(
+                ImGuiStyleVar.SelectableTextAlign, new Vector2(1.0f, 0.5f),
+                size != default || flags.HasFlag(DrawPointerFlags.RightAligned)
             );
             if (ImGui.Selectable(
                     customText ?? (pointer == 0 ? "nullptr" : $"0x{pointer:X}"),
@@ -138,6 +142,12 @@ public sealed partial class ImGuiComponents(
         /// Applied to the default text if the pointer is null.
         /// </summary>
         Semitransparent = 4,
+
+        /// <summary>
+        /// Aligns the text to the right horizontally and centers it vertically.
+        /// Always applied when passed an explicit size.
+        /// </summary>
+        RightAligned = 8,
     }
 
     public void DrawPointerTooltipDetails(nint pointer, ClassInfo? @class)
