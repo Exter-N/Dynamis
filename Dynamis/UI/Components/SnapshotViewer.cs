@@ -163,7 +163,7 @@ public sealed class SnapshotViewer(
         }
 
         var highlight = _vmSnapshot.HighlightColors[offset];
-        for (var i = 1; i < length; ++i) {
+        for (var i = 1; i < length && offset + i < _vmSnapshot.HighlightColors.Length; ++i) {
             if (_vmSnapshot.HighlightColors[offset + i] != highlight) {
                 return clicked;
             }
