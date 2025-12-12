@@ -338,7 +338,13 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
 
                 foreach (var instance in @class.Instances) {
                     if (instance.Pointer == pointer) {
-                        classesByInstance.Add(GetLiveAddress(instance.Ea), new(className, instance.Name));
+                        if (!classesByInstance.TryAdd(GetLiveAddress(instance.Ea), new(className, instance.Name))) {
+                            var conflict = classesByInstance[GetLiveAddress(instance.Ea)];
+                            _logger.LogWarning(
+                                "Class instance address conflict between {Name2}.{InstanceName2} and {Name}.{InstanceName}",
+                                className, instance.Name, conflict.ClassName, conflict.Name
+                            );
+                        }
                     }
                 }
             }
@@ -349,7 +355,7 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
 
     private Dictionary<nint, string> CalculateClassesByVtbl(DataYaml data)
     {
-        var classesByInstance = new Dictionary<nint, string>();
+        var classesByVtbl = new Dictionary<nint, string>();
         if (data.Classes is not null) {
             foreach (var (name, @class) in data.Classes) {
                 if (@class.Vtbls is null) {
@@ -357,12 +363,18 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
                 }
 
                 foreach (var vtbl in @class.Vtbls) {
-                    classesByInstance.Add(GetLiveAddress(vtbl.Ea), name);
+                    if (!classesByVtbl.TryAdd(GetLiveAddress(vtbl.Ea), name)) {
+                        var conflict = classesByVtbl[GetLiveAddress(vtbl.Ea)];
+                        _logger.LogWarning(
+                            "Class virtual table address conflict between {Name2} and {Name}",
+                            name, conflict
+                        );
+                    }
                 }
             }
         }
 
-        return classesByInstance;
+        return classesByVtbl;
     }
 
     private Dictionary<nint, MemberFunctionName> CalculateMemberFunctions(DataYaml data)
@@ -375,7 +387,13 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
                 }
 
                 foreach (var (address, fName) in @class.Funcs) {
-                    memberFunctions.Add(GetLiveAddress(address), new(name, fName));
+                    if (!memberFunctions.TryAdd(GetLiveAddress(address), new(name, fName))) {
+                        var conflict = memberFunctions[GetLiveAddress(address)];
+                        _logger.LogWarning(
+                            "Member function address conflict between {Name2}.{FName2} and {Name}.{FName}",
+                            name, fName, conflict.ClassName, conflict.FunctionName
+                        );
+                    }
                 }
             }
         }
@@ -399,7 +417,13 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
 
                 var vtblEa = GetLiveAddress(vtbl.Ea);
                 foreach (var (index, fName) in @class.Vfuncs) {
-                    virtualFunctions.Add(vtblEa + (nint)index * sizeof(nint), new(name, fName));
+                    if (!virtualFunctions.TryAdd(vtblEa + (nint)index * sizeof(nint), new(name, fName))) {
+                        var conflict = virtualFunctions[vtblEa + (nint)index * sizeof(nint)];
+                        _logger.LogWarning(
+                            "Virtual function address conflict between {Name2}.{FName2} and {Name}.{FName}",
+                            name, fName, conflict.ClassName, conflict.FunctionName
+                        );
+                    }
                 }
             }
         }
