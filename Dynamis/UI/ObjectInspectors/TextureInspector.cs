@@ -6,7 +6,7 @@ using Dynamis.Interop;
 using Dynamis.UI.Windows;
 using Dynamis.Utility;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Kernel;
-using SharpDX.Direct3D11;
+using TerraFX.Interop.DirectX;
 
 namespace Dynamis.UI.ObjectInspectors;
 
@@ -37,8 +37,9 @@ public sealed unsafe class TextureInspector(TextureArraySlicer textureArraySlice
             return;
         }
 
-        var description = ((ShaderResourceView)(nint)pointer->D3D11ShaderResourceView).Description;
-        ImGui.TextUnformatted($"Format: {description.Format} Dimension: {description.Dimension}");
+        D3D11_SHADER_RESOURCE_VIEW_DESC description;
+        ((ID3D11ShaderResourceView*)pointer->D3D11ShaderResourceView)->GetDesc(&description);
+        ImGui.TextUnformatted($"Format: {description.Format} Dimension: {description.ViewDimension}");
     }
 
     public void DrawAdditionalTooltipDetails(Texture* pointer)

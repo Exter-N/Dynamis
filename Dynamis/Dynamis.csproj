@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Project Sdk="Dalamud.NET.SDK/13.0.0">
+<Project Sdk="Dalamud.NET.SDK/14.0.1">
     <PropertyGroup>
         <LangVersion>preview</LangVersion>
         <Authors></Authors>
@@ -48,16 +48,8 @@
             <HintPath>$(DalamudLibPath)Iced.dll</HintPath>
             <Private>false</Private>
         </Reference>
-        <Reference Include="SharpDX">
-            <HintPath>$(DalamudLibPath)SharpDX.dll</HintPath>
-            <Private>false</Private>
-        </Reference>
-        <Reference Include="SharpDX.Direct3D11">
-            <HintPath>$(DalamudLibPath)SharpDX.Direct3D11.dll</HintPath>
-            <Private>false</Private>
-        </Reference>
-        <Reference Include="SharpDX.DXGI">
-            <HintPath>$(DalamudLibPath)SharpDX.DXGI.dll</HintPath>
+        <Reference Include="TerraFX.Interop.Windows">
+            <HintPath>$(DalamudLibPath)TerraFX.Interop.Windows.dll</HintPath>
             <Private>false</Private>
         </Reference>
     </ItemGroup>

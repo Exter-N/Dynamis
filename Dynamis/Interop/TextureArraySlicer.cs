@@ -1,8 +1,9 @@
+using System.Runtime.InteropServices;
 using Dalamud.Bindings.ImGui;
 using Dynamis.Utility;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Kernel;
-using SharpDX.Direct3D;
-using SharpDX.Direct3D11;
+using TerraFX.Interop.DirectX;
+using TerraFX.Interop.Windows;
 
 namespace Dynamis.Interop;
 
@@ -11,7 +12,7 @@ namespace Dynamis.Interop;
 /// </summary>
 public sealed unsafe class TextureArraySlicer : IDisposable
 {
-    private readonly ShortLivedCache<(nint XivTexture, byte SliceIndex), ShaderResourceView> _activeSlices = new();
+    private readonly ShortLivedCache<(nint XivTexture, byte SliceIndex), SafeComHandle<ID3D11ShaderResourceView>> _activeSlices = new();
 
     /// <remarks> Caching this across frames will cause a crash to desktop. </remarks>
     public ImTextureID GetImGuiHandle(Texture* texture, byte sliceIndex)
@@ -28,45 +29,65 @@ public sealed unsafe class TextureArraySlicer : IDisposable
         }
 
         if (_activeSlices.TryGetValue(((nint)texture, sliceIndex), out var sliceSrv)) {
-            return new((nint)sliceSrv);
+            return new((nint)sliceSrv.Object);
         }
 
-        var srv = (ShaderResourceView)(nint)texture->D3D11ShaderResourceView;
-        var description = srv.Description;
-        switch (description.Dimension) {
-            case ShaderResourceViewDimension.Texture1D:
-            case ShaderResourceViewDimension.Texture2D:
-            case ShaderResourceViewDimension.Texture2DMultisampled:
-            case ShaderResourceViewDimension.Texture3D:
-            case ShaderResourceViewDimension.TextureCube:
+        using var srv = new SafeComHandle<ID3D11ShaderResourceView>(
+            (ID3D11ShaderResourceView*)texture->D3D11ShaderResourceView, true
+        );
+        D3D11_SHADER_RESOURCE_VIEW_DESC description;
+        srv.Object->GetDesc(&description);
+        switch (description.ViewDimension) {
+            case D3D_SRV_DIMENSION.D3D11_SRV_DIMENSION_TEXTURE1D:
+            case D3D_SRV_DIMENSION.D3D11_SRV_DIMENSION_TEXTURE2D:
+            case D3D_SRV_DIMENSION.D3D11_SRV_DIMENSION_TEXTURE2DMS:
+            case D3D_SRV_DIMENSION.D3D11_SRV_DIMENSION_TEXTURE3D:
+            case D3D_SRV_DIMENSION.D3D11_SRV_DIMENSION_TEXTURECUBE:
                 // This function treats these as single-slice arrays.
                 // As per the range check above, the only valid slice (i.e. 0) has been requested, therefore there is nothing to do.
                 break;
-            case ShaderResourceViewDimension.Texture1DArray:
+            case D3D_SRV_DIMENSION.D3D11_SRV_DIMENSION_TEXTURE1DARRAY:
                 description.Texture1DArray.FirstArraySlice = sliceIndex;
-                description.Texture2DArray.ArraySize = 1;
+                description.Texture1DArray.ArraySize = 1;
                 break;
-            case ShaderResourceViewDimension.Texture2DArray:
+            case D3D_SRV_DIMENSION.D3D11_SRV_DIMENSION_TEXTURE2DARRAY:
                 description.Texture2DArray.FirstArraySlice = sliceIndex;
                 description.Texture2DArray.ArraySize = 1;
                 break;
-            case ShaderResourceViewDimension.Texture2DMultisampledArray:
+            case D3D_SRV_DIMENSION.D3D11_SRV_DIMENSION_TEXTURE2DMSARRAY:
                 description.Texture2DMSArray.FirstArraySlice = sliceIndex;
                 description.Texture2DMSArray.ArraySize = 1;
                 break;
-            case ShaderResourceViewDimension.TextureCubeArray:
-                description.TextureCubeArray.First2DArrayFace = sliceIndex * 6;
-                description.TextureCubeArray.CubeCount = 1;
+            case D3D_SRV_DIMENSION.D3D11_SRV_DIMENSION_TEXTURECUBEARRAY:
+                description.TextureCubeArray.First2DArrayFace = sliceIndex * 6u;
+                description.TextureCubeArray.NumCubes = 1;
                 break;
             default:
                 throw new NotSupportedException(
-                    $"{nameof(TextureArraySlicer)} does not support dimension {description.Dimension}"
+                    $"{nameof(TextureArraySlicer)} does not support dimension {description.ViewDimension}"
                 );
         }
 
-        sliceSrv = new(srv.Device, srv.Resource, description);
+        ID3D11ShaderResourceView* slice = null;
+        ID3D11Device* device = null;
+        ID3D11Resource* resource = null;
+        try {
+            srv.Object->GetDevice(&device);
+            srv.Object->GetResource(&resource);
+            Marshal.ThrowExceptionForHR(device->CreateShaderResourceView(resource, &description, &slice));
+        } finally {
+            if (resource is not null) {
+                resource->Release();
+            }
+
+            if (device is not null) {
+                device->Release();
+            }
+        }
+
+        sliceSrv = new(slice, false);
         _activeSlices.Add(((nint)texture, sliceIndex), sliceSrv);
-        return new((nint)sliceSrv);
+        return new((nint)slice);
     }
 
     public void Tick()
@@ -75,4 +96,3 @@ public sealed unsafe class TextureArraySlicer : IDisposable
     public void Dispose()
         => _activeSlices.Dispose();
 }
-
