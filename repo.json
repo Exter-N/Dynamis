@@ -1,6 +1,6 @@
 [
   {
-    "Author": "Ny",
+    "Author": "Nylfae",
     "Name": "Dynamis",
     "Punchline": "Developer/debugging/RE tool and experiment workbench.",
     "Description": "This plugin contains various tools to help reverse engineering the game through dynamic analysis, and prototyping things.",
@@ -25,7 +25,7 @@
     "IconUrl": "https://raw.githubusercontent.com/Exter-N/Dynamis/main/Dynamis/Resources/Dynamis128.png"
   },
   {
-    "Author": "Ny",
+    "Author": "Nylfae",
     "Name": "Dynamis (with Hosted PowerShell)",
     "Punchline": "Developer/debugging/RE tool and experiment workbench.",
     "Description": "This plugin contains various tools to help reverse engineering the game through dynamic analysis, and prototyping things.",
