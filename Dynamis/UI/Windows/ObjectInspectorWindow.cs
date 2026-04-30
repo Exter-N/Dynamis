@@ -292,7 +292,7 @@ public sealed class ObjectInspectorWindow : IndexedWindow
                     ImGui.TextUnformatted("Copy to clipboard");
                 }
 
-                indent.Push();
+                indent.Indent();
             }
         }
 

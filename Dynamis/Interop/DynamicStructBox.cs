@@ -373,7 +373,7 @@ public sealed class DynamicStructBox(nint address, ClassInfo @class, BoxAccess a
     }
 
     public string ReadCStringPointer(int offset)
-        => Read<CStringPointer>(offset);
+        => Read<CStringPointer>(offset).ToString();
 
     #endregion
 
