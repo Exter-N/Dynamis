@@ -9,7 +9,7 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -17,7 +17,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1.10.1
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v1
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.x.x'
 
@@ -49,7 +49,7 @@ jobs:
           set-content -Path $path -Value $content
 
       - name: Upload a Build Artifact (No SMA)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: artifact-no-sma
           path: |
@@ -70,7 +70,7 @@ jobs:
           set-content -Path $path -Value $content
 
       - name: Upload a Build Artifact (With SMA)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: artifact-with-sma
           path: |
