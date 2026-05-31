@@ -1,5 +1,6 @@
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using Dynamis.Interop;
@@ -10,12 +11,18 @@ using TerraFX.Interop.DirectX;
 
 namespace Dynamis.UI.ObjectInspectors;
 
-public sealed unsafe class TextureInspector(TextureArraySlicer textureArraySlicer) : IObjectInspector<Texture>
+public sealed unsafe class TextureInspector(
+    TextureArraySlicer textureArraySlicer,
+    FileDialogManager fileDialogManager,
+    TextureDumper dumper)
+    : IObjectInspector<Texture>
 {
     private void DrawAdditionalDetailsCommon(Texture* pointer, bool live)
     {
         if (pointer->ActualWidth < pointer->AllocatedWidth || pointer->ActualHeight < pointer->AllocatedHeight) {
-            ImGui.TextUnformatted($"Size: {pointer->ActualWidth}x{pointer->ActualHeight} (out of {pointer->AllocatedWidth}x{pointer->AllocatedHeight})");
+            ImGui.TextUnformatted(
+                $"Size: {pointer->ActualWidth}x{pointer->ActualHeight} (out of {pointer->AllocatedWidth}x{pointer->AllocatedHeight})"
+            );
         } else {
             ImGui.TextUnformatted($"Size: {pointer->ActualWidth}x{pointer->ActualHeight}");
         }
@@ -49,11 +56,15 @@ public sealed unsafe class TextureInspector(TextureArraySlicer textureArraySlice
             new((nint)pointer->D3D11ShaderResourceView),
             new Vector2(pointer->ActualWidth, pointer->ActualHeight).Contain(new(128.0f, 128.0f)),
             Vector2.Zero,
-            new Vector2((float)pointer->ActualWidth / pointer->AllocatedWidth, (float)pointer->ActualHeight / pointer->AllocatedHeight)
+            new Vector2(
+                (float)pointer->ActualWidth / pointer->AllocatedWidth,
+                (float)pointer->ActualHeight / pointer->AllocatedHeight
+            )
         );
     }
 
-    public void DrawAdditionalHeaderDetails(Texture* pointer, ObjectSnapshot snapshot, bool live, ObjectInspectorWindow window)
+    public void DrawAdditionalHeaderDetails(Texture* pointer, ObjectSnapshot snapshot, bool live,
+        ObjectInspectorWindow window)
         => DrawAdditionalDetailsCommon(pointer, live);
 
     public void DrawAdditionalTabs(Texture* pointer, ObjectSnapshot snapshot, bool live, ObjectInspectorWindow window)
@@ -81,6 +92,21 @@ public sealed unsafe class TextureInspector(TextureArraySlicer textureArraySlice
             }
         }
 
+        ImGui.SameLine();
+        if (ImGui.Button("Save to File"u8)) {
+            var safeHandle = new SafeTextureHandle(pointer, true);
+            fileDialogManager.SaveFileDialog(
+                "Save Texture", ".tex,.atex,.dds", "texture.tex", ".tex", (ok, path) =>
+                {
+                    if (!ok) {
+                        return;
+                    }
+
+                    dumper.SaveToFile(safeHandle, path);
+                }
+            );
+        }
+
         if (state.ArraySliceIndex >= pointer->ArraySize) {
             state.ArraySliceIndex = (byte)Math.Max(0, pointer->ArraySize - 1);
         }
@@ -94,7 +120,10 @@ public sealed unsafe class TextureInspector(TextureArraySlicer textureArraySlice
         ImGui.Image(
             textureArraySlicer.GetImGuiHandle(pointer, state.ArraySliceIndex), size,
             Vector2.Zero,
-            new Vector2((float)pointer->ActualWidth / pointer->AllocatedWidth, (float)pointer->ActualHeight / pointer->AllocatedHeight)
+            new Vector2(
+                (float)pointer->ActualWidth / pointer->AllocatedWidth,
+                (float)pointer->ActualHeight / pointer->AllocatedHeight
+            )
         );
     }
 

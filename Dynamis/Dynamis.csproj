@@ -40,6 +40,10 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Reference Include="BCnEncoder">
+            <HintPath>$(DalamudLibPath)BCnEncoder.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
         <Reference Include="CheapLoc">
             <HintPath>$(DalamudLibPath)CheapLoc.dll</HintPath>
             <Private>false</Private>

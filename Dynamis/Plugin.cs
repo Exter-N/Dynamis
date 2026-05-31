@@ -36,6 +36,7 @@ public sealed class Plugin : IDalamudPlugin
     public Plugin(
         IDalamudPluginInterface pluginInterface,
         ITextureProvider textureProvider,
+        ITextureReadbackProvider readbackProvider,
         ICommandManager commandManager,
         IChatGui chatGui,
         IDtrBar dtrBar,
@@ -66,6 +67,7 @@ public sealed class Plugin : IDalamudPlugin
                     {
                         collection.AddSingleton(pluginInterface);
                         collection.AddSingleton(textureProvider);
+                        collection.AddSingleton(readbackProvider);
                         collection.AddSingleton(commandManager);
                         collection.AddSingleton(chatGui);
                         collection.AddSingleton(dtrBar);
@@ -103,6 +105,7 @@ public sealed class Plugin : IDalamudPlugin
                         collection.AddSingleton<ClassRegistry>();
                         collection.AddSingleton<ObjectInspector>();
                         collection.AddSingleton<TextureArraySlicer>();
+                        collection.AddSingleton<TextureDumper>();
                         collection.AddSingleton<ImGuiComponents>();
                         collection.AddSingleton<ContextMenu>();
 #if WITH_SMA
