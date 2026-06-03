@@ -17,7 +17,8 @@ public sealed class ObjectTableWindow : Window, ISingletonWindow, IMessageObserv
     private readonly IObjectTable    _objectTable;
     private readonly MessageHub      _messageHub;
 
-    private Task<TableEntry[]>? _vmTable;
+    private bool                _vmLive = true;
+    private Task<TableEntry[]>? _vmSnapshot;
 
     public ObjectTableWindow(ImGuiComponents imGuiComponents, IFramework framework, IObjectTable objectTable,
         MessageHub messageHub) : base("Dynamis - Object Table", 0)
@@ -43,65 +44,98 @@ public sealed class ObjectTableWindow : Window, ISingletonWindow, IMessageObserv
 
     public override void Draw()
     {
-        if (_vmTable is null) {
-            _vmTable = _framework.RunOnFrameworkThread(TakeSnapshot);
+        ImGui.Checkbox("Show live table"u8, ref _vmLive);
+
+        if (_vmLive) {
+            DrawTableLive();
+            return;
         }
 
-        if (ImGui.Button("Refresh")) {
-            _vmTable = _framework.RunOnFrameworkThread(TakeSnapshot);
+        if (_vmSnapshot is null) {
+            _vmSnapshot = _framework.RunOnFrameworkThread(TakeSnapshot);
         }
 
-        if (!_vmTable.IsCompleted) {
-            ImGui.TextUnformatted("Taking snapshot of object table...");
-        } else if (_vmTable.Exception is not null) {
+        ImGui.SameLine();
+        if (ImGui.Button("Refresh"u8)) {
+            _vmSnapshot = _framework.RunOnFrameworkThread(TakeSnapshot);
+        }
+
+        if (!_vmSnapshot.IsCompleted) {
+            ImGui.TextUnformatted("Taking snapshot of object table..."u8);
+        } else if (_vmSnapshot.Exception is not null) {
             using (ImRaii.PushColor(ImGuiCol.Text, StyleModel.GetFromCurrent().BuiltInColors!.DalamudRed!.Value)) {
-                ImGui.TextUnformatted("Failed taking snapshot of object table:");
+                ImGui.TextUnformatted("Failed taking snapshot of object table:"u8);
             }
-            ImGui.TextUnformatted(_vmTable.Exception.ToString());
-        } else if (_vmTable.IsCompletedSuccessfully) {
-            DrawTable(_vmTable.Result);
+
+            ImGui.TextUnformatted(_vmSnapshot.Exception.ToString());
+        } else if (_vmSnapshot.IsCompletedSuccessfully) {
+            DrawTableSnapshot(_vmSnapshot.Result);
         }
     }
 
-    private void DrawTable(TableEntry[] objectTable)
+    private void DrawTableLive()
     {
-        using var table = ImRaii.Table("##objectTable", 6, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit);
+        using var table = ImRaii.Table("##objectTable"u8, 6, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit);
         if (!table) {
             return;
         }
 
-        ImGui.TableSetupColumn("Index",               ImGuiTableColumnFlags.WidthStretch, 0.05f);
-        ImGui.TableSetupColumn("Game Object ID",      ImGuiTableColumnFlags.WidthStretch, 0.15f);
-        ImGui.TableSetupColumn("Name",                ImGuiTableColumnFlags.WidthStretch, 0.3f);
-        ImGui.TableSetupColumn("Game Object Address", ImGuiTableColumnFlags.WidthStretch, 0.15f);
-        ImGui.TableSetupColumn("Draw Object Address", ImGuiTableColumnFlags.WidthStretch, 0.15f);
-        ImGui.TableSetupColumn("Position",            ImGuiTableColumnFlags.WidthStretch, 0.2f);
-        ImGui.TableHeadersRow();
-        foreach (var entry in objectTable) {
-            ImGui.TableNextColumn();
-            ImGuiComponents.DrawCopyable(entry.ObjectIndex.ToString(), true);
-
-            ImGui.TableNextColumn();
-            ImGuiComponents.DrawCopyable(entry.GameObjectId.ToString("X"), true);
-
-            ImGui.TableNextColumn();
-            ImGuiComponents.DrawCopyable(entry.Name, false);
-
-            ImGui.TableNextColumn();
-            _imGuiComponents.DrawPointer(
-                entry.GameObjectAddress, null, () => $"Game object of {entry.Name}",
-                flags: ImGuiComponents.DrawPointerFlags.RightAligned
-            );
-
-            ImGui.TableNextColumn();
-            _imGuiComponents.DrawPointer(
-                entry.DrawObjectAddress, null, () => $"Draw object of {entry.Name}",
-                flags: ImGuiComponents.DrawPointerFlags.RightAligned
-            );
-
-            ImGui.TableNextColumn();
-            ImGuiComponents.DrawCopyable($"{entry.Position.X:F2}, {entry.Position.Y:F2}, {entry.Position.Z:F2}", true);
+        SetupAndDrawTableHeader();
+        foreach (var obj in _objectTable) {
+            DrawTableEntry(TableEntry.FromGameObject(obj));
         }
+    }
+
+    private void DrawTableSnapshot(TableEntry[] objectTable)
+    {
+        using var table = ImRaii.Table("##objectTable"u8, 6, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit);
+        if (!table) {
+            return;
+        }
+
+        SetupAndDrawTableHeader();
+        foreach (var entry in objectTable) {
+            DrawTableEntry(in entry);
+        }
+    }
+
+    private static void SetupAndDrawTableHeader()
+    {
+        ImGui.TableSetupColumn("Index"u8,               ImGuiTableColumnFlags.WidthStretch, 0.05f);
+        ImGui.TableSetupColumn("Game Object ID"u8,      ImGuiTableColumnFlags.WidthStretch, 0.15f);
+        ImGui.TableSetupColumn("Name"u8,                ImGuiTableColumnFlags.WidthStretch, 0.3f);
+        ImGui.TableSetupColumn("Game Object Address"u8, ImGuiTableColumnFlags.WidthStretch, 0.15f);
+        ImGui.TableSetupColumn("Draw Object Address"u8, ImGuiTableColumnFlags.WidthStretch, 0.15f);
+        ImGui.TableSetupColumn("Position"u8,            ImGuiTableColumnFlags.WidthStretch, 0.2f);
+        ImGui.TableHeadersRow();
+    }
+
+    private void DrawTableEntry(in TableEntry entry)
+    {
+        ImGui.TableNextColumn();
+        ImGuiComponents.DrawCopyable(entry.ObjectIndex.ToString(), true);
+
+        ImGui.TableNextColumn();
+        ImGuiComponents.DrawCopyable(entry.GameObjectId.ToString("X"), true);
+
+        ImGui.TableNextColumn();
+        var name = entry.Name;
+        ImGuiComponents.DrawCopyable(name, false);
+
+        ImGui.TableNextColumn();
+        _imGuiComponents.DrawPointer(
+            entry.GameObjectAddress, null, () => $"Game object of {name}",
+            flags: ImGuiComponents.DrawPointerFlags.RightAligned
+        );
+
+        ImGui.TableNextColumn();
+        _imGuiComponents.DrawPointer(
+            entry.DrawObjectAddress, null, () => $"Draw object of {name}",
+            flags: ImGuiComponents.DrawPointerFlags.RightAligned
+        );
+
+        ImGui.TableNextColumn();
+        ImGuiComponents.DrawCopyable($"{entry.Position.X:F2}, {entry.Position.Y:F2}, {entry.Position.Z:F2}", true);
     }
 
     private TableEntry[] TakeSnapshot()
@@ -124,7 +158,7 @@ public sealed class ObjectTableWindow : Window, ISingletonWindow, IMessageObserv
         BringToFront();
 
         if (message.Arguments.Equals(1, "refresh", "r")) {
-            _vmTable = _framework.RunOnFrameworkThread(TakeSnapshot);
+            _vmSnapshot = _framework.RunOnFrameworkThread(TakeSnapshot);
         }
     }
 

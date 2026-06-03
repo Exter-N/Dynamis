@@ -57,6 +57,74 @@ public sealed partial class ImGuiComponents(
         }
     }
 
+    public static void DrawSeparatorText(ReadOnlySpan<byte> text, float extraW = 0.0f)
+    {
+        var style = ImGui.GetStyle();
+        var drawList = ImGui.GetWindowDrawList();
+        var window = ImGuiP.GetCurrentWindow();
+
+        var labelSize = ImGui.CalcTextSize(text);
+        var pos = ImGui.GetCursorScreenPos();
+        var padding = style.FramePadding;
+
+        var separatorThickness = style.WindowBorderSize;
+        var minSize = new Vector2(
+            labelSize.X + extraW + padding.X * 2.0f, MathF.Max(labelSize.Y + padding.Y * 2.0f, separatorThickness)
+        );
+        var bb = new ImRect(
+            pos, window.WorkRect.Max with
+            {
+                Y = pos.Y + minSize.Y,
+            }
+        );
+        var textBaselineY =
+            MathF.Truncate((bb.Max.Y - bb.Min.Y - labelSize.Y) * style.SelectableTextAlign.Y + 0.999f);
+        ImGuiP.ItemSize(minSize, textBaselineY);
+        if (!ImGuiP.ItemAdd(bb, 0)) {
+            return;
+        }
+
+        var sep1X1 = pos.X;
+        var sep2X2 = bb.Max.X;
+        var sepsY = MathF.Truncate((bb.Min.Y + bb.Max.Y) * 0.5f + 0.999f);
+
+        var labelAvailW = MathF.Max(0.0f, sep2X2 - sep1X1 - padding.X * 2.0f);
+        var labelPos = new Vector2(
+            pos.X + padding.X + MathF.Max(0.0f, (labelAvailW - labelSize.X - extraW) * style.SelectableTextAlign.X),
+            pos.Y + textBaselineY
+        );
+
+        // This allows using SameLine() to position something in the 'extra_w'
+        window.DC.CursorPosPrevLine = window.DC.CursorPosPrevLine with
+        {
+            X = labelPos.X + labelSize.X,
+        };
+
+        var separatorCol = ImGui.GetColorU32(ImGuiCol.Border);
+        if (labelSize.X > 0.0f) {
+            var sep1X2 = labelPos.X - style.ItemSpacing.X;
+            var sep2X1 = labelPos.X + labelSize.X + extraW + style.ItemSpacing.X;
+            if (sep1X2 > sep1X1 && separatorThickness > 0.0f) {
+                drawList.AddLine(new(sep1X1, sepsY), new(sep1X2, sepsY), separatorCol, separatorThickness);
+            }
+
+            if (sep2X2 > sep2X1 && separatorThickness > 0.0f) {
+                drawList.AddLine(new(sep2X1, sepsY), new(sep2X2, sepsY), separatorCol, separatorThickness);
+            }
+
+            ImGuiP.RenderTextEllipsis(
+                drawList, labelPos, bb.Max + style.ItemSpacing with
+                {
+                    X = 0.0f,
+                }, bb.Max.X, bb.Max.X, text, labelSize
+            );
+        } else {
+            if (separatorThickness > 0.0f) {
+                drawList.AddLine(new(sep1X1, sepsY), new(sep2X2, sepsY), separatorCol, separatorThickness);
+            }
+        }
+    }
+
     public static void DrawCopyable(string text, bool mono, Func<string>? copyText = null)
     {
         bool clicked;
