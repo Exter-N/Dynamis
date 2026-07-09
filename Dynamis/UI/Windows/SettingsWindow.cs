@@ -175,6 +175,12 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
     {
         var configuration = _configuration.Configuration;
 
+        var showInDevMenu = configuration.ShowInDevMenu;
+        if (ImGui.Checkbox("Show in dev menu", ref showInDevMenu)) {
+            configuration.ShowInDevMenu = showInDevMenu;
+            _configuration.Save(nameof(configuration.ShowInDevMenu));
+        }
+
         var serious = configuration.Serious;
         if (ImGui.Checkbox("I don't like fun.", ref serious)) {
             configuration.Serious = serious;

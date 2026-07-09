@@ -44,6 +44,8 @@ public sealed class Configuration : IPluginConfiguration
 
     public bool LastSnapshotAnnotated { get; set; } = false;
 
+    public bool ShowInDevMenu { get; set; } = true;
+
     public bool Serious { get; set; } = false;
 
     public uint[] GetHexViewerPalette()

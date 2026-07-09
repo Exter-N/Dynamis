@@ -10,17 +10,17 @@ namespace Dynamis.UI.Windows;
 
 public sealed class ToolboxWindow : Window, ISingletonWindow, IMessageObserver<CommandMessage>
 {
-    private readonly MessageHub             _messageHub;
-    private readonly ConfigurationContainer _configuration;
+    private readonly MessageHub _messageHub;
+    private readonly Toolbox    _toolbox;
 
-    public ToolboxWindow(MessageHub messageHub, ConfigurationContainer configuration, ImGuiComponents imGuiComponents) :
+    public ToolboxWindow(MessageHub messageHub, Toolbox toolbox, ImGuiComponents imGuiComponents) :
         base(
             $"Dynamis {Assembly.GetExecutingAssembly().GetName().Version} Toolbox###DynamisToolbox",
             ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoDocking
         )
     {
         _messageHub = messageHub;
-        _configuration = configuration;
+        _toolbox = toolbox;
 
         Size = new Vector2(384, 216);
         SizeCondition = ImGuiCond.Always;
@@ -30,51 +30,10 @@ public sealed class ToolboxWindow : Window, ISingletonWindow, IMessageObserver<C
 
     public override void Draw()
     {
-        if (ImGui.Button("Signature Scanner")) {
-            _messageHub.Publish<OpenWindowMessage<SigScannerWindow>>();
-        }
-
-        ImGui.SameLine();
-        if (ImGui.Button("Object Table")) {
-            _messageHub.Publish<OpenWindowMessage<ObjectTableWindow>>();
-        }
-
-        ImGui.Dummy(new(16.0f, 16.0f));
-        if (ImGui.Button("Object Inspector")) {
-            _messageHub.Publish<OpenWindowMessage<ObjectInspectorWindow>>();
-        }
-
-        ImGui.SameLine();
-#if WITH_SMA
-        if (ImGui.Button("Hosted PowerShell")) {
-            _messageHub.Publish<OpenWindowMessage<HostedPsWindow>>();
-        }
-#else
-        using (ImRaii.Disabled()) {
-            ImGui.Button("Hosted PowerShell");
-        }
-
-        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled)) {
-            using var _ = ImRaii.Tooltip();
-            ImGui.TextUnformatted("This Dynamis build does not include the hosted PowerShell.");
-            ImGui.TextUnformatted("To use this, install a build that includes this functionality.");
-        }
-#endif
-
-        using (ImRaii.Disabled(!_configuration.Configuration.EnableIpfd)) {
-            if (ImGui.Button("IPFD Breakpoint")) {
-                _messageHub.Publish<OpenWindowMessage<BreakpointWindow>>();
-            }
-        }
-
-        if (!_configuration.Configuration.EnableIpfd && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled)) {
-            using var _ = ImRaii.Tooltip();
-            ImGui.TextUnformatted("The In-Process Faux Debugger is currently disabled.");
-            ImGui.TextUnformatted("To use this, enable this functionality in Dynamis' settings.");
-        }
+        _toolbox.Draw(static label => ImGui.Button(label), static () => ImGui.Dummy(new(16.0f, 16.0f)), true);
 
         ImGui.Dummy(new(16.0f, ImGui.GetContentRegionAvail().Y - ImGui.GetFrameHeightWithSpacing()));
-        if (ImGui.Button("Dalamud Console / Log window", new(ImGui.GetContentRegionAvail().X, -1.0f))) {
+        if (ImGui.Button("Dalamud Console / Log window"u8, new(ImGui.GetContentRegionAvail().X, -1.0f))) {
             _messageHub.Publish<OpenDalamudConsoleMessage>();
         }
     }

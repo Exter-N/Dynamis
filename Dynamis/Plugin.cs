@@ -104,8 +104,10 @@ public sealed class Plugin : IDalamudPlugin
 
                         collection.AddSingleton<Ipfd>();
 
+                        collection.AddSingleton<Toolbox>();
                         collection.AddSingleton<CommandHandler>();
                         collection.AddSingleton<LaunchButton>();
+                        collection.AddSingleton<DevMenuItem>();
                         collection.AddSingleton<WindowManager>();
 
                         collection.AddLazySingletonAlias<IDalamudLoggingConfiguration, ConfigurationContainer>();

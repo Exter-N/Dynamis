@@ -11,6 +11,7 @@ namespace Dynamis.UI;
 public sealed class WindowManager(
     MessageHub messageHub,
     IUiBuilder uiBuilder,
+    DevMenuItem devMenuItem,
     WindowSystem windowSystem,
     FileDialogManager fileDialogManager,
     ContextMenu contextMenu,
@@ -47,6 +48,7 @@ public sealed class WindowManager(
 
     private void Draw()
     {
+        devMenuItem.Draw();
         windowSystem.Draw();
         fileDialogManager.Draw();
         contextMenu.Draw();

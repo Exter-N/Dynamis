@@ -17,7 +17,7 @@ public sealed class CommandHandler(MessageHub messageHub, ICommandManager comman
         commandManager.AddHandler(
             MainCommandName, new(OnCommand)
             {
-                HelpMessage = "Open Dynamis' toolbox. Use /dynamis help to list valid sub-commands.",
+                HelpMessage = "Open Dynamis's toolbox. Use /dynamis help to list valid sub-commands.",
             }
         );
 

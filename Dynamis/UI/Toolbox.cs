@@ -1,0 +1,58 @@
+using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.Utility.Raii;
+using Dynamis.Configuration;
+using Dynamis.Messaging;
+using Dynamis.UI.Windows;
+
+namespace Dynamis.UI;
+
+public class Toolbox(ConfigurationContainer configuration, MessageHub messageHub)
+{
+    public void Draw(Func<ImU8String, bool> item, Action separator, bool useSameLine)
+    {
+        if (item("Signature Scanner"u8)) {
+            messageHub.Publish<OpenWindowMessage<SigScannerWindow>>();
+        }
+
+        if (useSameLine)
+            ImGui.SameLine();
+        if (item("Object Table"u8)) {
+            messageHub.Publish<OpenWindowMessage<ObjectTableWindow>>();
+        }
+
+        separator();
+        if (item("Object Inspector"u8)) {
+            messageHub.Publish<OpenWindowMessage<ObjectInspectorWindow>>();
+        }
+
+        if (useSameLine)
+            ImGui.SameLine();
+#if WITH_SMA
+        if (item("Hosted PowerShell"u8)) {
+            messageHub.Publish<OpenWindowMessage<HostedPsWindow>>();
+        }
+#else
+        using (ImRaii.Disabled()) {
+            item("Hosted PowerShell"u8);
+        }
+
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled)) {
+            using var _ = ImRaii.Tooltip();
+            ImGui.TextUnformatted("This Dynamis build does not include the hosted PowerShell."u8);
+            ImGui.TextUnformatted("To use this, install a build that includes this functionality."u8);
+        }
+#endif
+
+        using (ImRaii.Disabled(!configuration.Configuration.EnableIpfd)) {
+            if (item("IPFD Breakpoint"u8)) {
+                messageHub.Publish<OpenWindowMessage<BreakpointWindow>>();
+            }
+        }
+
+        if (!configuration.Configuration.EnableIpfd && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled)) {
+            using var _ = ImRaii.Tooltip();
+            ImGui.TextUnformatted("The In-Process Faux Debugger is currently disabled."u8);
+            ImGui.TextUnformatted("To use this, enable this functionality in Dynamis's settings."u8);
+        }
+    }
+}
