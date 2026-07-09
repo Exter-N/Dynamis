@@ -1,5 +1,4 @@
-﻿using Dalamud.Game;
-using Dalamud.Interface.ImGuiFileDialog;
+﻿using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Plugin;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
@@ -33,21 +32,7 @@ public sealed class Plugin : IDalamudPlugin
 
     public static IPluginLog? Log { get; private set; }
 
-    public Plugin(
-        IDalamudPluginInterface pluginInterface,
-        ITextureProvider textureProvider,
-        ITextureReadbackProvider readbackProvider,
-        ICommandManager commandManager,
-        IChatGui chatGui,
-        IDtrBar dtrBar,
-        IPluginLog pluginLog,
-        ISigScanner sigScanner,
-        IGameInteropProvider gameInteropProvider,
-        ITitleScreenMenu titleScreenMenu,
-        INotificationManager notificationManager,
-        IFramework framework,
-        IObjectTable objectTable,
-        IDataManager dataManager)
+    public Plugin(IDalamudPluginInterface pluginInterface, IPluginLog pluginLog)
     {
         Log = pluginLog;
 
@@ -66,21 +51,11 @@ public sealed class Plugin : IDalamudPlugin
                     collection =>
                     {
                         collection.AddSingleton(pluginInterface);
-                        collection.AddSingleton(textureProvider);
-                        collection.AddSingleton(readbackProvider);
-                        collection.AddSingleton(commandManager);
-                        collection.AddSingleton(chatGui);
-                        collection.AddSingleton(dtrBar);
                         collection.AddSingleton(pluginLog);
-                        collection.AddSingleton(sigScanner);
-                        collection.AddSingleton(gameInteropProvider);
-                        collection.AddSingleton(titleScreenMenu);
-                        collection.AddSingleton(notificationManager);
-                        collection.AddSingleton(framework);
-                        collection.AddSingleton(objectTable);
-                        collection.AddSingleton(dataManager);
 
                         collection.AddSingleton(pluginInterface.UiBuilder);
+
+                        collection.AddDalamudServices();
 
                         collection.AddSingleton(new Dalamud.Localization("Dynamis.Localization.", "", useEmbedded: true));
                         collection.AddSingleton(new WindowSystem("Dynamis"));

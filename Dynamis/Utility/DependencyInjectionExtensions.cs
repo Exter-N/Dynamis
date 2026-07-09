@@ -1,5 +1,7 @@
 using System.Reflection;
 using Dalamud.Interface.Windowing;
+using Dalamud.Plugin;
+using Dalamud.Plugin.Services;
 using Dynamis.Messaging;
 using Dynamis.UI.Windows;
 using Microsoft.Extensions.DependencyInjection;
@@ -67,6 +69,17 @@ internal static class DependencyInjectionExtensions
 
         foreach (var opener in openers) {
             collection.Add(opener);
+        }
+    }
+
+    public static void AddDalamudServices(this IServiceCollection collection)
+    {
+        var iType = typeof(IDalamudService);
+        foreach (var type in iType.Assembly.ExportedTypes.Where(iType.IsAssignableFrom)) {
+            if (collection.All(t => t.ServiceType != type))
+                collection.AddSingleton(
+                    type, provider => provider.GetRequiredService<IDalamudPluginInterface>().GetRequiredService(type)
+                );
         }
     }
 
