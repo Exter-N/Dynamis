@@ -5,6 +5,8 @@ namespace Dynamis.Interop;
 
 public sealed partial class ClassRegistry
 {
+    private const int MaximumFunctionSize = 4096;
+
     public ClassInfo GetFunctionClass(nint functionAddress, bool safeReads)
     {
         var fnClassName = DetermineClassName(new(ClassIdentifierKind.Function, functionAddress));
@@ -24,6 +26,7 @@ public sealed partial class ClassRegistry
                 Name = fnClassName,
                 Kind = ClassKind.Function,
                 EstimatedSize = (uint)body.Size,
+                Truncated = body.Truncated,
                 FunctionBody = body.Instructions,
             };
 
@@ -35,15 +38,24 @@ public sealed partial class ClassRegistry
         return classInfo;
     }
 
-    private (FunctionInstruction[] Instructions, nint Size) GetFunctionBody(nint functionAddress, bool safeReads)
+    private (FunctionInstruction[] Instructions, nint Size, bool Truncated) GetFunctionBody(nint functionAddress,
+        bool safeReads)
     {
         var codeReader = new ExecutableMemoryCodeReader(functionAddress, safeReads ? ipfd : null);
         var decoder = codeReader.CreateDecoder();
+        var full = false;
         var instructions = MemoryHeuristics.GetFunctionInstructions(decoder)
+                                           .TakeWhile(instr =>
+                                                {
+                                                    full = (instr.IP - unchecked((ulong)functionAddress))
+                                                         < MaximumFunctionSize;
+                                                    return full;
+                                                }
+                                            )
                                            .Select(instr => new FunctionInstruction(instr, GetMemoryOperand(instr)))
                                            .ToArray();
 
-        return (instructions, unchecked((nint)decoder.IP - functionAddress));
+        return (instructions, unchecked((nint)decoder.IP - functionAddress), !full);
     }
 
     private static void ConnectJumps(FunctionInstruction[] body)

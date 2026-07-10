@@ -248,6 +248,13 @@ public sealed partial class ImGuiComponents(
 
         ImGui.TextUnformatted($"Estimated Size: {@class.EstimatedSize} (0x{@class.EstimatedSize:X}) bytes");
 
+        if (@class.Truncated) {
+            ImGui.SameLine();
+            using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ErrorForeground)) {
+                ImGui.TextUnformatted("(truncated)"u8);
+            }
+        }
+
         if (!string.IsNullOrEmpty(@class.DefiningModule)) {
             ImGui.TextUnformatted($"Defined in Module: {@class.DefiningModule}");
         }

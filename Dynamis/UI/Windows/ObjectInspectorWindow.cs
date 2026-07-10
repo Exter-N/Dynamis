@@ -328,6 +328,13 @@ public sealed class ObjectInspectorWindow : IndexedWindow
             }
         }
 
+        if (@class.Truncated) {
+            ImGui.SameLine();
+            using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ErrorForeground)) {
+                ImGui.TextUnformatted("This object is actually larger, but is currently truncated."u8);
+            }
+        }
+
         if (@class.SizeFromManagedType.HasValue
          && @class.SizeFromManagedType.Value != @class.EstimatedSize) {
             using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.WarningForeground)) {
