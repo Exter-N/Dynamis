@@ -118,7 +118,7 @@ internal static class TypeExtensions
             _                        => throw new ArgumentException($"Unrecognized FieldType {t}"),
         };
 
-    public static int Size(this FieldType t)
+    public static int Size(this FieldType t, int containerSize)
         => t switch
         {
             FieldType.Boolean        => 1,
@@ -137,8 +137,8 @@ internal static class TypeExtensions
             FieldType.Single         => 4,
             FieldType.Double         => 8,
             FieldType.Pointer        => nint.Size,
-            FieldType.ByteString     => 1,
-            FieldType.CharString     => 2,
+            FieldType.ByteString     => containerSize,
+            FieldType.CharString     => containerSize & ~1,
             FieldType.CStringPointer => nint.Size,
             _                        => throw new ArgumentException($"Unrecognized FieldType {t}"),
         };

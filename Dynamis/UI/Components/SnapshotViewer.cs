@@ -173,7 +173,9 @@ public sealed class SnapshotViewer(
             return clicked;
         }
 
-        var ptrAnnotation = GetValueAnnotation(unchecked((uint)offset), unchecked((uint)length), null, 0u);
+        var ptrAnnotation = GetValueAnnotation(
+            unchecked((uint)offset), unchecked((uint)length), null, 0u, offset, length
+        );
         if (!string.IsNullOrEmpty(ptrAnnotation)) {
             ImGui.SameLine();
             ImGui.TextUnformatted($"Unk_{offset:X}: ");
@@ -222,7 +224,10 @@ public sealed class SnapshotViewer(
                     continue;
                 }
 
-                var annotation = GetValueAnnotation(classOffset + elementOffset, field.ElementSize, field, classOffset);
+                var annotation = GetValueAnnotation(
+                    classOffset + elementOffset,          field.ElementSize, field, classOffset,
+                    unchecked((int)classOffset) + offset, length
+                );
                 if (string.IsNullOrEmpty(annotation)) {
                     continue;
                 }
@@ -288,7 +293,8 @@ public sealed class SnapshotViewer(
         return itemClicked;
     }
 
-    private string GetValueAnnotation(uint offset, uint size, FieldInfo? field, uint classOffset)
+    private string GetValueAnnotation(uint offset, uint size, FieldInfo? field, uint classOffset, int rowOffset,
+        int rowSize)
     {
         if (_vmSnapshot is null) {
             return string.Empty;
@@ -301,6 +307,15 @@ public sealed class SnapshotViewer(
                 field, _vmSnapshot.Data.AsSpan(unchecked((int)classOffset)),
                 (offset - field.Offset - classOffset) / field.ElementSize
             );
+            switch (field.Type) {
+                case FieldType.ByteString:
+                    value = Slice((string)value, rowOffset - unchecked((int)offset), rowSize, 0);
+                    break;
+                case FieldType.CharString:
+                    value = Slice((string)value, rowOffset - unchecked((int)offset), rowSize, 1);
+                    break;
+            }
+
             if (field.ManagedType is not null && field.ManagedType.IsEnum) {
                 value = Enum.GetName(field.ManagedType, value) ?? value;
             }
@@ -341,6 +356,20 @@ public sealed class SnapshotViewer(
             }
 
             return builder.ToString();
+        }
+
+        static string Slice(string value, int relativeOffset, int size, int charSizeShift)
+        {
+            var effectiveStart = relativeOffset >> charSizeShift;
+            var effectiveSize = ((relativeOffset + size) >> charSizeShift) - effectiveStart;
+            if (effectiveStart < 0) {
+                effectiveSize += effectiveStart;
+                effectiveStart = 0;
+            }
+
+            return effectiveSize <= 0 || effectiveStart >= value.Length
+                ? string.Empty
+                : value.Substring(effectiveStart, Math.Min(effectiveSize, value.Length - effectiveStart));
         }
     }
 

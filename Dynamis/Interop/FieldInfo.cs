@@ -24,7 +24,7 @@ public sealed class FieldInfo : IComparable<FieldInfo>
                 return ElementClass.EstimatedSize;
             }
 
-            return (uint)Type.Size();
+            return (uint)Type.Size(unchecked((int)Size));
         }
     }
 
