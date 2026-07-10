@@ -140,7 +140,7 @@ public sealed class ObjectInspector(
         }
 
         var vtbl = vtblHint ?? Read<nint>(objectAddress, safeReads);
-        var vtblProtection = VirtualMemory.GetProtection(vtbl);
+        var vtblProtection = vtbl is 0 ? default : VirtualMemory.GetProtection(vtbl);
         if ((vtbl & (nint.Size - 1)) == 0 && vtblProtection.CanExecute()
                                           && memoryHeuristics.EstimateSizeAndDisplacementFromDtor(vtbl) is
                                              {
@@ -152,6 +152,13 @@ public sealed class ObjectInspector(
         var classId = classIdHint ?? DetermineClassId(objectAddress, vtbl);
         if (classId.Kind is ClassIdentifierKind.WellKnownObject or ClassIdentifierKind.WellKnownObjectByPointer) {
             return (classRegistry.GetClass(classId, vtbl, restOfPageSize), 0);
+        }
+
+        if (vtbl is 0) {
+            return (new ClassInfo
+            {
+                EstimatedSize = restOfPageSize,
+            }, 0);
         }
 
         if (vtblProtection.CanRead()) {
