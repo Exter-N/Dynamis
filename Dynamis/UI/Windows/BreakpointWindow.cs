@@ -7,6 +7,7 @@ using Dynamis.Interop;
 using Dynamis.Interop.Ipfd;
 using Dynamis.Interop.Win32;
 using Dynamis.Messaging;
+using Dynamis.UI.Components;
 using Dynamis.Utility;
 
 namespace Dynamis.UI.Windows;
@@ -20,7 +21,8 @@ public sealed class BreakpointWindow : IndexedWindow
     private readonly MessageHub      _messageHub;
     private readonly Breakpoint      _breakpoint;
 
-    private nint              _vmNewAddress;
+    private readonly PointerInput _addressInput;
+
     private bool              _vmEnable;
     private BreakpointFlags   _vmLength;
     private BreakpointFlags   _vmCondition;
@@ -35,15 +37,16 @@ public sealed class BreakpointWindow : IndexedWindow
     public Breakpoint Breakpoint
         => _breakpoint;
 
-    public BreakpointWindow(WindowSystem windowSystem, ImGuiComponents imGuiComponents, ObjectInspector objectInspector,
-        MessageHub messageHub, Breakpoint breakpoint, int index) : base(
-        $"Dynamis - IPFD Breakpoint##{index}", windowSystem, index
-    )
+    public BreakpointWindow(WindowSystem windowSystem, ImGuiComponents imGuiComponents,
+        PointerInputFactory pointerInputFactory, ObjectInspector objectInspector, MessageHub messageHub,
+        Breakpoint breakpoint, int index) : base($"Dynamis - IPFD Breakpoint##{index}", windowSystem, index)
     {
         _imGuiComponents = imGuiComponents;
         _objectInspector = objectInspector;
         _messageHub = messageHub;
         _breakpoint = breakpoint;
+
+        _addressInput = pointerInputFactory.Create("Address");
 
         breakpoint.Hit += BreakpointHit;
 
@@ -58,7 +61,7 @@ public sealed class BreakpointWindow : IndexedWindow
 
     public void Configure(nint address, BreakpointFlags condition, BreakpointFlags length, bool enable, int maximumHits, DeduplicationMode deduplicationMode)
     {
-        _vmNewAddress = address;
+        _addressInput.SetValue(address);
         _vmCondition = condition;
         _vmLength = length;
         _vmEnable = enable;
@@ -66,7 +69,7 @@ public sealed class BreakpointWindow : IndexedWindow
         _vmDeduplication = deduplicationMode;
 
         _vmSyncTask = _breakpoint.ModifyAsync(
-            _vmNewAddress,
+            address,
             (_vmEnable ? BreakpointFlags.LocalEnable | BreakpointFlags.GlobalEnable : 0) | _vmLength | _vmCondition
         );
     }
@@ -96,7 +99,8 @@ public sealed class BreakpointWindow : IndexedWindow
         using (ImRaii.PushFont(UiBuilder.MonoFont)) {
             ImGui.SetNextItemWidth(ImGui.CalcTextSize("mmmmmmmmmmmmmmmm").X + ImGui.GetStyle().FramePadding.X * 2.0f);
         }
-        ImGuiComponents.InputPointer("Address", ref _vmNewAddress);
+
+        _addressInput.Draw();
         ImGui.SameLine();
         ImGui.SetNextItemWidth(ImGui.CalcTextSize("Execute").X + ImGui.GetStyle().FramePadding.X * 2.0f + ImGui.GetFrameHeight());
         ImGuiComponents.Combo(
@@ -122,7 +126,7 @@ public sealed class BreakpointWindow : IndexedWindow
         using (ImRaii.Disabled(!(_vmSyncTask?.IsCompleted ?? true))) {
             if (ImGui.Button("Apply Configuration")) {
                 _vmSyncTask = _breakpoint.ModifyAsync(
-                    _vmNewAddress,
+                    _addressInput.GetValue(),
                     (_vmEnable ? BreakpointFlags.LocalEnable | BreakpointFlags.GlobalEnable : 0) | _vmLength
                   | _vmCondition
                 );

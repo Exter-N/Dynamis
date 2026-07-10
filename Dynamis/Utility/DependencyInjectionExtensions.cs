@@ -76,10 +76,11 @@ internal static class DependencyInjectionExtensions
     {
         var iType = typeof(IDalamudService);
         foreach (var type in iType.Assembly.ExportedTypes.Where(iType.IsAssignableFrom)) {
-            if (collection.All(t => t.ServiceType != type))
+            if (collection.All(t => t.ServiceType != type)) {
                 collection.AddSingleton(
                     type, provider => provider.GetRequiredService<IDalamudPluginInterface>().GetRequiredService(type)
                 );
+            }
         }
     }
 

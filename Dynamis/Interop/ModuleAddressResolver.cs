@@ -1,11 +1,17 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Dynamis.Interop.Win32;
 using Microsoft.Extensions.Logging;
 
 namespace Dynamis.Interop;
 
-public sealed class ModuleAddressResolver(SymbolApi symbolApi, ILogger<ModuleAddressResolver> logger)
+public sealed class ModuleAddressResolver(
+    SymbolApi symbolApi,
+    ILogger<ModuleAddressResolver> logger)
 {
+    public static readonly nint ExeBaseAddress         = Process.GetCurrentProcess().MainModule!.BaseAddress;
+    public static readonly nint ExeOriginalBaseAddress = unchecked((nint)0x140000000);
+
     private readonly List<ModuleInfo> _moduleCache        = [];
     private          long             _moduleCacheBuiltAt = 0;
 
@@ -48,6 +54,35 @@ public sealed class ModuleAddressResolver(SymbolApi symbolApi, ILogger<ModuleAdd
         return new(module.ModuleName.Value, null, address - module.BaseAddress, originalAddress);
     }
 
+    public nint? GetAddress(ModuleAddress address)
+    {
+        if (address.SymbolName is not null) {
+            try {
+                if (symbolApi.SymFromName(ProcessThreadApi.GetCurrentProcess(), address.SymbolName) is
+                    {
+                    } symbol) {
+                    return unchecked((nint)symbol.Address + address.Displacement);
+                }
+            } catch (Exception e) {
+                logger.LogError(
+                    e, "Failed to resolve information for symbol {Symbol}",
+                    address.SymbolName
+                );
+            }
+
+            return null;
+        }
+
+        UpdateModuleCacheIfStale();
+        foreach (var entry in _moduleCache) {
+            if (string.Equals(entry.ModuleName.Value, address.ModuleName, StringComparison.OrdinalIgnoreCase)) {
+                return entry.BaseAddress + address.Displacement;
+            }
+        }
+
+        return null;
+    }
+
     private void UpdateModuleCacheIfStale()
     {
         if (unchecked(Environment.TickCount64 - _moduleCacheBuiltAt) <= ModuleCacheMaxAge) {
@@ -59,6 +94,7 @@ public sealed class ModuleAddressResolver(SymbolApi symbolApi, ILogger<ModuleAdd
         Array.Sort(modules);
         _moduleCache.AddRange(
             from module in modules
+            where module is not 0
             select new ModuleInfo(
                 new(() => Path.GetFileName(ProcessThreadApi.GetModuleFileName(module))), module,
                 GetOriginalBaseAddress(module)
@@ -69,6 +105,11 @@ public sealed class ModuleAddressResolver(SymbolApi symbolApi, ILogger<ModuleAdd
 
     public static unsafe nint GetOriginalBaseAddress(nint baseAddress)
     {
+        if (baseAddress == ExeBaseAddress) {
+            // HACK
+            return ExeOriginalBaseAddress;
+        }
+
         if (!VirtualMemory.GetProtection(baseAddress).CanRead()) {
             return 0;
         }

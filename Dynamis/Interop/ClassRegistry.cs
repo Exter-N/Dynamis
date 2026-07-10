@@ -494,19 +494,19 @@ public sealed partial class ClassRegistry(
                     return instanceName.ClassName;
                 }
 
-                return $"WkObj_{classId.Address}";
+                return $"WkObj_{classId.Address:X}";
             case ClassIdentifierKind.WellKnownObjectByPointer:
                 if (dataYamlContainer.ClassesByInstancePointer?.TryGetValue(classId.Address, out instanceName) ?? false) {
                     return instanceName.ClassName;
                 }
 
-                return $"WkObjP_{classId.Address}";
+                return $"WkObjP_{classId.Address:X}";
             case ClassIdentifierKind.ObjectWithVirtualTable:
                 if (dataYamlContainer.ClassesByVtbl?.TryGetValue(classId.Address, out var className) ?? false) {
                     return className;
                 }
 
-                return $"Cls_{classId.Address}";
+                return $"Cls_{classId.Address:X}";
             case ClassIdentifierKind.VirtualTable:
                 var baseName = DetermineClassName(
                     classId with

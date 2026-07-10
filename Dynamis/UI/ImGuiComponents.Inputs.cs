@@ -190,43 +190,27 @@ partial class ImGuiComponents
         }
     }
 
-    public static unsafe bool InputPointer(string label, ref nint value, ImGuiInputTextFlags flags = 0,
-        bool showLabel = true)
+    public static void AddInputSubText(float mainTextWidth, string? subText)
     {
-        var config = GetPointerConfiguration();
-
-        using var id = ImRaii.PushId(label);
-
-        bool changed;
-        using (ImRaii.PushFont(UiBuilder.MonoFont)) {
-            fixed (nint* pValue = &value) {
-                changed = ImGui.InputScalar(
-                    "###pointer", config.DataType, new(pValue, 1), 0, 0, config.CFormat,
-                    ImGuiInputTextFlags.CharsHexadecimal | flags
-                );
-            }
+        if (string.IsNullOrWhiteSpace(subText)) {
+            return;
         }
 
-        if (showLabel) {
-            ImGui.SameLine(0.0f, ImGui.GetStyle().ItemInnerSpacing.X);
-            ImGui.TextUnformatted(label);
+        var framePadding = ImGui.GetStyle().FramePadding;
+        var rectMin = ImGui.GetItemRectMin() + framePadding;
+        if (mainTextWidth >= 0.0f) {
+            rectMin.X += mainTextWidth + ImGui.GetStyle().ItemInnerSpacing.X;
         }
 
-        return changed;
-    }
-
-    public static Vector2 CalcPointerSize(nint value)
-    {
-        using (ImRaii.PushFont(UiBuilder.MonoFont)) {
-            return ImGui.CalcTextSize(value.ToString(GetPointerConfiguration().DotnetFormat));
+        var rectMax = ImGui.GetItemRectMax() - framePadding;
+        var rectSize = rectMax - rectMin;
+        var textSize = ImGui.CalcTextSize(subText);
+        var textStart = new Vector2(rectMin.X + Math.Max(0.0f, rectSize.X - textSize.X), rectMin.Y + (rectSize.Y - textSize.Y) * 0.5f);
+        ImGui.GetWindowDrawList().PushClipRect(rectMin, rectMax, true);
+        try {
+            ImGui.GetWindowDrawList().AddText(textStart, ImGuiUtil.HalfTransparentText(), subText);
+        } finally {
+            ImGui.GetWindowDrawList().PopClipRect();
         }
     }
-
-    private static (ImGuiDataType DataType, string CFormat, string DotnetFormat) GetPointerConfiguration()
-        => nint.Size switch
-        {
-            4 => (ImGuiDataType.U32, "%08X", "X8"),
-            8 => (ImGuiDataType.U64, "%016llX", "X16"),
-            _ => throw new NotSupportedException("Only 32-bit and 64-bit pointers are supported"),
-        };
 }

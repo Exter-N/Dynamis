@@ -2,13 +2,12 @@ using System.Globalization;
 using Dalamud.Interface.ImGuiNotification;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
-using Dynamis.Configuration;
 using Dynamis.Interop;
 using Dynamis.Interop.Ipfd;
 using Dynamis.Messaging;
 using Dynamis.Resources;
+using Dynamis.UI.Components;
 using Dynamis.Utility;
-using Microsoft.Extensions.Logging;
 using static Dynamis.Utility.ChatGuiUtility;
 using static Dynamis.Utility.SeStringUtility;
 
@@ -19,6 +18,7 @@ public sealed class BreakpointWindowFactory(
     INotificationManager notificationManager,
     IChatGui chatGui,
     ImGuiComponents imGuiComponents,
+    PointerInputFactory pointerInputFactory,
     ObjectInspector objectInspector,
     Ipfd ipfd,
     MessageHub messageHub,
@@ -31,7 +31,9 @@ public sealed class BreakpointWindowFactory(
     {
         messageHub.Publish<DataYamlPreloadMessage>();
 
-        return new(WindowSystem, imGuiComponents, objectInspector, messageHub, breakpoint, GetFreeIndex());
+        return new(
+            WindowSystem, imGuiComponents, pointerInputFactory, objectInspector, messageHub, breakpoint, GetFreeIndex()
+        );
     }
 
     private BreakpointWindow CreateWindow(Breakpoint breakpoint)

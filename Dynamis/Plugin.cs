@@ -82,6 +82,7 @@ public sealed class Plugin : IDalamudPlugin
                         collection.AddSingleton<TextureArraySlicer>();
                         collection.AddSingleton<TextureDumper>();
                         collection.AddSingleton<ImGuiComponents>();
+                        collection.AddSingleton<PointerInputFactory>();
                         collection.AddSingleton<ContextMenu>();
 #if WITH_SMA
                         collection.AddSingleton<BootHelper>();

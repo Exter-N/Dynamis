@@ -26,20 +26,21 @@ public sealed class ObjectInspectorWindow : IndexedWindow
     private          bool                     _vmShowParents = false;
     private readonly Dictionary<Type, object> _vmCustom      = [];
 
-    private nint            _vmAddress;
+    private readonly PointerInput _addressInput;
+
     private int             _vmStatus;
     private ObjectSnapshot? _vmSnapshot;
 
     private bool _vmLive;
 
     public nint ObjectAddress
-        => _vmAddress;
+        => _addressInput.GetValue();
 
     public ObjectSnapshot? Snapshot
         => _vmSnapshot;
 
     public ObjectInspectorWindow(ILogger logger, WindowSystem windowSystem, ImGuiComponents imGuiComponents,
-        DataYamlContainer dataYamlContainer, ObjectInspector objectInspector,
+        PointerInputFactory pointerInputFactory, DataYamlContainer dataYamlContainer, ObjectInspector objectInspector,
         SnapshotViewerFactory snapshotViewerFactory, Lazy<ObjectInspectorDispatcher> objectInspectorDispatcher,
         int index) : base($"Dynamis - Object Inspector##{index}", windowSystem, index, 0)
     {
@@ -52,6 +53,8 @@ public sealed class ObjectInspectorWindow : IndexedWindow
         _associatedSnapshotViewer = snapshotViewerFactory.Create();
         _classFieldViewer = new();
 
+        _addressInput = pointerInputFactory.Create("###objectAddress");
+
         SizeConstraints = new WindowSizeConstraints
         {
             MinimumSize = new(768, 432),
@@ -63,13 +66,13 @@ public sealed class ObjectInspectorWindow : IndexedWindow
 
     public void Inspect(nint address, ClassInfo? @class, ClassIdentifier? classIdHint, string? name)
     {
-        _vmAddress = address;
+        _addressInput.SetValue(address);
         RunInspection(@class, classIdHint, name);
     }
 
     public void Inspect(ObjectSnapshot snapshot)
     {
-        _vmAddress = snapshot.Address ?? 0;
+        _addressInput.SetValue(snapshot.Address ?? 0);
         _vmSnapshot = snapshot;
         _vmStatus = 1;
 
@@ -91,11 +94,13 @@ public sealed class ObjectInspectorWindow : IndexedWindow
     private void RunInspection(ClassInfo? @class, ClassIdentifier? classIdHint, string? name)
     {
         try {
-            _vmSnapshot = _objectInspector.TakeSnapshot(_vmAddress, @class, classIdHint, name);
-            _vmAddress = _vmSnapshot.Address ?? _vmAddress;
+            _vmSnapshot = _objectInspector.TakeSnapshot(_addressInput.GetValue(), @class, classIdHint, name);
+            _addressInput.SetValue(_vmSnapshot.Address);
             _vmStatus = 1;
         } catch (Exception e) {
-            _logger.LogError(e, "Object snapshotting or inspection failed for address 0x{Address:X}", _vmAddress);
+            _logger.LogError(
+                e, "Object snapshotting or inspection failed for address 0x{Address:X}", _addressInput.GetValue()
+            );
             _vmSnapshot = null;
             _vmStatus = 2;
         }
@@ -115,24 +120,9 @@ public sealed class ObjectInspectorWindow : IndexedWindow
         var itemInnerSpacing = ImGui.GetStyle().ItemInnerSpacing.X;
         var refreshButtonWidth = ImGuiComponents.NormalizedIconButtonSize(FontAwesomeIcon.Sync).X;
         ImGui.SetNextItemWidth(ImGui.CalcItemWidth() - itemInnerSpacing - refreshButtonWidth - ImGui.GetFrameHeight());
-        if (ImGuiComponents.InputPointer("Object Address", ref _vmAddress, ImGuiInputTextFlags.EnterReturnsTrue, false)) {
+        _addressInput.SubText = _vmSnapshot?.Name;
+        if (_addressInput.Draw(ImGuiInputTextFlags.EnterReturnsTrue)) {
             RunInspection(null, null, null);
-        }
-
-        if (!ImGui.IsItemActive() && _vmSnapshot?.Name is not null) {
-            var framePadding = ImGui.GetStyle().FramePadding;
-            var rectMin = ImGui.GetItemRectMin() + framePadding;
-            rectMin.X += ImGuiComponents.CalcPointerSize(_vmAddress).X + itemInnerSpacing;
-            var rectMax = ImGui.GetItemRectMax() - framePadding;
-            var rectSize = rectMax - rectMin;
-            var textSize = ImGui.CalcTextSize(_vmSnapshot.Name);
-            var textStart = new Vector2(rectMin.X + Math.Max(0.0f, rectSize.X - textSize.X), rectMin.Y + (rectSize.Y - textSize.Y) * 0.5f);
-            ImGui.GetWindowDrawList().PushClipRect(rectMin, rectMax, false);
-            try {
-                ImGui.GetWindowDrawList().AddText(textStart, ImGuiUtil.HalfTransparentText(), _vmSnapshot.Name);
-            } finally {
-                ImGui.GetWindowDrawList().PopClipRect();
-            }
         }
 
         ImGui.SameLine(0.0f, 0.0f);
@@ -144,8 +134,8 @@ public sealed class ObjectInspectorWindow : IndexedWindow
             if (combo) {
                 foreach (var (address, identification) in
                          _dataYamlContainer.GetWellKnownAddresses(AddressType.Instance)) {
-                    if (ImGui.Selectable(identification.Describe(), address == _vmAddress)) {
-                        _vmAddress = address;
+                    if (ImGui.Selectable(identification.Describe(), address == _addressInput.GetValue())) {
+                        _addressInput.SetValue(address);
                         RunInspection(null, identification.ClassIdentifierHint, identification.Describe());
                     }
                 }
@@ -155,7 +145,7 @@ public sealed class ObjectInspectorWindow : IndexedWindow
         if (_vmStatus != 0 && (_vmSnapshot is null || _vmSnapshot.Address.HasValue && _vmSnapshot.Live)) {
             ImGui.SameLine(0.0f, itemInnerSpacing);
             if (ImGuiComponents.NormalizedIconButton(FontAwesomeIcon.Sync)) {
-                _vmAddress = _vmSnapshot?.Address ?? _vmAddress;
+                _addressInput.SetValue(_vmSnapshot?.Address);
                 RunInspection(_vmSnapshot?.Class, null, _vmSnapshot?.Name);
             }
 
@@ -267,6 +257,7 @@ public sealed class ObjectInspectorWindow : IndexedWindow
             ImGui.SameLine(0.0f, ImGui.GetStyle().ItemInnerSpacing.X);
         }
 
+        ImGui.AlignTextToFramePadding();
         ImGui.TextUnformatted($"Class Name: {@class.Name}");
         ImGui.SameLine(0.0f, ImGui.GetStyle().ItemInnerSpacing.X);
         if (ImGuiComponents.NormalizedIconButton(FontAwesomeIcon.Copy)) {
@@ -281,6 +272,7 @@ public sealed class ObjectInspectorWindow : IndexedWindow
         if (@class.DataYamlParents.Length > 0 && _vmShowParents) {
             using var indent = ImRaii.PushIndent(2);
             foreach (var parent in @class.DataYamlParents) {
+                ImGui.AlignTextToFramePadding();
                 ImGui.TextUnformatted($"Parent: {parent.Name}");
                 ImGui.SameLine(0.0f, ImGui.GetStyle().ItemInnerSpacing.X);
                 if (ImGuiComponents.NormalizedIconButton(FontAwesomeIcon.Copy)) {

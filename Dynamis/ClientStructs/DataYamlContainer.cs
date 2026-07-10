@@ -58,14 +58,14 @@ public sealed class DataYamlContainer : IMessageObserver<ConfigurationChangedMes
     public Dictionary<nint, MemberFunctionName>? VirtualFunctions
         => _virtualFunctions!.Value;
 
-    public DataYamlContainer(ConfigurationContainer configuration, ILogger<DataYamlContainer> logger, IDalamudPluginInterface pi, HttpClient httpClient)
+    public DataYamlContainer(ConfigurationContainer configuration, ILogger<DataYamlContainer> logger,
+        IDalamudPluginInterface pi, HttpClient httpClient)
     {
         _configuration = configuration;
         _logger = logger;
         _pi = pi;
         _httpClient = httpClient;
-        var exeBaseAddress = Process.GetCurrentProcess().MainModule!.BaseAddress;
-        _exeOffset = exeBaseAddress - unchecked((nint)0x140000000);
+        _exeOffset = ModuleAddressResolver.ExeBaseAddress - ModuleAddressResolver.ExeOriginalBaseAddress;
         Refresh();
     }
 

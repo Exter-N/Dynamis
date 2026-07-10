@@ -262,8 +262,13 @@ public sealed partial class ImGuiComponents(
             new PointerContextMenu(messageHub, pointer, moduleAddressResolver.Resolve(pointer), @class, name)
         );
 
+    public void OpenPointerCopyOnlyContextMenu(nint pointer)
+        => contextMenu.Open(
+            new PointerContextMenu(null, pointer, moduleAddressResolver.Resolve(pointer), null, null)
+        );
+
     private sealed class PointerContextMenu(
-        MessageHub messageHub,
+        MessageHub? messageHub,
         nint pointer,
         ModuleAddress? moduleAddress,
         Func<ClassInfo?>? @class,
@@ -272,7 +277,7 @@ public sealed partial class ImGuiComponents(
         public bool Draw()
         {
             var ret = false;
-            if (pointer != 0 && ImGui.Selectable("Inspect object")) {
+            if (messageHub is not null && pointer != 0 && ImGui.Selectable("Inspect object")) {
                 messageHub.Publish(new InspectObjectMessage(pointer, @class?.Invoke(), null, name?.Invoke()));
                 ret = true;
             }

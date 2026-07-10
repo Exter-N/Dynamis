@@ -18,16 +18,19 @@ public sealed class DevMenuItem(
     {
         // Must be kept in sync with ToolboxWindow.Draw.
 
-        if (!configuration.Configuration.ShowInDevMenu || !pluginInterface.IsDevMenuOpen)
+        if (!configuration.Configuration.ShowInDevMenu || !pluginInterface.IsDevMenuOpen) {
             return;
+        }
 
         using var bar = ImRaii.MainMenuBar();
-        if (!bar)
+        if (!bar) {
             return;
+        }
 
         using var menu = ImRaii.Menu("Dynamis"u8);
-        if (!menu)
+        if (!menu) {
             return;
+        }
 
         toolbox.Draw(static label => ImGui.MenuItem(label), ImGui.Separator, false);
 

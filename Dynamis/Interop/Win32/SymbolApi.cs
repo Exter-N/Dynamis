@@ -98,6 +98,12 @@ public sealed partial class SymbolApi : IMessageObserver<ConfigurationChangedMes
         SymbolInfo* Symbol);
 
     [LibraryImport(
+        "dbghelp.dll", EntryPoint = "SymFromNameW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16
+    )]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static unsafe partial bool SymFromName(nint hProcess, string Name, SymbolInfo* Symbol);
+
+    [LibraryImport(
         "dbghelp.dll", EntryPoint = "StackWalk64", StringMarshalling = StringMarshalling.Utf16
     )]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -135,6 +141,33 @@ public sealed partial class SymbolApi : IMessageObserver<ConfigurationChangedMes
         }
 
         return (new(symInfo->Name, 0, (int)symInfo->NameLen), *symInfo, unchecked((nint)displacement));
+    }
+
+    public unsafe SymbolInfo? SymFromName(nint hProcess, string Name)
+    {
+        if (!_initialized) {
+            return null;
+        }
+
+        bool success;
+        var buffer = stackalloc byte[sizeof(SymbolInfo) + (MaxSymName - 1) * sizeof(char)];
+        var symInfo = (SymbolInfo*)buffer;
+        symInfo->SizeOfStruct = (uint)sizeof(SymbolInfo);
+        symInfo->MaxNameLen = MaxSymName;
+        lock (this) {
+            success = SymFromName(hProcess, Name, symInfo);
+        }
+
+        if (!success) {
+            var hr = Marshal.GetHRForLastWin32Error();
+            if (hr != unchecked((int)0x80070000u)) {
+                Marshal.ThrowExceptionForHR(hr);
+            }
+
+            return null;
+        }
+
+        return *symInfo;
     }
 
     public unsafe StackFrame[] StackWalk(ref readonly Context context, ReadProcessMemoryRoutine? readProcessMemory)

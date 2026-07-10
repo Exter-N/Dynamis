@@ -13,6 +13,7 @@ public sealed class ObjectInspectorWindowFactory(
     ILogger<ObjectInspectorWindowFactory> logger,
     WindowSystem windowSystem,
     ImGuiComponents imGuiComponents,
+    PointerInputFactory pointerInputFactory,
     DataYamlContainer dataYamlContainer,
     ObjectInspector objectInspector,
     SnapshotViewerFactory snapshotViewerFactory,
@@ -26,8 +27,8 @@ public sealed class ObjectInspectorWindowFactory(
         dataYamlContainer.Preload();
 
         return new(
-            logger, WindowSystem, imGuiComponents, dataYamlContainer, objectInspector, snapshotViewerFactory,
-            objectInspectorDispatcher, GetFreeIndex()
+            logger, WindowSystem, imGuiComponents, pointerInputFactory, dataYamlContainer, objectInspector,
+            snapshotViewerFactory, objectInspectorDispatcher, GetFreeIndex()
         );
     }
 
