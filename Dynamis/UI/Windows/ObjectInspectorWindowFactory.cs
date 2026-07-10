@@ -5,6 +5,7 @@ using Dynamis.Interop;
 using Dynamis.Messaging;
 using Dynamis.UI.Components;
 using Dynamis.UI.ObjectInspectors;
+using Dynamis.Utility;
 using Microsoft.Extensions.Logging;
 
 namespace Dynamis.UI.Windows;
@@ -12,6 +13,7 @@ namespace Dynamis.UI.Windows;
 public sealed class ObjectInspectorWindowFactory(
     ILogger<ObjectInspectorWindowFactory> logger,
     WindowSystem windowSystem,
+    ShortLivedSingleCacheFactory shortLivedSingleCacheFactory,
     ImGuiComponents imGuiComponents,
     PointerInputFactory pointerInputFactory,
     DataYamlContainer dataYamlContainer,
@@ -22,12 +24,19 @@ public sealed class ObjectInspectorWindowFactory(
         IMessageObserver<InspectObjectMessage>,
         IMessageObserver<CommandMessage>
 {
+    private readonly ShortLivedSingleCache<KeyValuePair<nint, AddressIdentification>[]> _wellKnownAddresses =
+        shortLivedSingleCacheFactory.Create(() =>
+            dataYamlContainer.GetWellKnownAddresses(AddressType.Instance)
+                             .OrderBy(entry => entry.Value.Describe())
+                             .ToArray()
+        );
+
     protected override ObjectInspectorWindow DoCreateWindow()
     {
         dataYamlContainer.Preload();
 
         return new(
-            logger, WindowSystem, imGuiComponents, pointerInputFactory, dataYamlContainer, objectInspector,
+            logger, WindowSystem, imGuiComponents, pointerInputFactory, objectInspector, _wellKnownAddresses,
             snapshotViewerFactory, objectInspectorDispatcher, GetFreeIndex()
         );
     }

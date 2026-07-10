@@ -4,10 +4,10 @@ using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
-using Dynamis.ClientStructs;
 using Dynamis.Interop;
 using Dynamis.UI.Components;
 using Dynamis.UI.ObjectInspectors;
+using Dynamis.Utility;
 using Microsoft.Extensions.Logging;
 
 namespace Dynamis.UI.Windows;
@@ -15,9 +15,10 @@ namespace Dynamis.UI.Windows;
 public sealed class ObjectInspectorWindow : IndexedWindow
 {
     private readonly ILogger                         _logger;
-    private readonly DataYamlContainer               _dataYamlContainer;
     private readonly ObjectInspector                 _objectInspector;
     private readonly Lazy<ObjectInspectorDispatcher> _objectInspectorDispatcher;
+
+    private readonly ShortLivedSingleCache<KeyValuePair<nint, AddressIdentification>[]> _wellKnownAddresses;
 
     private readonly SnapshotViewer   _snapshotViewer;
     private readonly SnapshotViewer   _associatedSnapshotViewer;
@@ -40,14 +41,16 @@ public sealed class ObjectInspectorWindow : IndexedWindow
         => _vmSnapshot;
 
     public ObjectInspectorWindow(ILogger logger, WindowSystem windowSystem, ImGuiComponents imGuiComponents,
-        PointerInputFactory pointerInputFactory, DataYamlContainer dataYamlContainer, ObjectInspector objectInspector,
+        PointerInputFactory pointerInputFactory, ObjectInspector objectInspector,
+        ShortLivedSingleCache<KeyValuePair<nint, AddressIdentification>[]> wellKnownAddresses,
         SnapshotViewerFactory snapshotViewerFactory, Lazy<ObjectInspectorDispatcher> objectInspectorDispatcher,
         int index) : base($"Dynamis - Object Inspector##{index}", windowSystem, index, 0)
     {
         _logger = logger;
-        _dataYamlContainer = dataYamlContainer;
         _objectInspector = objectInspector;
         _objectInspectorDispatcher = objectInspectorDispatcher;
+
+        _wellKnownAddresses = wellKnownAddresses;
 
         _snapshotViewer = snapshotViewerFactory.Create();
         _associatedSnapshotViewer = snapshotViewerFactory.Create();
@@ -132,8 +135,7 @@ public sealed class ObjectInspectorWindow : IndexedWindow
                    ImGuiComboFlags.NoPreview | ImGuiComboFlags.HeightLarge | ImGuiComboFlags.PopupAlignLeft
                )) {
             if (combo) {
-                foreach (var (address, identification) in
-                         _dataYamlContainer.GetWellKnownAddresses(AddressType.Instance)) {
+                foreach (var (address, identification) in _wellKnownAddresses.GetOrCreateValue()) {
                     if (ImGui.Selectable(identification.Describe(), address == _addressInput.GetValue())) {
                         _addressInput.SetValue(address);
                         RunInspection(null, identification.ClassIdentifierHint, identification.Describe());

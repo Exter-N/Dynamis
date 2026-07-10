@@ -4,6 +4,7 @@ using Dalamud.Interface.Windowing;
 using Dynamis.Interop;
 using Dynamis.Messaging;
 using Dynamis.UI.Windows;
+using Dynamis.Utility;
 using Microsoft.Extensions.Hosting;
 
 namespace Dynamis.UI;
@@ -18,6 +19,7 @@ public sealed class WindowManager(
     TextureArraySlicer textureArraySlicer,
     ObjectInspector objectInspector,
     AddressIdentifier addressIdentifier,
+    ShortLivedSingleCacheFactory shortLivedSingleCacheFactory,
     IEnumerable<Lazy<Window>> windows)
     : IHostedService
 {
@@ -55,6 +57,7 @@ public sealed class WindowManager(
         textureArraySlicer.Tick();
         objectInspector.Tick();
         addressIdentifier.Tick();
+        shortLivedSingleCacheFactory.Tick();
     }
 
     private void OpenMainUi()

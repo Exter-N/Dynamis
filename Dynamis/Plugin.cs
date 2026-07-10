@@ -88,6 +88,7 @@ public sealed class Plugin : IDalamudPlugin
                         collection.AddSingleton<BootHelper>();
 #endif
                         collection.AddSingleton<DynamicBoxFactory>();
+                        collection.AddSingleton<ShortLivedSingleCacheFactory>();
 
                         collection.AddSingleton<SnapshotViewerFactory>();
 
