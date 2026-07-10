@@ -7,7 +7,7 @@ using System.Numerics;
 using System.Reflection;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
-using Dalamud.Interface.Style;
+using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using Dynamis.UI.Components;
 using Dynamis.Utility;
@@ -73,7 +73,7 @@ public sealed class FormPrompt(
         if (!string.IsNullOrEmpty(helpMessage)) {
             ImGui.SameLine(0.0f, ImGui.GetStyle().ItemInnerSpacing.X);
             ImGuiComponents.NormalizedIcon(
-                FontAwesomeIcon.InfoCircle, StyleModel.GetFromCurrent()!.BuiltInColors!.ParsedBlue!.Value.ToUInt32()
+                FontAwesomeIcon.InfoCircle, ImGuiColors.InfoForeground.ToUInt32()
             );
 
             if (ImGui.IsItemHovered()) {

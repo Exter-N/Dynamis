@@ -1,6 +1,6 @@
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
-using Dalamud.Interface.Style;
+using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
@@ -115,7 +115,7 @@ public sealed class SigScannerWindow : Window, ISingletonWindow, IMessageObserve
                     result.Address, null, null, flags: ImGuiComponents.DrawPointerFlags.RightAligned
                 );
             } else {
-                using (ImRaii.PushColor(ImGuiCol.Text, StyleModel.GetFromCurrent().BuiltInColors!.DalamudRed!.Value)) {
+                using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ErrorForeground)) {
                     if (result.Exception is not null) {
                         ImGui.Selectable("Error");
                     } else {

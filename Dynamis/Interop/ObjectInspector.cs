@@ -5,7 +5,6 @@ using Dynamis.Interop.Win32;
 using Dynamis.Messaging;
 using Dynamis.UI;
 using Dynamis.Utility;
-using Microsoft.Extensions.Logging;
 
 namespace Dynamis.Interop;
 

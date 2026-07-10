@@ -1,7 +1,7 @@
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.ClientState.Objects.Types;
-using Dalamud.Interface.Style;
+using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
@@ -63,7 +63,7 @@ public sealed class ObjectTableWindow : Window, ISingletonWindow, IMessageObserv
         if (!_vmSnapshot.IsCompleted) {
             ImGui.TextUnformatted("Taking snapshot of object table..."u8);
         } else if (_vmSnapshot.Exception is not null) {
-            using (ImRaii.PushColor(ImGuiCol.Text, StyleModel.GetFromCurrent().BuiltInColors!.DalamudRed!.Value)) {
+            using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ErrorForeground)) {
                 ImGui.TextUnformatted("Failed taking snapshot of object table:"u8);
             }
 

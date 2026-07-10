@@ -1,7 +1,7 @@
 ﻿using System.Reflection;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
-using Dalamud.Interface.Style;
+using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
@@ -120,10 +120,7 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
 
     private void DrawUnstableSettingWarning()
     {
-        ImGuiComponents.NormalizedIcon(
-            FontAwesomeIcon.ExclamationTriangle,
-            StyleModel.GetFromCurrent().BuiltInColors!.DalamudOrange!.Value.ToUInt32()
-        );
+        ImGuiComponents.NormalizedIcon(FontAwesomeIcon.ExclamationTriangle, ImGuiColors.WarningForeground.ToUInt32());
 
         if (ImGui.IsItemHovered()) {
             using var _ = ImRaii.Tooltip();

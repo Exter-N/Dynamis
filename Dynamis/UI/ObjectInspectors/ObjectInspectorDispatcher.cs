@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Interface.Style;
+using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using Dynamis.Interop;
 using Dynamis.UI.Windows;
@@ -88,7 +88,7 @@ public sealed class ObjectInspectorDispatcher
                     $"Exception caught in {{InspectorType}}.{nameof(IObjectInspector<T>.DrawAdditionalTooltipDetails)}",
                     inspector.GetType()
                 );
-                using (ImRaii.PushColor(ImGuiCol.Text, StyleModel.GetFromCurrent().BuiltInColors!.DalamudRed!.Value)) {
+                using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ErrorForeground)) {
                     ImGui.TextUnformatted($"Error in {typeof(T).Name}");
                 }
             }
@@ -114,7 +114,7 @@ public sealed class ObjectInspectorDispatcher
                     $"Exception caught in {{InspectorType}}.{nameof(IObjectInspector<T>.DrawAdditionalHeaderDetails)}",
                     inspector.GetType()
                 );
-                using (ImRaii.PushColor(ImGuiCol.Text, StyleModel.GetFromCurrent().BuiltInColors!.DalamudRed!.Value)) {
+                using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ErrorForeground)) {
                     ImGui.TextUnformatted($"Error in {typeof(T).Name}");
                 }
             }
@@ -140,7 +140,7 @@ public sealed class ObjectInspectorDispatcher
                     $"Exception caught in {{InspectorType}}.{nameof(IObjectInspector<T>.DrawAdditionalTabs)}",
                     inspector.GetType()
                 );
-                using (ImRaii.PushColor(ImGuiCol.Text, StyleModel.GetFromCurrent().BuiltInColors!.DalamudRed!.Value)) {
+                using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ErrorForeground)) {
                     using var _ = ImRaii.TabItem($"Error in {typeof(T).Name}");
                     // This block intentionally left "blank".
                 }

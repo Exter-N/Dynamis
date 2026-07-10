@@ -1,8 +1,8 @@
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
+using Dalamud.Interface.Colors;
 using Dalamud.Interface.ImGuiFileDialog;
-using Dalamud.Interface.Style;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dynamis.Interop;
@@ -241,7 +241,7 @@ public sealed partial class ImGuiComponents(
         }
 
         if (displacement > 0) {
-            using (ImRaii.PushColor(ImGuiCol.Text, StyleModel.GetFromCurrent().BuiltInColors!.DalamudYellow!.Value)) {
+            using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.WarningForeground)) {
                 ImGui.TextUnformatted($"Displacement: {displacement} (0x{displacement:X}) bytes");
             }
         }

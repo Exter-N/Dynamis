@@ -1,7 +1,7 @@
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
-using Dalamud.Interface.Style;
+using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dynamis.ClientStructs;
@@ -165,7 +165,7 @@ public sealed class ObjectInspectorWindow : IndexedWindow
                 DrawSnapshot();
                 break;
             case 2:
-                using (ImRaii.PushColor(ImGuiCol.Text, StyleModel.GetFromCurrent().BuiltInColors!.DalamudRed!.Value)) {
+                using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ErrorForeground)) {
                     ImGui.TextUnformatted("Error");
                 }
 
@@ -176,7 +176,7 @@ public sealed class ObjectInspectorWindow : IndexedWindow
     private void DrawSnapshot()
     {
         if (_vmSnapshot is null) {
-            using var _ = ImRaii.PushColor(ImGuiCol.Text, StyleModel.GetFromCurrent().BuiltInColors!.DalamudRed!.Value);
+            using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ErrorForeground);
             ImGui.TextUnformatted("Error");
             return;
         }
@@ -301,17 +301,17 @@ public sealed class ObjectInspectorWindow : IndexedWindow
                          && @class.SizeFromContext.Value == @class.EstimatedSize;
         if (sizeIsFromCtx) {
             ImGui.SameLine();
-            using (ImRaii.PushColor(ImGuiCol.Text, StyleModel.GetFromCurrent().BuiltInColors!.ParsedBlue!.Value)) {
+            using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.InfoForeground)) {
                 ImGui.TextUnformatted("(from context)");
             }
         } else if (sizeIsFromDtor && sizeIsFromManaged) {
             ImGui.SameLine();
-            using (ImRaii.PushColor(ImGuiCol.Text, StyleModel.GetFromCurrent().BuiltInColors!.ParsedGreen!.Value)) {
+            using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.SuccessForeground)) {
                 ImGui.TextUnformatted("(from both managed type and dtor)");
             }
         } else if (!sizeIsFromDtor && !sizeIsFromManaged) {
             ImGui.SameLine();
-            using (ImRaii.PushColor(ImGuiCol.Text, StyleModel.GetFromCurrent().BuiltInColors!.DalamudRed!.Value)) {
+            using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ErrorForeground)) {
                 ImGui.TextUnformatted("(no valid source - using rest of page)");
             }
         } else {
@@ -328,7 +328,7 @@ public sealed class ObjectInspectorWindow : IndexedWindow
 
         if (@class.SizeFromManagedType.HasValue
          && @class.SizeFromManagedType.Value != @class.EstimatedSize) {
-            using (ImRaii.PushColor(ImGuiCol.Text, StyleModel.GetFromCurrent().BuiltInColors!.DalamudYellow!.Value)) {
+            using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.WarningForeground)) {
                 ImGui.TextUnformatted(
                     $"Size from managed type: {@class.SizeFromManagedType.Value} (0x{@class.SizeFromManagedType.Value:X}) bytes"
                 );
@@ -336,7 +336,7 @@ public sealed class ObjectInspectorWindow : IndexedWindow
         }
 
         if (@class.SizeFromDtor.HasValue && @class.SizeFromDtor.Value != @class.EstimatedSize) {
-            using (ImRaii.PushColor(ImGuiCol.Text, StyleModel.GetFromCurrent().BuiltInColors!.DalamudYellow!.Value)) {
+            using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.WarningForeground)) {
                 ImGui.TextUnformatted(
                     $"Size from dtor: {@class.SizeFromDtor.Value} (0x{@class.SizeFromDtor.Value:X}) bytes"
                 );

@@ -6,7 +6,7 @@ using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Interface;
-using Dalamud.Interface.Style;
+using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
@@ -387,10 +387,7 @@ public sealed class HostedPsWindow : IndexedWindow, IDisposable
         ImGui.SameLine();
         ImGui.Checkbox("Copy mode", ref _copyOnClick);
         ImGui.SameLine(0.0f, ImGui.GetStyle().ItemInnerSpacing.X);
-        ImGuiComponents.NormalizedIcon(
-            FontAwesomeIcon.InfoCircle,
-            StyleModel.GetFromCurrent().BuiltInColors!.DalamudGrey!.Value.ToUInt32()
-        );
+        ImGuiComponents.NormalizedIcon(FontAwesomeIcon.InfoCircle, ImGuiColors.InfoForeground.ToUInt32());
 
         if (ImGui.IsItemHovered()) {
             using var _ = ImRaii.Tooltip();

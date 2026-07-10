@@ -1,6 +1,6 @@
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
-using Dalamud.Interface.Style;
+using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dynamis.Interop;
@@ -134,7 +134,7 @@ public sealed class BreakpointWindow : IndexedWindow
         }
 
         if (_vmCondition == BreakpointFlags.DataReadsAndWrites) {
-            using (ImRaii.PushColor(ImGuiCol.Text, StyleModel.GetFromCurrent().BuiltInColors!.DalamudRed!.Value)) {
+            using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ErrorForeground)) {
                 ImGui.TextUnformatted("Read/Write watchpoints in IPFD are known to cause crashes in some circumstances. Use at your own risk!");
             }
         }
@@ -145,11 +145,11 @@ public sealed class BreakpointWindow : IndexedWindow
         ImGui.TextUnformatted("Current breakpoint status: ");
         ImGui.SameLine(0.0f, 0.0f);
         if (flags.HasFlag(BreakpointFlags.LocalEnable)) {
-            using (ImRaii.PushColor(ImGuiCol.Text, StyleModel.GetFromCurrent().BuiltInColors!.ParsedGreen!.Value)) {
+            using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.SuccessForeground)) {
                 ImGui.TextUnformatted("Enabled");
             }
         } else {
-            using (ImRaii.PushColor(ImGuiCol.Text, StyleModel.GetFromCurrent().BuiltInColors!.DalamudRed!.Value)) {
+            using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ErrorForeground)) {
                 ImGui.TextUnformatted("Disabled");
             }
         }

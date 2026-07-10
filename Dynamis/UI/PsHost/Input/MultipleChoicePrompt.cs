@@ -3,7 +3,7 @@ using System.Collections.ObjectModel;
 using System.Management.Automation.Host;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
-using Dalamud.Interface.Style;
+using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using Dynamis.Utility;
 
@@ -42,7 +42,7 @@ public sealed class MultipleChoicePrompt(
             if (!string.IsNullOrEmpty(choice.HelpMessage)) {
                 ImGui.SameLine(0.0f, ImGui.GetStyle().ItemInnerSpacing.X);
                 ImGuiComponents.NormalizedIcon(
-                    FontAwesomeIcon.InfoCircle, StyleModel.GetFromCurrent()!.BuiltInColors!.ParsedBlue!.Value.ToUInt32()
+                    FontAwesomeIcon.InfoCircle, ImGuiColors.InfoForeground.ToUInt32()
                 );
 
                 if (ImGui.IsItemHovered()) {

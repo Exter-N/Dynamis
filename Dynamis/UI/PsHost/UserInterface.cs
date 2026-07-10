@@ -4,7 +4,6 @@ using System.Management.Automation;
 using System.Management.Automation.Host;
 using System.Security;
 using Dalamud.Game.Text.SeStringHandling;
-using Dalamud.Interface.Style;
 using Dynamis.UI.PsHost.Input;
 using Dynamis.UI.PsHost.Output;
 using Dynamis.UI.Windows;
@@ -70,9 +69,6 @@ public sealed class UserInterface(HostedPsWindow window) : PSHostUserInterface, 
 
     public override void WriteLine(string value)
         => Write(null, value, null, true);
-
-    private static DalamudColors BuiltInColors
-        => StyleModel.GetFromCurrent().BuiltInColors!;
 
     public override void WriteErrorLine(string message)
         => Write([Icon(BitmapFontIcon.Warning), UiForeground(16),], message, [UiForegroundOff,], true);
