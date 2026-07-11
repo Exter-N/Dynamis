@@ -1,7 +1,9 @@
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using FFXIVClientStructs.Interop;
 using ReflFieldInfo = System.Reflection.FieldInfo;
 
 namespace Dynamis.Interop;
@@ -153,5 +155,48 @@ public static class ReflectionExtensions
 
         typeArguments = typeArgumentsList.ToArray();
         return true;
+    }
+
+    public static bool IsPointerCsAware(this Type type)
+        => type.IsPointer || type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Pointer<>);
+
+    public static bool TryGetPointeeTypeCsAware(this Type? type, [NotNullWhen(true)] out Type? pointeeType)
+    {
+        if (type is null) {
+            pointeeType = null;
+            return false;
+        }
+
+        if (type.IsPointer) {
+            pointeeType = type.GetElementType();
+            return pointeeType is not null;
+        }
+
+        if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Pointer<>)) {
+            pointeeType = type.GetGenericArguments()[0];
+            return true;
+        }
+
+        pointeeType = null;
+        return false;
+    }
+
+    public static Type ToCsPointerType(this Type type)
+    {
+        if (type == typeof(void*)) {
+            return typeof(nint);
+        }
+
+        if (type.IsPointer || type.IsByRef) {
+            return typeof(Pointer<>).MakeGenericType(type.GetElementType()!.ToCsPointerType());
+        }
+
+        if (!type.IsValueType) {
+            throw new NotSupportedException(
+                $"Unsupported type for ClientStructs Pointer<> conversion: {type.FullName}"
+            );
+        }
+
+        return type;
     }
 }

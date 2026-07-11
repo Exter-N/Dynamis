@@ -35,7 +35,7 @@ public sealed class FieldInfo : IComparable<FieldInfo>
     {
         get
         {
-            if (Type is FieldType.Pointer && ManagedType is not null && ManagedType.IsPointer) {
+            if (Type is FieldType.Pointer && ManagedType is not null && ManagedType.IsPointerCsAware()) {
                 ClassRegistry.TryGetShortClassName(ManagedType, out var shortName);
                 return shortName ?? ManagedType.ToString();
             }
@@ -75,11 +75,11 @@ public sealed class FieldInfo : IComparable<FieldInfo>
     public ClassIdentifier? GetManagedTypeHint()
     {
         var type = ManagedType;
-        if (type is null || !type.IsPointer || type == typeof(void*)) {
+        if (!type.TryGetPointeeTypeCsAware(out var pointeeType) || pointeeType == typeof(void)) {
             return null;
         }
 
-        return ClassIdentifier.ManagedType(type.GetElementType()!);
+        return ClassIdentifier.ManagedType(pointeeType);
     }
 
     public static nint GetAddress(object? value)
