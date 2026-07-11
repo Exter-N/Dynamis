@@ -177,11 +177,11 @@ public sealed class ObjectInspector(
     {
         if (dataYamlContainer.Data is not null) {
             if (objectAddress != 0 && dataYamlContainer.ClassesByInstance!.ContainsKey(objectAddress)) {
-                return new(ClassIdentifierKind.WellKnownObject, objectAddress);
+                return ClassIdentifier.WellKnownObject(objectAddress);
             }
 
             if (vtbl != 0 && dataYamlContainer.ClassesByVtbl!.ContainsKey(vtbl)) {
-                return new(ClassIdentifierKind.ObjectWithVirtualTable, vtbl);
+                return ClassIdentifier.ObjectWithVirtualTable(vtbl);
             }
 
             if (objectAddress != 0) {
@@ -189,7 +189,7 @@ public sealed class ObjectInspector(
                 lock (_instancePointers) {
                     foundPointer = _instancePointers.TryGetValue(objectAddress, out var pointer);
                     if (foundPointer && pointer.HasValue) {
-                        return new(ClassIdentifierKind.WellKnownObjectByPointer, pointer.Value);
+                        return ClassIdentifier.WellKnownObjectByPointer(pointer.Value);
                     }
                 }
 
@@ -200,7 +200,7 @@ public sealed class ObjectInspector(
                                 _instancePointers.TryAdd(objectAddress, pointer);
                             }
 
-                            return new(ClassIdentifierKind.WellKnownObjectByPointer, pointer);
+                            return ClassIdentifier.WellKnownObjectByPointer(pointer);
                         }
                     }
 
@@ -211,7 +211,7 @@ public sealed class ObjectInspector(
             }
         }
 
-        return new(ClassIdentifierKind.ObjectWithVirtualTable, vtbl);
+        return ClassIdentifier.ObjectWithVirtualTable(vtbl);
     }
 
     private void Highlight(ReadOnlySpan<byte> objectBytes, ClassInfo? classInfo, Span<byte> byteColors, bool safeReads = true)

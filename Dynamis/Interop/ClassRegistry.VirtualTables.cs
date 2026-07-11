@@ -6,7 +6,7 @@ public sealed partial class ClassRegistry
 {
     public unsafe ClassInfo GetVirtualTableClass(nint vtbl, (uint, nuint) ownerSizeAndDisplacement, bool safeReads)
     {
-        var className = DetermineClassName(new(ClassIdentifierKind.ObjectWithVirtualTable, vtbl));
+        var className = DetermineClassName(ClassIdentifier.ObjectWithVirtualTable(vtbl));
         var vtblClassName = $"<Virtual Table> {className}";
         ClassInfo? classInfo;
         lock (_classCache) {
