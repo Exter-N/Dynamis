@@ -40,8 +40,14 @@ public static class ReflectionExtensions
     public static IEnumerable<Attribute> GetCustomAttributes(this MemberInfo member, string attributeName)
         => member.GetCustomAttributes().Where(attribute => attribute.GetType().Name == attributeName);
 
-    public static int SizeOf(this Type type)
-        => (int)typeof(Unsafe).GetMethod(nameof(Unsafe.SizeOf))!.MakeGenericMethod(type).Invoke(null, null)!;
+    public static unsafe int SizeOf(this Type type)
+    {
+        if (type.IsPointer) {
+            return sizeof(nint);
+        }
+
+        return (int)typeof(Unsafe).GetMethod(nameof(Unsafe.SizeOf))!.MakeGenericMethod(type).Invoke(null, null)!;
+    }
 
     private static int GetFieldOffsetSequential(ReflFieldInfo info)
     {

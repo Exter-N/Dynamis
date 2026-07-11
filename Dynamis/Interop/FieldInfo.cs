@@ -31,6 +31,19 @@ public sealed class FieldInfo : IComparable<FieldInfo>
     public uint ElementCount
         => Size / ElementSize;
 
+    public string TypeName
+    {
+        get
+        {
+            if (Type is FieldType.Pointer && ManagedType is not null && ManagedType.IsPointer) {
+                ClassRegistry.TryGetShortClassName(ManagedType, out var shortName);
+                return shortName ?? ManagedType.ToString();
+            }
+
+            return Type.Description();
+        }
+    }
+
     public override string ToString()
         => Name;
 
@@ -59,6 +72,16 @@ public sealed class FieldInfo : IComparable<FieldInfo>
         return string.Compare(Name, other.Name, StringComparison.OrdinalIgnoreCase);
     }
 
+    public ClassIdentifier? GetManagedTypeHint()
+    {
+        var type = ManagedType;
+        if (type is null || !type.IsPointer || type == typeof(void*)) {
+            return null;
+        }
+
+        return ClassIdentifier.ManagedType(type.GetElementType()!);
+    }
+
     public static nint GetAddress(object? value)
         => TryGetAddress(value, out var address)
             ? address
@@ -83,16 +106,16 @@ public sealed class FieldInfo : IComparable<FieldInfo>
         }
     }
 
-    public static (ClassInfo Class, nuint Displacement)? DetermineClassAndDisplacement(object? value, ObjectInspector objectInspector, ClassRegistry classRegistry)
+    public static (ClassInfo Class, nuint Displacement)? DetermineClassAndDisplacement(object? value,
+        ClassIdentifier? classIdHint, ObjectInspector objectInspector, ClassRegistry classRegistry)
     {
-        switch (value)
-        {
+        switch (value) {
             case nint raw:
                 if (raw == 0) {
                     return null;
                 }
 
-                return objectInspector.DetermineClassAndDisplacement(raw);
+                return objectInspector.DetermineClassAndDisplacement(raw, classIdHint: classIdHint);
             case DynamicMemory memory:
                 return (PseudoClasses.GenerateArray(classRegistry.FromManagedType(memory.ElementType), memory.Length),
                     0);

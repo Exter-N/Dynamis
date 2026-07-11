@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using Dalamud.Bindings.ImGui;
@@ -117,7 +118,7 @@ public sealed class SnapshotViewer(
 
         using var _ = ImRaii.Tooltip();
         var value = path.Read(_vmSnapshot.Data);
-        ImGui.TextUnformatted($"{path.Type.Description()} {path.Path} @ 0x{path.Offset:X}");
+        ImGui.TextUnformatted($"{path.Field?.TypeName ?? path.Type.Description()} {path.Path} @ 0x{path.Offset:X}");
         ImGui.Separator();
         ImGui.TextUnformatted(ToString(value, path));
 
@@ -125,7 +126,10 @@ public sealed class SnapshotViewer(
             ImGui.Separator();
             imGuiComponents.DrawPointerTooltipDetails(
                 FieldInfo.GetAddress(value),
-                FieldInfo.DetermineClassAndDisplacement(value, objectInspector, classRegistry)?.Class
+                FieldInfo.DetermineClassAndDisplacement(
+                              value, path.GetManagedTypeHint(), objectInspector, classRegistry
+                          )
+                        ?.Class
             );
         }
 
@@ -340,7 +344,10 @@ public sealed class SnapshotViewer(
                 return "nullptr";
             }
 
-            var @class = FieldInfo.DetermineClassAndDisplacement(value, objectInspector, classRegistry)?.Class;
+            var @class = FieldInfo.DetermineClassAndDisplacement(
+                                       value, field?.GetManagedTypeHint(), objectInspector, classRegistry
+                                   )
+                                 ?.Class;
             if (@class is null) {
                 return string.Empty;
             }
@@ -453,6 +460,10 @@ public sealed class SnapshotViewer(
 
             return Type.Read(instance.Slice(unchecked((int)Offset), unchecked((int)Size)));
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ClassIdentifier? GetManagedTypeHint()
+            => Field?.GetManagedTypeHint();
     }
 
     private sealed class FieldContextMenu(
@@ -471,7 +482,9 @@ public sealed class SnapshotViewer(
 
         private readonly (ClassInfo Class, nuint Displacement)? _class =
             path.Type == FieldType.Pointer
-                ? FieldInfo.DetermineClassAndDisplacement(value, objectInspector, classRegistry)
+                ? FieldInfo.DetermineClassAndDisplacement(
+                    value, path.GetManagedTypeHint(), objectInspector, classRegistry
+                )
                 : null;
 
         public bool Draw()
@@ -481,23 +494,23 @@ public sealed class SnapshotViewer(
                 if (_class is
                     {
                     } @class && @class.Class.Kind == ClassKind.VirtualTable) {
-                    if (ImGui.Selectable("Inspect virtual table")) {
+                    if (ImGui.Selectable("Inspect virtual table"u8)) {
                         messageHub.Publish(new InspectObjectMessage(FieldInfo.GetAddress(value), @class.Class, null, null));
                         ret = true;
                     }
 
                     if (ea is
                         {
-                        } eoAddress && ImGui.Selectable("Inspect embedded object")) {
+                        } eoAddress && ImGui.Selectable("Inspect embedded object"u8)) {
                         messageHub.Publish(new InspectObjectMessage(eoAddress, null, null, null));
                         ret = true;
                     }
                 } else {
-                    if (ImGui.Selectable("Inspect object")) {
+                    if (ImGui.Selectable("Inspect object"u8)) {
                         messageHub.Publish(
                             new InspectObjectMessage(
-                                FieldInfo.GetAddress(value) - (nint)(_class?.Displacement ?? 0), _class?.Class, null,
-                                null
+                                FieldInfo.GetAddress(value) - (nint)(_class?.Displacement ?? 0), _class?.Class,
+                                path.GetManagedTypeHint(), null
                             )
                         );
                         ret = true;
@@ -523,17 +536,17 @@ public sealed class SnapshotViewer(
                     ret = true;
                 }
 
-                if (ImGui.Selectable($"Copy {str.Address:X}")) {
+                if (ImGui.Selectable($"Copy address ({str.Address:X})")) {
                     ImGui.SetClipboardText($"{str.Address:X}");
                     ret = true;
                 }
             } else if (path.Type.IsInteger() && $"{value:X}" != $"{value}") {
-                if (ImGui.Selectable($"Copy {value:X}")) {
+                if (ImGui.Selectable($"Copy hex ({value:X})")) {
                     ImGui.SetClipboardText($"{value:X}");
                     ret = true;
                 }
 
-                if (ImGui.Selectable($"Copy {value}")) {
+                if (ImGui.Selectable($"Copy decimal ({value})")) {
                     ImGui.SetClipboardText($"{value}");
                     ret = true;
                 }
@@ -562,18 +575,18 @@ public sealed class SnapshotViewer(
             if (ea is
                 {
                 } address) {
-                if (ImGui.Selectable("Copy effective address")) {
+                if (ImGui.Selectable("Copy effective address"u8)) {
                     ImGui.SetClipboardText(address.ToString("X"));
                     ret = true;
                 }
             }
 
-            if (ImGui.Selectable("Copy field offset")) {
+            if (ImGui.Selectable("Copy field offset"u8)) {
                 ImGui.SetClipboardText(path.Offset.ToString("X"));
                 ret = true;
             }
 
-            if (ImGui.Selectable("Copy field path")) {
+            if (ImGui.Selectable("Copy field path"u8)) {
                 ImGui.SetClipboardText(path.Path);
                 ret = true;
             }

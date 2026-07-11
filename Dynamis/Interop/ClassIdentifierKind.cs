@@ -8,4 +8,6 @@ public enum ClassIdentifierKind
     WellKnownObjectByPointer,
     VirtualTable,
     Function,
+    ManagedType,
+    TypeName,
 }

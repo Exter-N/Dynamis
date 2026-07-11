@@ -149,7 +149,18 @@ public sealed class ObjectInspector(
             return (classRegistry.GetVirtualTableClass(objectAddress, ownerSize, safeReads), 0);
         }
 
-        var classId = classIdHint ?? DetermineClassId(objectAddress, vtbl);
+        var classId = DetermineClassId(objectAddress, vtbl, classIdHint);
+        if (classId.Kind is ClassIdentifierKind.ManagedType) {
+            return (classRegistry.FromManagedType(classId.Type!), 0);
+        }
+
+        if (classId.Kind is ClassIdentifierKind.TypeName) {
+            var @class = classRegistry.FromTypeName(classId.Name!);
+            if (@class is not null) {
+                return (@class, 0);
+            }
+        }
+
         if (classId.Kind is ClassIdentifierKind.WellKnownObject or ClassIdentifierKind.WellKnownObjectByPointer) {
             return (classRegistry.GetClass(classId, vtbl, restOfPageSize), 0);
         }
@@ -173,8 +184,15 @@ public sealed class ObjectInspector(
         return (classRegistry.GetClass(classId, vtbl, restOfPageSize), 0);
     }
 
-    private unsafe ClassIdentifier DetermineClassId(nint objectAddress, nint vtbl)
+    private unsafe ClassIdentifier DetermineClassId(nint objectAddress, nint vtbl, ClassIdentifier? hint)
     {
+        if (hint is
+            {
+                Kind: not ClassIdentifierKind.ManagedType and not ClassIdentifierKind.TypeName,
+            } hintValue) {
+            return hintValue;
+        }
+
         if (dataYamlContainer.Data is not null) {
             if (objectAddress != 0 && dataYamlContainer.ClassesByInstance!.ContainsKey(objectAddress)) {
                 return ClassIdentifier.WellKnownObject(objectAddress);
@@ -211,7 +229,7 @@ public sealed class ObjectInspector(
             }
         }
 
-        return ClassIdentifier.ObjectWithVirtualTable(vtbl);
+        return hint ?? ClassIdentifier.ObjectWithVirtualTable(vtbl);
     }
 
     private void Highlight(ReadOnlySpan<byte> objectBytes, ClassInfo? classInfo, Span<byte> byteColors, bool safeReads = true)
@@ -305,9 +323,7 @@ public sealed class ObjectInspector(
                             if (protect.CanRead()) {
                                 color = (byte)HexViewerColor.Text;
                             } else {
-                                color = (byte)GetClassColor(
-                                    DetermineClassAndDisplacement(value, null, null, safeReads).Class
-                                );
+                                color = (byte)HexViewerColor.BadPointer;
                             }
                         }
 

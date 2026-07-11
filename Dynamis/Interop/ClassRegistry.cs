@@ -55,6 +55,13 @@ public sealed partial class ClassRegistry(
     }
 
     public static bool TryGetClientStructsClassName(Type type, [MaybeNullWhen(false)] out string className)
+        => TryGetClassName(type, TryResolveNativeClassName, out className);
+
+    public static bool TryGetShortClassName(Type type, [MaybeNullWhen(false)] out string className)
+        => TryGetClassName(type, TryResolveShortClassName, out className);
+
+    private static bool TryGetClassName(Type type, TryResolveClassNameDelegate resolver,
+        [MaybeNullWhen(false)] out string className)
     {
         var typeName = type.FullName;
         if (typeName is null || type.Assembly != typeof(StdString).Assembly) {
@@ -63,14 +70,14 @@ public sealed partial class ClassRegistry(
         }
 
         if (!type.IsGenericType) {
-            return TryResolveNativeClassName(typeName, out className);
+            return TryResolveClassName(typeName, resolver, out className);
         }
 
         var definition = type.GetGenericTypeDefinition();
         var arguments = type.GetGenericArguments();
         if (definition == typeof(Pointer<>)) {
             var pointedType = arguments[0];
-            TryGetClientStructsClassName(pointedType, out var pointedTypeName);
+            TryGetClassName(pointedType, resolver, out var pointedTypeName);
             if (pointedTypeName is null) {
                 className = null;
                 return false;
@@ -88,32 +95,71 @@ public sealed partial class ClassRegistry(
 
         var argNames = new string?[arguments.Length];
         for (var i = 0; i < arguments.Length; ++i) {
-            TryGetClientStructsClassName(arguments[i], out argNames[i]);
+            TryGetClassName(arguments[i], resolver, out argNames[i]);
             if (argNames[i] is null) {
                 className = null;
                 return false;
             }
         }
 
-        var result = TryResolveNativeClassName(typeName, out className);
+        var result = TryResolveClassName(typeName, resolver, out className);
         className += $"<{string.Join(", ", argNames)}>";
         return result;
+    }
+
+    private static bool TryResolveClassName(string typeName, TryResolveClassNameDelegate resolver, out string className)
+        => TryResolvePrimitiveName(typeName, out className) || resolver(typeName, out className);
+
+    private static bool TryResolvePrimitiveName(string typeName, out string className)
+    {
+        var primitive = typeName switch
+        {
+            "System.Boolean" => "bool",
+            "System.Byte"    => "byte",
+            "System.SByte"   => "sbyte",
+            "System.UInt16"  => "ushort",
+            "System.Int16"   => "short",
+            "System.UInt32"  => "uint",
+            "System.Int32"   => "int",
+            "System.UInt64"  => "ulong",
+            "System.Int64"   => "long",
+            "System.UIntPtr" => "nuint",
+            "System.IntPtr"  => "nint",
+            "System.Char"    => "char",
+            "System.Half"    => "half float",
+            "System.Single"  => "float",
+            "System.Double"  => "double",
+            "System.Void"    => "void",
+            "System.String"  => "string",
+            "System.Object"  => "object",
+            _                => null,
+        };
+
+        className = primitive ?? typeName;
+        return primitive is not null;
     }
 
     private static bool TryResolveNativeClassName(string typeName, out string className)
     {
         if (typeName.StartsWith("FFXIVClientStructs.FFXIV.")) {
-            className = typeName[25..].Replace(".", "::");
+            className = typeName[25..].Replace("+", "::").Replace(".", "::");
             return true;
         }
 
         if (typeName.StartsWith("FFXIVClientStructs.STD.Std")) {
-            className = "std::" + typeName[26..].ToSnakeCase().Replace(".", "::");
+            className = "std::" + typeName[26..].ToSnakeCase().Replace("+", "::").Replace(".", "::");
             return true;
         }
 
         className = typeName;
         return false;
+    }
+
+    private static bool TryResolveShortClassName(string typeName, out string className)
+    {
+        var pos = typeName.LastIndexOfAny(['+', '.',]);
+        className = pos >= 0 ? typeName[(pos + 1)..] : typeName;
+        return true;
     }
 
     public ClassInfo FromManagedType(Type type)
@@ -154,6 +200,22 @@ public sealed partial class ClassRegistry(
         }
 
         return classInfo;
+    }
+
+    public ClassInfo? FromTypeName(string name)
+    {
+        lock (_classCache) {
+            if (_classCache.TryGetValue(name, out var classInfo)) {
+                return classInfo;
+            }
+        }
+
+        var type = ResolveClientStructsType(name);
+        if (type is null) {
+            return null;
+        }
+
+        return FromManagedType(type);
     }
 
     private void PopulateFromVtbl(ClassInfo classInfo, nint vtbl, bool safeReads)
@@ -274,11 +336,38 @@ public sealed partial class ClassRegistry(
             var elementType = ResolveClientStructsType(className[..^1].TrimEnd());
             return elementType is null
                 ? null
-                : typeof(Pointer<>).MakeGenericType(elementType);
+                : elementType == typeof(void)
+                    ? typeof(nint)
+                    : typeof(Pointer<>).MakeGenericType(elementType);
         }
 
-        return typeof(StdString).Assembly.GetType(ResolveClientStructsClassName(className));
+        return ResolvePrimitiveType(className)
+            ?? typeof(StdString).Assembly.GetType(ResolveClientStructsClassName(className));
     }
+
+    private static Type? ResolvePrimitiveType(string className)
+        => className switch
+        {
+            "bool"       => typeof(bool),
+            "byte"       => typeof(byte),
+            "sbyte"      => typeof(sbyte),
+            "ushort"     => typeof(ushort),
+            "short"      => typeof(short),
+            "uint"       => typeof(uint),
+            "int"        => typeof(int),
+            "ulong"      => typeof(ulong),
+            "long"       => typeof(long),
+            "nuint"      => typeof(nuint),
+            "nint"       => typeof(nint),
+            "char"       => typeof(char),
+            "half float" => typeof(Half),
+            "float"      => typeof(float),
+            "double"     => typeof(double),
+            "void"       => typeof(void),
+            "string"     => typeof(string),
+            "object"     => typeof(object),
+            _            => null,
+        };
 
     private static string ResolveClientStructsClassName(string className)
         => className.StartsWith("std::")
@@ -524,6 +613,11 @@ public sealed partial class ClassRegistry(
                 }
 
                 return className;
+            case ClassIdentifierKind.ManagedType:
+                TryGetClientStructsClassName(classId.Type!, out className);
+                return className ?? classId.Type!.ToString();
+            case ClassIdentifierKind.TypeName:
+                return classId.Name ?? string.Empty;
             default:
                 throw new ArgumentException($"Unsupported class identifier kind {classId.Kind}", nameof(classId));
         }
@@ -541,4 +635,6 @@ public sealed partial class ClassRegistry(
             }
         }
     }
+
+    private delegate bool TryResolveClassNameDelegate(string typeName, out string className);
 }
