@@ -12,6 +12,8 @@ public sealed class ChangeLogWindow : Window, ISingletonWindow, IMessageObserver
 
     private readonly ConfigurationContainer _configuration;
 
+    private int _readVersion;
+
     public ChangeLogWindow(ConfigurationContainer configuration, ImGuiComponents imGuiComponents) : base(
         $"Dynamis {Assembly.GetExecutingAssembly().GetName().Version} Change Log###DynamisChangeLog",
         ImGuiWindowFlags.NoDocking
@@ -30,6 +32,7 @@ public sealed class ChangeLogWindow : Window, ISingletonWindow, IMessageObserver
 
     public override void OnOpen()
     {
+        _readVersion = _configuration.Configuration.ReadChangeLogVersion;
         if (_configuration.Configuration.ReadChangeLogVersion < ChangeLogVersion) {
             _configuration.Configuration.ReadChangeLogVersion = ChangeLogVersion;
             _configuration.Save(nameof(_configuration.Configuration.ReadChangeLogVersion));
@@ -57,10 +60,12 @@ public sealed class ChangeLogWindow : Window, ISingletonWindow, IMessageObserver
             )
         );
         ImGui.SameLine(0.0f, 0.0f);
-        if (ImGui.Button(label)) {
-            _configuration.Configuration.ReadChangeLogVersion = markAsRead ? ChangeLogVersion : 0;
-            _configuration.Save(nameof(_configuration.Configuration.ReadChangeLogVersion));
+        if (!ImGui.Button(label)) {
+            return;
         }
+
+        _configuration.Configuration.ReadChangeLogVersion = markAsRead ? ChangeLogVersion : 0;
+        _configuration.Save(nameof(_configuration.Configuration.ReadChangeLogVersion));
     }
 
     public void HandleMessage(CommandMessage message)
