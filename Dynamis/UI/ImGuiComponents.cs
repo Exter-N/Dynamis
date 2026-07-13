@@ -22,40 +22,44 @@ public sealed partial class ImGuiComponents(
     Lazy<ObjectInspectorDispatcher> objectInspectorDispatcher,
     ContextMenu contextMenu)
 {
+    private readonly TitleBarButton _toolboxButton  = BuildToolboxButton(messageHub);
+    private readonly TitleBarButton _settingsButton = BuildSettingsButton(messageHub);
+
     public void AddTitleBarButtons(Window window)
     {
         if (window is not ToolboxWindow) {
-            window.TitleBarButtons.Add(
-                new()
-                {
-                    Icon = FontAwesomeIcon.Home,
-                    Click = _ => messageHub.Publish<OpenWindowMessage<ToolboxWindow>>(),
-                    IconOffset = new(1, 0),
-                    ShowTooltip = () =>
-                    {
-                        using var _ = ImRaii.Tooltip();
-                        ImGui.Text("Toolbox"u8);
-                    }
-                }
-            );
+            window.TitleBarButtons.Add(_toolboxButton);
         }
 
         if (window is not SettingsWindow) {
-            window.TitleBarButtons.Add(
-                new()
-                {
-                    Icon = FontAwesomeIcon.Cog,
-                    Click = _ => messageHub.Publish<OpenWindowMessage<SettingsWindow>>(),
-                    IconOffset = new(2, 1),
-                    ShowTooltip = () =>
-                    {
-                        using var _ = ImRaii.Tooltip();
-                        ImGui.Text("Settings"u8);
-                    }
-                }
-            );
+            window.TitleBarButtons.Add(_settingsButton);
         }
     }
+
+    private static TitleBarButton BuildToolboxButton(MessageHub messageHub)
+        => new()
+        {
+            Icon = FontAwesomeIcon.Home,
+            Click = _ => messageHub.Publish<OpenWindowMessage<ToolboxWindow>>(),
+            ShowTooltip = () =>
+            {
+                using var _ = ImRaii.Tooltip();
+                ImGui.Text("Toolbox"u8);
+            },
+        };
+
+    private static TitleBarButton BuildSettingsButton(MessageHub messageHub)
+        => new()
+        {
+            Icon = FontAwesomeIcon.Cog,
+            Click = _ => messageHub.Publish<OpenWindowMessage<SettingsWindow>>(),
+            IconOffset = new(0, 1),
+            ShowTooltip = () =>
+            {
+                using var _ = ImRaii.Tooltip();
+                ImGui.Text("Settings"u8);
+            },
+        };
 
     private const           float   SeparatorThickness = 1.0f;
     private static readonly Vector2 SeparatorTextAlign = new(0.02f, 0.5f);
