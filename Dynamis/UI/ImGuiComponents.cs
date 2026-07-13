@@ -5,6 +5,7 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
+using Dynamis.Configuration;
 using Dynamis.Interop;
 using Dynamis.Interop.Win32;
 using Dynamis.Messaging;
@@ -15,24 +16,30 @@ namespace Dynamis.UI;
 
 public sealed partial class ImGuiComponents(
     MessageHub messageHub,
+    ConfigurationContainer configuration,
     FileDialogManager fileDialogManager,
     ModuleAddressResolver moduleAddressResolver,
     AddressIdentifier addressIdentifier,
     ObjectInspector objectInspector,
     Lazy<ObjectInspectorDispatcher> objectInspectorDispatcher,
-    ContextMenu contextMenu)
+    ContextMenu contextMenu) : IMessageObserver<ConfigurationChangedMessage>
 {
-    private readonly TitleBarButton _toolboxButton  = BuildToolboxButton(messageHub);
-    private readonly TitleBarButton _settingsButton = BuildSettingsButton(messageHub);
+    private readonly TitleBarButton _toolboxButton   = BuildToolboxButton(messageHub);
+    private readonly TitleBarButton _settingsButton  = BuildSettingsButton(messageHub);
+    private readonly TitleBarButton _changeLogButton = BuildChangeLogButton(messageHub, configuration);
 
     public void AddTitleBarButtons(Window window)
     {
-        if (window is not ToolboxWindow) {
-            window.TitleBarButtons.Add(_toolboxButton);
+        if (window is not ChangeLogWindow) {
+            window.TitleBarButtons.Add(_changeLogButton);
         }
 
         if (window is not SettingsWindow) {
             window.TitleBarButtons.Add(_settingsButton);
+        }
+
+        if (window is not ToolboxWindow) {
+            window.TitleBarButtons.Add(_toolboxButton);
         }
     }
 
@@ -58,6 +65,27 @@ public sealed partial class ImGuiComponents(
             {
                 using var _ = ImRaii.Tooltip();
                 ImGui.Text("Settings"u8);
+            },
+        };
+
+    private static TitleBarButton BuildChangeLogButton(MessageHub messageHub, ConfigurationContainer configuration)
+        => new()
+        {
+            Icon = FontAwesomeIcon.Book,
+            Click = _ => messageHub.Publish<OpenWindowMessage<ChangeLogWindow>>(),
+            IconColor = configuration.Configuration.ReadChangeLogVersion < ChangeLogWindow.ChangeLogVersion
+                ? ImGuiColors.SuccessForeground
+                : null,
+            IconOffset = new(0, 1),
+            ShowTooltip = () =>
+            {
+                using var _ = ImRaii.Tooltip();
+                ImGui.Text("Change Log"u8);
+                if (configuration.Configuration.ReadChangeLogVersion < ChangeLogWindow.ChangeLogVersion) {
+                    ImGui.SameLine(0.0f, ImGui.GetStyle().ItemInnerSpacing.X);
+                    using var color = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.SuccessForeground);
+                    ImGui.TextUnformatted("(NEW!)"u8);
+                }
             },
         };
 
@@ -324,6 +352,16 @@ public sealed partial class ImGuiComponents(
             }
 
             return ret;
+        }
+    }
+
+    public void HandleMessage(ConfigurationChangedMessage message)
+    {
+        if (message.IsPropertyChanged(nameof(configuration.Configuration.ReadChangeLogVersion))) {
+            _changeLogButton.IconColor =
+                configuration.Configuration.ReadChangeLogVersion < ChangeLogWindow.ChangeLogVersion
+                    ? ImGuiColors.SuccessForeground
+                    : null;
         }
     }
 }
