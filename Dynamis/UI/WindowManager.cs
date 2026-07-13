@@ -12,6 +12,7 @@ namespace Dynamis.UI;
 public sealed class WindowManager(
     MessageHub messageHub,
     IUiBuilder uiBuilder,
+    ImGuiComponents imGuiComponents,
     DevMenuItem devMenuItem,
     WindowSystem windowSystem,
     FileDialogManager fileDialogManager,
@@ -28,6 +29,7 @@ public sealed class WindowManager(
         uiBuilder.Draw += Draw;
         uiBuilder.OpenMainUi += OpenMainUi;
         uiBuilder.OpenConfigUi += OpenConfigUi;
+        uiBuilder.DefaultStyleChanged += DefaultStyleChanged;
 
         foreach (var window in windows) {
             windowSystem.AddWindow(window.Value);
@@ -42,6 +44,7 @@ public sealed class WindowManager(
             (window as IDisposable)?.Dispose();
         }
         windowSystem.RemoveAllWindows();
+        uiBuilder.DefaultStyleChanged -= DefaultStyleChanged;
         uiBuilder.OpenConfigUi -= OpenConfigUi;
         uiBuilder.OpenMainUi -= OpenMainUi;
         uiBuilder.Draw -= Draw;
@@ -65,4 +68,7 @@ public sealed class WindowManager(
 
     private void OpenConfigUi()
         => messageHub.Publish<OpenWindowMessage<SettingsWindow>>();
+
+    private void DefaultStyleChanged()
+        => imGuiComponents.Update();
 }

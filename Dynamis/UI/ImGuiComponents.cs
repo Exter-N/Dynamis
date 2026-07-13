@@ -361,10 +361,15 @@ public sealed partial class ImGuiComponents(
     public void HandleMessage(ConfigurationChangedMessage message)
     {
         if (message.IsPropertyChanged(nameof(configuration.Configuration.ReadChangeLogVersion))) {
-            _changeLogButton.IconColor =
-                configuration.Configuration.ReadChangeLogVersion < ChangeLogWindow.ChangeLogVersion
-                    ? ImGuiColors.SuccessForeground
-                    : null;
+            Update();
         }
+    }
+
+    public void Update()
+    {
+        _changeLogButton.IconColor =
+            configuration.Configuration.ReadChangeLogVersion < ChangeLogWindow.ChangeLogVersion
+                ? ImGuiColors.SuccessForeground
+                : null;
     }
 }

@@ -8,13 +8,13 @@ namespace Dynamis.UI.Windows;
 
 public sealed class ChangeLogWindow : Window, ISingletonWindow, IMessageObserver<CommandMessage>
 {
-    public const int ChangeLogVersion = 0;
+    public const int ChangeLogVersion = 1;
 
     private readonly ConfigurationContainer _configuration;
 
     public ChangeLogWindow(ConfigurationContainer configuration, ImGuiComponents imGuiComponents) : base(
         $"Dynamis {Assembly.GetExecutingAssembly().GetName().Version} Change Log###DynamisChangeLog",
-        ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoDocking
+        ImGuiWindowFlags.NoDocking
     )
     {
         _configuration = configuration;
@@ -39,7 +39,10 @@ public sealed class ChangeLogWindow : Window, ISingletonWindow, IMessageObserver
     public override void Draw()
     {
         DrawMarkAsUnread();
-        ImGui.TextUnformatted("TBD"u8);
+        using var twp = new ImRaiiTextWrapPos();
+        ImGui.TextUnformatted(
+            "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam finibus et augue eu viverra. Donec porta augue orci, sed sollicitudin quam pulvinar sit amet. In eget arcu ultrices, consequat ipsum eu, facilisis lectus. Donec cursus auctor orci vitae finibus. Curabitur tellus risus, mollis eget orci porttitor, eleifend congue felis. Mauris ex erat, placerat ac libero ac, maximus pellentesque felis. Vestibulum placerat, lacus ac porttitor tristique, nibh quam consectetur ex, a rhoncus magna nisi in arcu. Nulla sit amet nulla nec nunc porttitor faucibus. Morbi in laoreet turpis, ut consectetur odio. Donec vitae venenatis felis, a tristique mi. Integer scelerisque eleifend libero a ornare. Vivamus maximus lorem vel lobortis varius. Nam efficitur faucibus fringilla. Nam ac tristique turpis."u8
+        );
     }
 
     private void DrawMarkAsUnread()
