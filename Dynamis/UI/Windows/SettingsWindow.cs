@@ -49,19 +49,19 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
 
     public override void Draw()
     {
-        if (ImGui.CollapsingHeader("Behavior")) {
+        if (ImGui.CollapsingHeader("Behavior"u8)) {
             DrawBehavior();
         }
 
-        if (ImGui.CollapsingHeader("Interface")) {
+        if (ImGui.CollapsingHeader("Interface"u8)) {
             DrawInterface();
         }
 
-        if (ImGui.CollapsingHeader("Data")) {
+        if (ImGui.CollapsingHeader("Data"u8)) {
             DrawData();
         }
 
-        if (ImGui.CollapsingHeader("Object Inspector Colors")) {
+        if (ImGui.CollapsingHeader("Object Inspector Colors"u8)) {
             DrawColors();
         }
     }
@@ -80,7 +80,7 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
         }
 
         var enableIpfd = configuration.EnableIpfd;
-        if (ImGui.Checkbox("Enable IPFD (In-Process Faux Debugger)", ref enableIpfd)) {
+        if (ImGui.Checkbox("Enable IPFD (In-Process Faux Debugger)"u8, ref enableIpfd)) {
             configuration.EnableIpfd = enableIpfd;
             _configuration.Save(nameof(configuration.EnableIpfd));
         }
@@ -90,7 +90,7 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
 
         ImGui.SameLine();
         using (ImRaii.Disabled(!_ipfd.Loaded)) {
-            if (ImGui.Button("Force Unload##ipfd")) {
+            if (ImGui.Button("Force Unload##ipfd"u8)) {
                 _ipfd.Unload();
             }
         }
@@ -98,7 +98,7 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
         var symbolHandlerMode = configuration.SymbolHandlerMode;
         if (Util.IsWine()) {
             var enableWineSymbolHandler = symbolHandlerMode == SymbolHandlerMode.ForceInitialize;
-            if (ImGui.Checkbox("Enable Symbol Handler", ref enableWineSymbolHandler)) {
+            if (ImGui.Checkbox("Enable Symbol Handler"u8, ref enableWineSymbolHandler)) {
                 symbolHandlerMode = enableWineSymbolHandler
                     ? SymbolHandlerMode.ForceInitialize
                     : SymbolHandlerMode.Disable;
@@ -124,7 +124,7 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
 
         if (ImGui.IsItemHovered()) {
             using var _ = ImRaii.Tooltip();
-            ImGui.TextUnformatted("This setting may cause stability issues.");
+            ImGui.TextUnformatted("This setting may cause stability issues."u8);
             ImGui.TextUnformatted(
                 $"Disabling it may then require hand-editing pluginConfigs{(Util.IsWine() ? '/' : '\\')}{_configuration.InternalName}.json."
             );
@@ -133,16 +133,14 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
 
     private void DrawInterface()
     {
-        using (var node = ImRaii.TreeNode("Memory Snapshots###Interface_MemorySnapshots", ImGuiTreeNodeFlags.DefaultOpen)) {
-            if (node) {
-                DrawInterface_MemorySnapshots();
-            }
+        ImGuiComponents.SeparatorText("Memory Snapshots"u8);
+        using (ImRaii.PushId("###Interface_MemorySnapshots"u8)) {
+            DrawInterface_MemorySnapshots();
         }
 
-        using (var node = ImRaii.TreeNode("Miscellaneous###Interface_Miscellaneous")) {
-            if (node) {
-                DrawInterface_Miscellaneous();
-            }
+        ImGuiComponents.SeparatorText("Miscellaneous"u8);
+        using (ImRaii.PushId("###Interface_Miscellaneous"u8)) {
+            DrawInterface_Miscellaneous();
         }
     }
 
@@ -173,13 +171,13 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
         var configuration = _configuration.Configuration;
 
         var showInDevMenu = configuration.ShowInDevMenu;
-        if (ImGui.Checkbox("Show in dev menu", ref showInDevMenu)) {
+        if (ImGui.Checkbox("Show in dev menu"u8, ref showInDevMenu)) {
             configuration.ShowInDevMenu = showInDevMenu;
             _configuration.Save(nameof(configuration.ShowInDevMenu));
         }
 
         var serious = configuration.Serious;
-        if (ImGui.Checkbox("I don't like fun.", ref serious)) {
+        if (ImGui.Checkbox("I don't like fun."u8, ref serious)) {
             configuration.Serious = serious;
             _configuration.Save(nameof(configuration.Serious));
         }
@@ -205,7 +203,7 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
             using (ImRaii.Disabled()) {
                 var dummy = "Automatically download from GitHub";
                 ImGui.InputText(
-                    "###dataYamlPathDummy", ref dummy, dummy.Length + 1, ImGuiInputTextFlags.ReadOnly
+                    "###dataYamlPathDummy"u8, ref dummy, dummy.Length + 1, ImGuiInputTextFlags.ReadOnly
                 );
             }
 
@@ -217,7 +215,7 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
 
             if (ImGui.IsItemHovered()) {
                 using var _ = ImRaii.Tooltip();
-                ImGui.TextUnformatted("Use a local copy of the file instead");
+                ImGui.TextUnformatted("Use a local copy of the file instead"u8);
             }
         } else {
             _imGuiComponents.InputFile(
@@ -237,7 +235,7 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
 
             if (ImGui.IsItemHovered()) {
                 using var _ = ImRaii.Tooltip();
-                ImGui.TextUnformatted("Automatically download the file from GitHub instead");
+                ImGui.TextUnformatted("Automatically download the file from GitHub instead"u8);
             }
         }
 
@@ -248,13 +246,13 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
 
         if (ImGui.IsItemHovered()) {
             using var _ = ImRaii.Tooltip();
-            ImGui.TextUnformatted("Refresh the file");
+            ImGui.TextUnformatted("Refresh the file"u8);
         }
 
         ImGui.SameLine(0.0f, innerSpacing);
-        ImGui.TextUnformatted("ClientStructs' data.yml");
+        ImGui.TextUnformatted("ClientStructs' data.yml"u8);
 
-        DrawDisableLogCategoryCheckbox(typeof(DataYamlContainer), "Silence data.yml-related logs");
+        DrawDisableLogCategoryCheckbox(typeof(DataYamlContainer), "Silence data.yml-related logs"u8);
     }
 
     private void DrawDisableLogCategoryCheckbox(Type type, ImU8String label)
