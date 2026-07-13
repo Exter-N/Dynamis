@@ -1,7 +1,9 @@
 using System.Runtime.InteropServices;
 using System.Text;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface;
 using Dalamud.Interface.ImGuiFileDialog;
+using Dalamud.Interface.Utility.Raii;
 using Dynamis.Interop;
 using Dynamis.UI.Windows;
 using FFXIVClientStructs.FFXIV.Client.System.Resource.Handle;
@@ -19,19 +21,33 @@ public sealed unsafe class ResourceHandleInspector : IObjectInspector<ResourceHa
         _fileDialogManager = fileDialogManager;
     }
 
-    public void DrawAdditionalTooltipDetails(ResourceHandle* pointer)
+    private void DrawAdditionalTooltipDetails(ResourceHandle* pointer, bool allowCopy)
     {
         ImGui.TextUnformatted($"Reference Count: {pointer->RefCount}");
         if (pointer->RefCount <= 0) {
             return;
         }
 
-        ImGui.TextUnformatted($"File Name: {pointer->FileName}");
+        if (allowCopy) {
+            ImGui.AlignTextToFramePadding();
+            ImGui.TextUnformatted($"File Name: {pointer->FileName}");
+            ImGui.SameLine(0.0f, ImGui.GetStyle().ItemInnerSpacing.X);
+            using var id = ImRaii.PushId("FileNameCopy");
+            if (ImGuiComponents.NormalizedIconButton(FontAwesomeIcon.Copy)) {
+                ImGui.SetClipboardText(pointer->FileName.AsSpan());
+            }
+        } else {
+            ImGui.TextUnformatted($"File Name: {pointer->FileName}");
+        }
+
         var length = pointer->GetLength();
         if (length > 0) {
             ImGui.TextUnformatted($"Resource Size: {length} (0x{length:X}) bytes");
         }
     }
+
+    public void DrawAdditionalTooltipDetails(ResourceHandle* pointer)
+        => DrawAdditionalTooltipDetails(pointer, false);
 
     public void DrawAdditionalHeaderDetails(ResourceHandle* pointer, ObjectSnapshot snapshot, bool live, ObjectInspectorWindow window)
     {
@@ -39,7 +55,7 @@ public sealed unsafe class ResourceHandleInspector : IObjectInspector<ResourceHa
             return;
         }
 
-        DrawAdditionalTooltipDetails(pointer);
+        DrawAdditionalTooltipDetails(pointer, true);
         if (pointer->RefCount <= 0) {
             return;
         }
