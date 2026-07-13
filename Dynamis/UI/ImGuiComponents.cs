@@ -30,16 +30,16 @@ public sealed partial class ImGuiComponents(
 
     public void AddTitleBarButtons(Window window)
     {
-        if (window is not ChangeLogWindow) {
-            window.TitleBarButtons.Add(_changeLogButton);
+        if (window is not ToolboxWindow) {
+            window.TitleBarButtons.Add(_toolboxButton);
         }
 
         if (window is not SettingsWindow) {
             window.TitleBarButtons.Add(_settingsButton);
         }
 
-        if (window is not ToolboxWindow) {
-            window.TitleBarButtons.Add(_toolboxButton);
+        if (window is not ChangeLogWindow) {
+            window.TitleBarButtons.Add(_changeLogButton);
         }
     }
 
@@ -53,6 +53,7 @@ public sealed partial class ImGuiComponents(
                 using var _ = ImRaii.Tooltip();
                 ImGui.Text("Toolbox"u8);
             },
+            Priority = 1,
         };
 
     private static TitleBarButton BuildSettingsButton(MessageHub messageHub)
@@ -66,6 +67,7 @@ public sealed partial class ImGuiComponents(
                 using var _ = ImRaii.Tooltip();
                 ImGui.Text("Settings"u8);
             },
+            Priority = 2,
         };
 
     private static TitleBarButton BuildChangeLogButton(MessageHub messageHub, ConfigurationContainer configuration)
@@ -87,6 +89,7 @@ public sealed partial class ImGuiComponents(
                     ImGui.TextUnformatted("(NEW!)"u8);
                 }
             },
+            Priority = 3,
         };
 
     private const           float   SeparatorThickness = 1.0f;
