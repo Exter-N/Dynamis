@@ -60,7 +60,7 @@ public sealed class RsvWindow : Window, ISingletonWindow, IMessageObserver<Comma
             return;
         }
 
-        ImGuiComponents.DrawSeparatorText("RSV Map"u8);
+        ImGuiComponents.SeparatorText("RSV Map"u8);
         using var table = ImRaii.Table("##rsvMap"u8, 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit);
         if (!table) {
             return;
@@ -85,7 +85,7 @@ public sealed class RsvWindow : Window, ISingletonWindow, IMessageObserver<Comma
             return;
         }
 
-        ImGuiComponents.DrawSeparatorText("RSF Map"u8);
+        ImGuiComponents.SeparatorText("RSF Map"u8);
         using var table = ImRaii.Table("##rsfMap"u8, 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit);
         if (!table) {
             return;

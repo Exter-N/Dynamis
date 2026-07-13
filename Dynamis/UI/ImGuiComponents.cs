@@ -34,7 +34,7 @@ public sealed partial class ImGuiComponents(
                     ShowTooltip = () =>
                     {
                         using var _ = ImRaii.Tooltip();
-                        ImGui.Text("Toolbox");
+                        ImGui.Text("Toolbox"u8);
                     }
                 }
             );
@@ -50,14 +50,17 @@ public sealed partial class ImGuiComponents(
                     ShowTooltip = () =>
                     {
                         using var _ = ImRaii.Tooltip();
-                        ImGui.Text("Settings");
+                        ImGui.Text("Settings"u8);
                     }
                 }
             );
         }
     }
 
-    public static void DrawSeparatorText(ReadOnlySpan<byte> text, float extraW = 0.0f)
+    private const           float   SeparatorThickness = 1.0f;
+    private static readonly Vector2 SeparatorTextAlign = new(0.02f, 0.5f);
+
+    public static void SeparatorText(ReadOnlySpan<byte> text, float extraW = 0.0f)
     {
         var style = ImGui.GetStyle();
         var drawList = ImGui.GetWindowDrawList();
@@ -67,9 +70,8 @@ public sealed partial class ImGuiComponents(
         var pos = ImGui.GetCursorScreenPos();
         var padding = style.FramePadding;
 
-        var separatorThickness = style.WindowBorderSize;
         var minSize = new Vector2(
-            labelSize.X + extraW + padding.X * 2.0f, MathF.Max(labelSize.Y + padding.Y * 2.0f, separatorThickness)
+            labelSize.X + extraW + padding.X * 2.0f, MathF.Max(labelSize.Y + padding.Y * 2.0f, SeparatorThickness)
         );
         var bb = new ImRect(
             pos, window.WorkRect.Max with
@@ -78,7 +80,7 @@ public sealed partial class ImGuiComponents(
             }
         );
         var textBaselineY =
-            MathF.Truncate((bb.Max.Y - bb.Min.Y - labelSize.Y) * style.SelectableTextAlign.Y + 0.999f);
+            MathF.Truncate((bb.Max.Y - bb.Min.Y - labelSize.Y) * SeparatorTextAlign.Y + 0.999f);
         ImGuiP.ItemSize(minSize, textBaselineY);
         if (!ImGuiP.ItemAdd(bb, 0)) {
             return;
@@ -90,7 +92,7 @@ public sealed partial class ImGuiComponents(
 
         var labelAvailW = MathF.Max(0.0f, sep2X2 - sep1X1 - padding.X * 2.0f);
         var labelPos = new Vector2(
-            pos.X + padding.X + MathF.Max(0.0f, (labelAvailW - labelSize.X - extraW) * style.SelectableTextAlign.X),
+            pos.X + padding.X + MathF.Max(0.0f, (labelAvailW - labelSize.X - extraW) * SeparatorTextAlign.X),
             pos.Y + textBaselineY
         );
 
@@ -100,16 +102,16 @@ public sealed partial class ImGuiComponents(
             X = labelPos.X + labelSize.X,
         };
 
-        var separatorCol = ImGui.GetColorU32(ImGuiCol.Border);
+        var separatorCol = ImGui.GetColorU32(ImGuiCol.Separator);
         if (labelSize.X > 0.0f) {
             var sep1X2 = labelPos.X - style.ItemSpacing.X;
             var sep2X1 = labelPos.X + labelSize.X + extraW + style.ItemSpacing.X;
-            if (sep1X2 > sep1X1 && separatorThickness > 0.0f) {
-                drawList.AddLine(new(sep1X1, sepsY), new(sep1X2, sepsY), separatorCol, separatorThickness);
+            if (sep1X2 > sep1X1 && SeparatorThickness > 0.0f) {
+                drawList.AddLine(new(sep1X1, sepsY), new(sep1X2, sepsY), separatorCol, SeparatorThickness);
             }
 
-            if (sep2X2 > sep2X1 && separatorThickness > 0.0f) {
-                drawList.AddLine(new(sep2X1, sepsY), new(sep2X2, sepsY), separatorCol, separatorThickness);
+            if (sep2X2 > sep2X1 && SeparatorThickness > 0.0f) {
+                drawList.AddLine(new(sep2X1, sepsY), new(sep2X2, sepsY), separatorCol, SeparatorThickness);
             }
 
             ImGuiP.RenderTextEllipsis(
@@ -119,8 +121,8 @@ public sealed partial class ImGuiComponents(
                 }, bb.Max.X, bb.Max.X, text, labelSize
             );
         } else {
-            if (separatorThickness > 0.0f) {
-                drawList.AddLine(new(sep1X1, sepsY), new(sep2X2, sepsY), separatorCol, separatorThickness);
+            if (SeparatorThickness > 0.0f) {
+                drawList.AddLine(new(sep1X1, sepsY), new(sep2X2, sepsY), separatorCol, SeparatorThickness);
             }
         }
     }
