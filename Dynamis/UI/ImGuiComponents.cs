@@ -240,19 +240,27 @@ public sealed partial class ImGuiComponents(
             ImGui.TextUnformatted($"Class Name: {@class.Name}");
         }
 
+        if (!@class.Known && @class.ManagedType is not null) {
+            ImGui.TextUnformatted($"Implementation of {@class.ManagedType.Name}");
+        }
+
         if (displacement > 0) {
             using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.WarningForeground)) {
                 ImGui.TextUnformatted($"Displacement: {displacement} (0x{displacement:X}) bytes");
             }
         }
 
-        ImGui.TextUnformatted($"Estimated Size: {@class.EstimatedSize} (0x{@class.EstimatedSize:X}) bytes");
+        if (@class.EstimatedSize > 0) {
+            ImGui.TextUnformatted($"Estimated Size: {@class.EstimatedSize} (0x{@class.EstimatedSize:X}) bytes");
 
-        if (@class.Truncated) {
-            ImGui.SameLine();
-            using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ErrorForeground)) {
-                ImGui.TextUnformatted("(truncated)"u8);
+            if (@class.Truncated) {
+                ImGui.SameLine();
+                using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ErrorForeground)) {
+                    ImGui.TextUnformatted("(truncated)"u8);
+                }
             }
+        } else {
+            ImGui.TextUnformatted($"Unknown Size");
         }
 
         if (!string.IsNullOrEmpty(@class.DefiningModule)) {

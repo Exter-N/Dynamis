@@ -199,4 +199,23 @@ public static class ReflectionExtensions
 
         return type;
     }
+
+    public static HashSet<Type> GetDirectInterfaces(this Type t)
+    {
+        var interfaces = new HashSet<Type>(t.GetInterfaces());
+        if (t.BaseType is
+            {
+            } parent) {
+            interfaces.ExceptWith(parent.GetInterfaces());
+        }
+
+        var indirect = new HashSet<Type>();
+        foreach (var @interface in interfaces) {
+            indirect.UnionWith(@interface.GetInterfaces());
+        }
+
+        interfaces.ExceptWith(indirect);
+
+        return interfaces;
+    }
 }

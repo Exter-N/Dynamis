@@ -15,6 +15,7 @@ public sealed partial class ClassRegistry(
     MemoryHeuristics memoryHeuristics,
     AddressIdentifier addressIdentifier,
     ModuleAddressResolver moduleAddressResolver,
+    NanoComProbe nanoComProbe,
     Ipfd.Ipfd ipfd,
     DataYamlContainer dataYamlContainer)
     : IMessageObserver<ConfigurationChangedMessage>
@@ -25,7 +26,7 @@ public sealed partial class ClassRegistry(
     private unsafe T Read<T>(nint address, bool safe) where T : unmanaged
         => safe ? ipfd.Read<T>(address) : *(T*)address;
 
-    public ClassInfo GetClass(ClassIdentifier classId, nint vtbl, uint restOfPageSize)
+    public ClassInfo GetClass(ClassIdentifier classId, nint vtbl, nint? objectToProbe)
     {
         if (!classId.Kind.IsObject()) {
             throw new ArgumentException($"Unsupported class identifier kind {classId.Kind}");
@@ -35,6 +36,11 @@ public sealed partial class ClassRegistry(
         ClassInfo? classInfo;
         lock (_classCache) {
             if (_classCache.TryGetValue(className, out classInfo)) {
+                if (objectToProbe.HasValue && classInfo.ProbePending) {
+                    classInfo.ProbePending = false;
+                    nanoComProbe.Populate(classInfo, objectToProbe.Value);
+                }
+
                 return classInfo;
             }
 
@@ -46,7 +52,14 @@ public sealed partial class ClassRegistry(
 
             PopulateFromVtbl(classInfo, vtbl, true);
             PopulateFromClientStructs(classInfo);
-            PopulateAggregates(classInfo, restOfPageSize);
+            PopulateAggregates(classInfo);
+            if (NanoComProbe.CanPopulate(classInfo)) {
+                if (objectToProbe.HasValue) {
+                    nanoComProbe.Populate(classInfo, objectToProbe.Value);
+                } else {
+                    classInfo.ProbePending = true;
+                }
+            }
 
             _classCache.Add(className, classInfo);
         }
@@ -63,14 +76,31 @@ public sealed partial class ClassRegistry(
     private static bool TryGetClassName(Type type, TryResolveClassNameDelegate resolver,
         [MaybeNullWhen(false)] out string className)
     {
+        bool result;
+        if (type.IsPointer) {
+            var pointeeType = type.GetElementType();
+            if (pointeeType is null) {
+                className = "void*";
+                return false;
+            }
+
+            result = TryGetClassName(pointeeType, resolver, out className);
+            className += "*";
+            return result;
+        }
+
         var typeName = type.FullName;
-        if (typeName is null || type.Assembly != typeof(StdString).Assembly) {
-            className = typeName;
+        if (typeName is null) {
+            className = null;
             return false;
         }
 
+        if (type.Assembly != typeof(StdString).Assembly) {
+            return TryResolvePrimitiveName(typeName, out className);
+        }
+
         if (!type.IsGenericType) {
-            return TryResolveClassName(typeName, resolver, out className);
+            return resolver(typeName, out className);
         }
 
         var definition = type.GetGenericTypeDefinition();
@@ -102,13 +132,10 @@ public sealed partial class ClassRegistry(
             }
         }
 
-        var result = TryResolveClassName(typeName, resolver, out className);
+        result = resolver(typeName, out className);
         className += $"<{string.Join(", ", argNames)}>";
         return result;
     }
-
-    private static bool TryResolveClassName(string typeName, TryResolveClassNameDelegate resolver, out string className)
-        => TryResolvePrimitiveName(typeName, out className) || resolver(typeName, out className);
 
     private static bool TryResolvePrimitiveName(string typeName, out string className)
     {
@@ -194,7 +221,7 @@ public sealed partial class ClassRegistry(
                 PopulateFromManagedType(classInfo);
             }
 
-            PopulateAggregates(classInfo, (uint)Environment.SystemPageSize);
+            PopulateAggregates(classInfo);
 
             _classCache.Add(className, classInfo);
         }
@@ -564,14 +591,8 @@ public sealed partial class ClassRegistry(
         }
     }
 
-    private static void PopulateAggregates(ClassInfo classInfo, uint restOfPageSize)
-    {
-        if (classInfo.SizeFromDtor.HasValue || classInfo.SizeFromManagedType.HasValue) {
-            classInfo.EstimatedSize = Math.Max(classInfo.SizeFromDtor ?? 0, classInfo.SizeFromManagedType ?? 0);
-        } else {
-            classInfo.EstimatedSize = restOfPageSize;
-        }
-    }
+    private static void PopulateAggregates(ClassInfo classInfo)
+        => classInfo.EstimatedSize = Math.Max(classInfo.SizeFromDtor ?? 0, classInfo.SizeFromManagedType ?? 0);
 
     private string DetermineClassName(ClassIdentifier classId)
     {

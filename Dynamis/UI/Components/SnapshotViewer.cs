@@ -357,9 +357,24 @@ public sealed class SnapshotViewer(
             }
 
             var builder = new StringBuilder();
-            builder.Append($"{@class.EstimatedSize} (0x{@class.EstimatedSize:X}) bytes");
+            if (@class.EstimatedSize > 0) {
+                builder.Append($"{@class.EstimatedSize} (0x{@class.EstimatedSize:X}) bytes");
+            }
+
+            if (@class.ManagedType is not null) {
+                if (builder.Length > 0) {
+                    builder.Append(", ");
+                }
+
+                builder.Append(@class.ManagedType.Name);
+            }
+
             if (!string.IsNullOrEmpty(@class.DefiningModule)) {
-                builder.Append($", defined in {@class.DefiningModule}");
+                if (builder.Length > 0) {
+                    builder.Append(", ");
+                }
+
+                builder.Append($"defined in {@class.DefiningModule}");
             }
 
             return builder.ToString();

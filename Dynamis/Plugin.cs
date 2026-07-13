@@ -77,6 +77,7 @@ public sealed class Plugin : IDalamudPlugin
                         collection.AddSingleton<SymbolApi>();
                         collection.AddSingleton<ModuleAddressResolver>();
                         collection.AddSingleton<AddressIdentifier>();
+                        collection.AddSingleton<NanoComProbe>();
                         collection.AddSingleton<ClassRegistry>();
                         collection.AddSingleton<ObjectInspector>();
                         collection.AddSingleton<TextureArraySlicer>();

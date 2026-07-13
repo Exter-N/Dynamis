@@ -32,9 +32,10 @@ public sealed class ClassInfo
     public uint? SizeFromManagedType { get; set; }
     public uint? SizeFromContext     { get; set; }
 
-    public bool Truncated { get; set; }
+    public bool Truncated    { get; set; }
+    public bool ProbePending { get; set; }
 
-    public ImmutableArray<FieldInfo> Fields     { get; private set; } = [];
+    public ImmutableArray<FieldInfo> Fields { get; private set; } = [];
 
     public FrozenDictionary<string, FieldInfo> FieldsByName { get; private set; } =
         FrozenDictionary<string, FieldInfo>.Empty;

@@ -43,7 +43,12 @@ public sealed class ObjectInspector(
             objectAddress -= (nint)displacement;
         }
 
-        var data = new byte[@class.EstimatedSize];
+        var size = @class.EstimatedSize;
+        if (size is 0 && VirtualMemory.GetProtection(objectAddress).CanRead()) {
+            size = unchecked((uint)(MemoryHeuristics.NextPage(objectAddress) - objectAddress));
+        }
+
+        var data = new byte[size];
         if (safeReads) {
             ipfd.Copy<byte>(objectAddress, data.Length, data);
         } else {
@@ -114,11 +119,11 @@ public sealed class ObjectInspector(
     }
 
     public (ClassInfo Class, nuint Displacement) DetermineClassAndDisplacement(nint objectAddress,
-        nint? vtblHint = null, ClassIdentifier? classIdHint = null, bool safeReads = true)
+        nint? vtblHint = null, ClassIdentifier? classIdHint = null, bool safeReads = true, bool allowProbing = false)
     {
         var protection = VirtualMemory.GetProtection(objectAddress);
         if (!protection.CanRead()) {
-            return (new ClassInfo(), 0);
+            return (new(), 0);
         }
 
         if (protection.CanExecute()) {
@@ -129,14 +134,10 @@ public sealed class ObjectInspector(
             return (classRegistry.GetFunctionClass(objectAddress - displacement, safeReads), (uint)displacement);
         }
 
-        var restOfPageSize = (uint)(MemoryHeuristics.NextPage(objectAddress) - objectAddress).ToInt32();
         if ((objectAddress & (nint.Size - 1)) != 0) {
             // The object is not aligned on a void* boundary.
             // Return a dummy class that will contain the rest of the page.
-            return (new ClassInfo
-            {
-                EstimatedSize = restOfPageSize,
-            }, 0);
+            return (new(), 0);
         }
 
         var vtbl = vtblHint ?? Read<nint>(objectAddress, safeReads);
@@ -162,26 +163,25 @@ public sealed class ObjectInspector(
         }
 
         if (classId.Kind is ClassIdentifierKind.WellKnownObject or ClassIdentifierKind.WellKnownObjectByPointer) {
-            return (classRegistry.GetClass(classId, vtbl, restOfPageSize), 0);
+            return (classRegistry.GetClass(classId, vtbl, allowProbing ? objectAddress : null), 0);
         }
 
         if (vtbl is 0) {
-            return (new ClassInfo
-            {
-                EstimatedSize = restOfPageSize,
-            }, 0);
+            return (new(), 0);
         }
 
         if (vtblProtection.CanRead()) {
             var dtor = Read<nint>(vtbl, safeReads);
             var displacement = memoryHeuristics.EstimateDisplacementFromVfunc(dtor);
             if (displacement != 0) {
-                var actual = DetermineClassAndDisplacement(objectAddress - (nint)displacement, null, null, safeReads);
+                var actual = DetermineClassAndDisplacement(
+                    objectAddress - (nint)displacement, null, null, safeReads, allowProbing
+                );
                 return (actual.Class, actual.Displacement + displacement);
             }
         }
 
-        return (classRegistry.GetClass(classId, vtbl, restOfPageSize), 0);
+        return (classRegistry.GetClass(classId, vtbl, allowProbing ? objectAddress : null), 0);
     }
 
     private unsafe ClassIdentifier DetermineClassId(nint objectAddress, nint vtbl, ClassIdentifier? hint)
@@ -238,7 +238,7 @@ public sealed class ObjectInspector(
             HighlightInstance(objectBytes, classInfo, byteColors, safeReads);
         }
 
-        HighlightPointers(objectBytes, byteColors, safeReads);
+        HighlightPointers(objectBytes, byteColors, safeReads, classInfo is not null && classInfo.EstimatedSize > 0);
     }
 
     private void HighlightInstance(ReadOnlySpan<byte> objectBytes, ClassInfo classInfo, Span<byte> byteColors, bool safeReads)
@@ -301,7 +301,10 @@ public sealed class ObjectInspector(
                                 color = (byte)HexViewerColor.BadPointer;
                             } else {
                                 color = (byte)GetClassColor(
-                                    DetermineClassAndDisplacement(value, null, null, safeReads).Class
+                                    DetermineClassAndDisplacement(
+                                            value, null, null, safeReads, classInfo.EstimatedSize > 0
+                                        )
+                                       .Class
                                 );
                             }
                         }
@@ -348,7 +351,8 @@ public sealed class ObjectInspector(
         }
     }
 
-    private void HighlightPointers(ReadOnlySpan<byte> objectBytes, Span<byte> byteColors, bool safeReads)
+    private void HighlightPointers(ReadOnlySpan<byte> objectBytes, Span<byte> byteColors, bool safeReads,
+        bool allowProbing)
     {
         for (var i = 0; i + nint.Size - 1 < objectBytes.Length; i += nint.Size) {
             if (MemoryMarshal.Read<nint>(byteColors[i..(i + nint.Size)]) != 0) {
@@ -366,7 +370,9 @@ public sealed class ObjectInspector(
                 } else if (!protect.CanRead()) {
                     color = (byte)HexViewerColor.Default;
                 } else {
-                    color = (byte)GetClassColor(DetermineClassAndDisplacement(value, null, null, safeReads).Class);
+                    color = (byte)GetClassColor(
+                        DetermineClassAndDisplacement(value, null, null, safeReads, allowProbing).Class
+                    );
                 }
             }
 

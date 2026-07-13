@@ -21,10 +21,10 @@ public sealed unsafe class TextureInspector(
     {
         if (pointer->ActualWidth < pointer->AllocatedWidth || pointer->ActualHeight < pointer->AllocatedHeight) {
             ImGui.TextUnformatted(
-                $"Size: {pointer->ActualWidth}x{pointer->ActualHeight} (out of {pointer->AllocatedWidth}x{pointer->AllocatedHeight})"
+                $"Dimensions: {pointer->ActualWidth} × {pointer->ActualHeight} (out of {pointer->AllocatedWidth} × {pointer->AllocatedHeight})"
             );
         } else {
-            ImGui.TextUnformatted($"Size: {pointer->ActualWidth}x{pointer->ActualHeight}");
+            ImGui.TextUnformatted($"Dimensions: {pointer->ActualWidth} × {pointer->ActualHeight}");
         }
 
         if (pointer->Depth > 1) {

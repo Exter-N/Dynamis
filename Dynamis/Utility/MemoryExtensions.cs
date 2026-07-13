@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Text;
 
 namespace Dynamis.Utility;
 
@@ -35,4 +36,18 @@ public static unsafe class MemoryExtensions
 
     public static nint GetAddress<T>(this ReadOnlyMemory<T> memory, int index = 0) where T : unmanaged
         => memory.Span.GetAddress(index);
+
+    public static string ToHexString(this ReadOnlySpan<byte> span)
+    {
+        if (span.IsEmpty) {
+            return string.Empty;
+        }
+
+        var sb = new StringBuilder();
+        foreach (var b in span) {
+            sb.Append($"{b:X2} ");
+        }
+
+        return sb.ToString(0, sb.Length - 1);
+    }
 }

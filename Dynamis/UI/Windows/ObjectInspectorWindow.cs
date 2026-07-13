@@ -294,13 +294,18 @@ public sealed class ObjectInspectorWindow : IndexedWindow
             ImGui.TextUnformatted($"Managed type: {@class.ManagedType}");
         }
 
-        ImGui.TextUnformatted($"Estimated Size: {@class.EstimatedSize} (0x{@class.EstimatedSize:X}) bytes");
+        var size = @class.EstimatedSize;
+        if (size is 0 && _vmSnapshot is not null) {
+            size = unchecked((uint)_vmSnapshot.Data.Length);
+        }
+
+        ImGui.TextUnformatted($"Estimated Size: {size} (0x{size:X}) bytes");
         var sizeIsFromDtor = @class.SizeFromDtor.HasValue
-                          && @class.SizeFromDtor.Value == @class.EstimatedSize;
+                          && @class.SizeFromDtor.Value == size;
         var sizeIsFromManaged = @class.SizeFromManagedType.HasValue
-                        && @class.SizeFromManagedType.Value == @class.EstimatedSize;
+                        && @class.SizeFromManagedType.Value == size;
         var sizeIsFromCtx = @class.SizeFromContext.HasValue
-                         && @class.SizeFromContext.Value == @class.EstimatedSize;
+                         && @class.SizeFromContext.Value == size;
         if (sizeIsFromCtx) {
             ImGui.SameLine();
             using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.InfoForeground)) {
