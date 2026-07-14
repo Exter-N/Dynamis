@@ -15,12 +15,10 @@ public sealed class DevMenuItem(
     IDalamudPluginInterface pluginInterface,
     ConfigurationContainer configuration,
     Toolbox toolbox,
-    MessageHub messageHub)
+    MessageHub messageHub) : Toolbox.IView
 {
     public void Draw()
     {
-        // Must be kept in sync with ToolboxWindow.Draw.
-
         if (!configuration.Configuration.ShowInDevMenu || !pluginInterface.IsDevMenuOpen) {
             return;
         }
@@ -35,7 +33,7 @@ public sealed class DevMenuItem(
             return;
         }
 
-        toolbox.Draw(static label => ImGui.MenuItem(label), ImGui.Separator, false);
+        toolbox.Draw(this);
 
         ImGui.Separator();
 
@@ -47,14 +45,14 @@ public sealed class DevMenuItem(
             messageHub.Publish<OpenWindowMessage<SettingsWindow>>();
         }
 
-        if (ImGui.MenuItem("Change Log"u8)) {
-            messageHub.Publish<OpenWindowMessage<ChangeLogWindow>>();
+        if (ImGui.MenuItem("Changelog"u8)) {
+            messageHub.Publish<OpenWindowMessage<ChangelogWindow>>();
         }
 
-        if (configuration.Configuration.ReadChangeLogVersion < ChangeLogWindow.ChangeLogVersion) {
+        if (configuration.Configuration.ReadChangelogVersion < ChangelogWindow.ChangelogVersion) {
             var drawList = ImGui.GetWindowDrawList();
             var style = ImGui.GetStyle();
-            var min = ImGui.GetItemRectMin() + ImGui.CalcTextSize("Change Log"u8) with
+            var min = ImGui.GetItemRectMin() + ImGui.CalcTextSize("Changelog"u8) with
             {
                 Y = 0.0f,
             };
@@ -75,4 +73,14 @@ public sealed class DevMenuItem(
         ImGui.Separator();
         ImGui.MenuItem($"Version {Assembly.GetExecutingAssembly().GetName().Version}###DynamisVersion", enabled: false);
     }
+
+    void Toolbox.IView.Begin()
+    {
+    }
+
+    bool Toolbox.IView.Item(ReadOnlySpan<byte> label)
+        => ImGui.MenuItem(label);
+
+    void Toolbox.IView.Separator()
+        => ImGui.Separator();
 }

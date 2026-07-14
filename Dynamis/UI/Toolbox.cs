@@ -8,32 +8,33 @@ namespace Dynamis.UI;
 
 public class Toolbox(ConfigurationContainer configuration, MessageHub messageHub)
 {
-    public void Draw(Func<ImU8String, bool> item, Action separator, bool useSameLine)
+    public void Draw(IView view)
     {
-        if (item("Signature Scanner"u8)) {
+        view.Begin();
+
+        if (view.Item("Signature Scanner"u8)) {
             messageHub.Publish<OpenWindowMessage<SigScannerWindow>>();
         }
 
-        if (useSameLine)
-            ImGui.SameLine();
-        if (item("Object Table"u8)) {
+        if (view.Item("Object Table"u8)) {
             messageHub.Publish<OpenWindowMessage<ObjectTableWindow>>();
         }
 
-        separator();
-        if (item("Object Inspector"u8)) {
-            messageHub.Publish<OpenWindowMessage<ObjectInspectorWindow>>();
+        if (view.Item("RSV Viewer"u8)) {
+            messageHub.Publish<OpenWindowMessage<RsvWindow>>();
         }
 
-        if (useSameLine)
-            ImGui.SameLine();
+        view.Separator();
+        if (view.Item("Object Inspector"u8)) {
+            messageHub.Publish<OpenWindowMessage<ObjectInspectorWindow>>();
+        }
 #if WITH_SMA
-        if (item("Hosted PowerShell"u8)) {
+        if (view.Item("Hosted PowerShell"u8)) {
             messageHub.Publish<OpenWindowMessage<HostedPsWindow>>();
         }
 #else
         using (ImRaii.Disabled()) {
-            item("Hosted PowerShell"u8);
+            frontEnd.Item("Hosted PowerShell"u8);
         }
 
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled)) {
@@ -44,7 +45,7 @@ public class Toolbox(ConfigurationContainer configuration, MessageHub messageHub
 #endif
 
         using (ImRaii.Disabled(!configuration.Configuration.EnableIpfd)) {
-            if (item("IPFD Breakpoint"u8)) {
+            if (view.Item("IPFD Breakpoint"u8)) {
                 messageHub.Publish<OpenWindowMessage<BreakpointWindow>>();
             }
         }
@@ -54,5 +55,14 @@ public class Toolbox(ConfigurationContainer configuration, MessageHub messageHub
             ImGui.TextUnformatted("The In-Process Faux Debugger is currently disabled."u8);
             ImGui.TextUnformatted("To use this, enable this functionality in Dynamis's settings."u8);
         }
+    }
+
+    public interface IView
+    {
+        void Begin();
+
+        bool Item(ReadOnlySpan<byte> label);
+
+        void Separator();
     }
 }

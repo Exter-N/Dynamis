@@ -26,7 +26,7 @@ public sealed partial class ImGuiComponents(
 {
     private readonly TitleBarButton _toolboxButton   = BuildToolboxButton(messageHub);
     private readonly TitleBarButton _settingsButton  = BuildSettingsButton(messageHub);
-    private readonly TitleBarButton _changeLogButton = BuildChangeLogButton(messageHub, configuration);
+    private readonly TitleBarButton _changelogButton = BuildChangelogButton(messageHub, configuration);
 
     public void AddTitleBarButtons(Window window)
     {
@@ -38,8 +38,8 @@ public sealed partial class ImGuiComponents(
             window.TitleBarButtons.Add(_settingsButton);
         }
 
-        if (window is not ChangeLogWindow) {
-            window.TitleBarButtons.Add(_changeLogButton);
+        if (window is not ChangelogWindow) {
+            window.TitleBarButtons.Add(_changelogButton);
         }
     }
 
@@ -70,20 +70,20 @@ public sealed partial class ImGuiComponents(
             Priority = 2,
         };
 
-    private static TitleBarButton BuildChangeLogButton(MessageHub messageHub, ConfigurationContainer configuration)
+    private static TitleBarButton BuildChangelogButton(MessageHub messageHub, ConfigurationContainer configuration)
         => new()
         {
             Icon = FontAwesomeIcon.Book,
-            Click = _ => messageHub.Publish<OpenWindowMessage<ChangeLogWindow>>(),
-            IconColor = configuration.Configuration.ReadChangeLogVersion < ChangeLogWindow.ChangeLogVersion
+            Click = _ => messageHub.Publish<OpenWindowMessage<ChangelogWindow>>(),
+            IconColor = configuration.Configuration.ReadChangelogVersion < ChangelogWindow.ChangelogVersion
                 ? ImGuiColors.SuccessForeground
                 : null,
             IconOffset = new(0, 1),
             ShowTooltip = () =>
             {
                 using var _ = ImRaii.Tooltip();
-                ImGui.Text("Change Log"u8);
-                if (configuration.Configuration.ReadChangeLogVersion < ChangeLogWindow.ChangeLogVersion) {
+                ImGui.Text("Changelog"u8);
+                if (configuration.Configuration.ReadChangelogVersion < ChangelogWindow.ChangelogVersion) {
                     ImGui.SameLine(0.0f, ImGui.GetStyle().ItemInnerSpacing.X);
                     using var color = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.SuccessForeground);
                     ImGui.TextUnformatted("(NEW!)"u8);
@@ -360,15 +360,15 @@ public sealed partial class ImGuiComponents(
 
     public void HandleMessage(ConfigurationChangedMessage message)
     {
-        if (message.IsPropertyChanged(nameof(configuration.Configuration.ReadChangeLogVersion))) {
+        if (message.IsPropertyChanged(nameof(configuration.Configuration.ReadChangelogVersion))) {
             Update();
         }
     }
 
     public void Update()
     {
-        _changeLogButton.IconColor =
-            configuration.Configuration.ReadChangeLogVersion < ChangeLogWindow.ChangeLogVersion
+        _changelogButton.IconColor =
+            configuration.Configuration.ReadChangelogVersion < ChangelogWindow.ChangelogVersion
                 ? ImGuiColors.SuccessForeground
                 : null;
     }

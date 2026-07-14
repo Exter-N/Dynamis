@@ -6,16 +6,16 @@ using Dynamis.Messaging;
 
 namespace Dynamis.UI.Windows;
 
-public sealed class ChangeLogWindow : Window, ISingletonWindow, IMessageObserver<CommandMessage>
+public sealed class ChangelogWindow : Window, ISingletonWindow, IMessageObserver<CommandMessage>
 {
-    public const int ChangeLogVersion = 1;
+    public const int ChangelogVersion = 1;
 
     private readonly ConfigurationContainer _configuration;
 
     private int _readVersion;
 
-    public ChangeLogWindow(ConfigurationContainer configuration, ImGuiComponents imGuiComponents) : base(
-        $"Dynamis {Assembly.GetExecutingAssembly().GetName().Version} Change Log###DynamisChangeLog",
+    public ChangelogWindow(ConfigurationContainer configuration, ImGuiComponents imGuiComponents) : base(
+        $"Dynamis {Assembly.GetExecutingAssembly().GetName().Version} Changelog###DynamisChangelog",
         ImGuiWindowFlags.NoDocking
     )
     {
@@ -32,10 +32,10 @@ public sealed class ChangeLogWindow : Window, ISingletonWindow, IMessageObserver
 
     public override void OnOpen()
     {
-        _readVersion = _configuration.Configuration.ReadChangeLogVersion;
-        if (_configuration.Configuration.ReadChangeLogVersion < ChangeLogVersion) {
-            _configuration.Configuration.ReadChangeLogVersion = ChangeLogVersion;
-            _configuration.Save(nameof(_configuration.Configuration.ReadChangeLogVersion));
+        _readVersion = _configuration.Configuration.ReadChangelogVersion;
+        if (_configuration.Configuration.ReadChangelogVersion < ChangelogVersion) {
+            _configuration.Configuration.ReadChangelogVersion = ChangelogVersion;
+            _configuration.Save(nameof(_configuration.Configuration.ReadChangelogVersion));
         }
     }
 
@@ -50,7 +50,7 @@ public sealed class ChangeLogWindow : Window, ISingletonWindow, IMessageObserver
 
     private void DrawMarkAsUnread()
     {
-        var markAsRead = _configuration.Configuration.ReadChangeLogVersion < ChangeLogVersion;
+        var markAsRead = _configuration.Configuration.ReadChangelogVersion < ChangelogVersion;
         var label = markAsRead ? "Mark as read"u8 : "Mark as unread"u8;
 
         ImGui.Dummy(
@@ -64,8 +64,8 @@ public sealed class ChangeLogWindow : Window, ISingletonWindow, IMessageObserver
             return;
         }
 
-        _configuration.Configuration.ReadChangeLogVersion = markAsRead ? ChangeLogVersion : 0;
-        _configuration.Save(nameof(_configuration.Configuration.ReadChangeLogVersion));
+        _configuration.Configuration.ReadChangelogVersion = markAsRead ? ChangelogVersion : 0;
+        _configuration.Save(nameof(_configuration.Configuration.ReadChangelogVersion));
     }
 
     public void HandleMessage(CommandMessage message)

@@ -48,7 +48,7 @@ public sealed class Configuration : IPluginConfiguration
 
     public bool Serious { get; set; } = false;
 
-    public int ReadChangeLogVersion { get; set; } = 0;
+    public int ReadChangelogVersion { get; set; } = 0;
 
     public uint[] GetHexViewerPalette()
     {

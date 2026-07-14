@@ -56,7 +56,7 @@ public sealed class CommandHandler(MessageHub messageHub, ICommandManager comman
 
         Print($"    》 {UiForeground("help", Gold)} - Display this help message.");
 
-        Print($"    》 {UiForeground("toolbox", Gold)} - Open the Dynamis toolbox.");
+        Print($"    》 {UiForeground("toolbox", Gold)} - Open Dynamis's toolbox.");
 
         Print($"    》 {UiForeground("sigscan", Gold)} - Open the signature scanner.");
         Print(
@@ -77,10 +77,12 @@ public sealed class CommandHandler(MessageHub messageHub, ICommandManager comman
             $"        》 {UiForeground("breakpoint", Gold)} {UiForeground("address", Blue)} {UiForeground("[execute|write|rw]", Gold)} {UiForeground("[length]", Green)} {UiForeground("[--on]", Red)} {UiForeground("[--hits=", Red)}{UiForeground("N", Green)}{UiForeground("]", Red)} - Set an IPFD breakpoint at the given address."
         );
 
-        Print($"    》 {UiForeground("settings", Gold)} - Open the Dynamis settings.");
+        Print($"    》 {UiForeground("settings", Gold)} - Open Dynamis's settings.");
         Print(
             $"        》 {UiForeground("settings help", Gold)} - Displays a more detailed help message about settings sub-commands."
         );
+
+        Print($"    》 {UiForeground("changelog", Gold)} - Open Dynamis's changelog.");
     }
 
     public void HandleMessage(OpenDalamudConsoleMessage _)

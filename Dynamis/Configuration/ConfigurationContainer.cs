@@ -1,6 +1,7 @@
 using Dalamud.Plugin;
 using Dynamis.Logging;
 using Dynamis.Messaging;
+using Dynamis.UI.Windows;
 using Microsoft.Extensions.Logging;
 
 namespace Dynamis.Configuration;
@@ -21,8 +22,17 @@ public sealed class ConfigurationContainer : IDalamudLoggingConfiguration
     {
         _messageHub = messageHub;
         _pluginInterface = pi;
-        _configuration = new(() => _pluginInterface.GetPluginConfig() as Configuration ?? new());
+        _configuration = new(LoadOrCreateConfiguration);
     }
+
+    private Configuration LoadOrCreateConfiguration()
+        => _pluginInterface.GetPluginConfig() as Configuration ?? CreateConfiguration();
+
+    private static Configuration CreateConfiguration()
+        => new Configuration
+        {
+            ReadChangelogVersion = ChangelogWindow.ChangelogVersion,
+        };
 
     public void Save(string? changedPropertyHint)
     {
