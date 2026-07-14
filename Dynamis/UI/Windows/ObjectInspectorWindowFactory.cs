@@ -18,6 +18,7 @@ public sealed class ObjectInspectorWindowFactory(
     PointerInputFactory pointerInputFactory,
     DataYamlContainer dataYamlContainer,
     ObjectInspector objectInspector,
+    ClassRegistry classRegistry,
     PointerParser pointerParser,
     SnapshotViewerFactory snapshotViewerFactory,
     Lazy<ObjectInspectorDispatcher> objectInspectorDispatcher)
@@ -37,8 +38,8 @@ public sealed class ObjectInspectorWindowFactory(
         dataYamlContainer.Preload();
 
         return new(
-            logger, WindowSystem, imGuiComponents, pointerInputFactory, objectInspector, _wellKnownAddresses,
-            snapshotViewerFactory, objectInspectorDispatcher, GetFreeIndex()
+            logger, WindowSystem, imGuiComponents, pointerInputFactory, objectInspector, classRegistry,
+            _wellKnownAddresses, snapshotViewerFactory, objectInspectorDispatcher, GetFreeIndex()
         );
     }
 
@@ -81,15 +82,23 @@ public sealed class ObjectInspectorWindowFactory(
             return;
         }
 
+        ClassInfo? @class = null;
+        if (!message.Arguments.Equals(2, null)) {
+            @class = classRegistry.FromTypeName(message.Arguments[2]);
+        }
+
         message.SetHandled();
 
         var window =
-            OpenWindows.FirstOrDefault(window => (window.Snapshot?.Address ?? window.ObjectAddress) == address);
+            OpenWindows.FirstOrDefault(window
+                => (window.Snapshot?.Address ?? window.ObjectAddress) == address
+                && (@class is null || window.Snapshot?.Class == @class)
+            );
         if (window is not null) {
             window.BringToFront();
             return;
         }
 
-        CreateWindow()!.Inspect(address, null, null, null);
+        CreateWindow()!.Inspect(address, @class, null, null);
     }
 }

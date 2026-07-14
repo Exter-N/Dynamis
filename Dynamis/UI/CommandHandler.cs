@@ -69,7 +69,7 @@ public sealed class CommandHandler(MessageHub messageHub, ICommandManager comman
 
         Print($"    》 {UiForeground("inspect", Gold)} - Open an object inspector.");
         Print(
-            $"        》 {UiForeground("inspect", Gold)} {UiForeground("address", Blue)} - Inspect the object at the given address."
+            $"        》 {UiForeground("inspect", Gold)} {UiForeground("address", Blue)} {UiForeground("[class]", Purple)} - Inspect the object at the given address. If no class is specified, it will be automatically determined."
         );
 
         Print($"    》 {UiForeground("breakpoint", Gold)} - Open an IPFD breakpoint.");
