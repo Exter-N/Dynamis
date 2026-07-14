@@ -20,6 +20,7 @@ public sealed class BreakpointWindowFactory(
     ImGuiComponents imGuiComponents,
     PointerInputFactory pointerInputFactory,
     ObjectInspector objectInspector,
+    PointerParser pointerParser,
     Ipfd ipfd,
     MessageHub messageHub,
     ResourceProvider resourceProvider)
@@ -102,7 +103,7 @@ public sealed class BreakpointWindowFactory(
             return;
         }
 
-        if (!nint.TryParse(message.Arguments[1], NumberStyles.HexNumber, null, out var address)) {
+        if (!pointerParser.TryParse(message.Arguments[1], out var address)) {
             return;
         }
 

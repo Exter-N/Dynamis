@@ -1,20 +1,14 @@
-using System.Globalization;
 using System.Numerics;
-using System.Text;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Utility.Raii;
-using Dynamis.ClientStructs;
 using Dynamis.Interop;
 using Dynamis.Utility;
 
 namespace Dynamis.UI.Components;
 
-public sealed class PointerInput(
-    DataYamlContainer dataYamlContainer,
-    ModuleAddressResolver moduleAddressResolver,
-    ImGuiComponents imGuiComponents,
-    string label) : IInput<nint>
+public sealed class PointerInput(PointerParser pointerParser, ImGuiComponents imGuiComponents, string label)
+    : IInput<nint>
 {
     private const int BufferCapacity = 2048;
 
@@ -55,7 +49,10 @@ public sealed class PointerInput(
         }
 
         if (changed) {
-            changed = ParseValue();
+            changed = pointerParser.TryParse(((ReadOnlySpan<byte>)_buffer).BeforeNull(), out var newValue);
+            if (changed) {
+                _value = newValue;
+            }
         }
 
         if (ImGui.IsItemDeactivatedAfterEdit()) {
@@ -76,68 +73,6 @@ public sealed class PointerInput(
         }
 
         return changed;
-    }
-
-    private bool ParseValue()
-    {
-        var value = ((ReadOnlySpan<byte>)_buffer).BeforeNull();
-        if (value.IsEmpty) {
-            return false;
-        }
-
-        if (nint.TryParse(value, NumberStyles.HexNumber, null, out var parsedHex)) {
-            _value = parsedHex;
-            return true;
-        }
-
-        var separator = value.IndexOf((byte)'+');
-        if (separator >= 0 && nint.TryParse(value[(separator + 1)..], NumberStyles.HexNumber, null, out parsedHex)) {
-            var baseValue = value[..separator];
-            separator = baseValue.IndexOf((byte)'!');
-            ModuleAddress moduleAddress;
-            if (separator >= 0) {
-                moduleAddress = new(
-                    Encoding.UTF8.GetString(baseValue[..separator]),
-                    Encoding.UTF8.GetString(baseValue[(separator + 1)..]), parsedHex, -1
-                );
-            } else {
-                moduleAddress = new(Encoding.UTF8.GetString(baseValue), null, parsedHex, -1);
-            }
-
-            if (moduleAddressResolver.GetAddress(moduleAddress) is
-                {
-                } address) {
-                _value = address;
-                return true;
-            }
-
-            return false;
-        }
-
-        separator = value.IndexOf((byte)'!');
-        if (separator >= 0) {
-            var moduleAddress = new ModuleAddress(
-                Encoding.UTF8.GetString(value[..separator]),
-                Encoding.UTF8.GetString(value[(separator + 1)..]), 0, -1
-            );
-
-            if (moduleAddressResolver.GetAddress(moduleAddress) is
-                {
-                } address) {
-                _value = address;
-                return true;
-            }
-
-            return false;
-        }
-
-        separator = value.IndexOf((byte)'_');
-        if (separator >= 0 && nint.TryParse(value[(separator + 1)..], NumberStyles.HexNumber, null, out parsedHex)) {
-            _value = dataYamlContainer.GetLiveAddress(new(parsedHex));
-            return true;
-        }
-
-        return false;
     }
 
     private static void FormatValue(Span<byte> buffer, nint value)

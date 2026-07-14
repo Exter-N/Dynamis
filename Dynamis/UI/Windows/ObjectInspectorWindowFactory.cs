@@ -18,6 +18,7 @@ public sealed class ObjectInspectorWindowFactory(
     PointerInputFactory pointerInputFactory,
     DataYamlContainer dataYamlContainer,
     ObjectInspector objectInspector,
+    PointerParser pointerParser,
     SnapshotViewerFactory snapshotViewerFactory,
     Lazy<ObjectInspectorDispatcher> objectInspectorDispatcher)
     : WindowFactory<ObjectInspectorWindow>(windowSystem),
@@ -76,11 +77,7 @@ public sealed class ObjectInspectorWindowFactory(
             return;
         }
 
-        if (!nint.TryParse(
-                message.Arguments[1].StartsWith("0x", StringComparison.OrdinalIgnoreCase)
-                    ? message.Arguments[1][2..]
-                    : message.Arguments[1], NumberStyles.HexNumber, null, out var address
-            )) {
+        if (!pointerParser.TryParse(message.Arguments[1], out var address)) {
             return;
         }
 

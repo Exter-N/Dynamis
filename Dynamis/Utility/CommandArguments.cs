@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 
 namespace Dynamis.Utility;
 
@@ -11,6 +12,7 @@ public record CommandArguments(string[] Arguments) : IReadOnlyList<string>
     public string this[int index]
         => Arguments[index];
 
+    [OverloadResolutionPriority(1)]
     public bool Equals(int index, string? arg, StringComparison comparisonType = StringComparison.OrdinalIgnoreCase)
         => arg is null
             ? Arguments.Length <= index
