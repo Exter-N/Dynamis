@@ -67,6 +67,8 @@ public sealed class CommandHandler(MessageHub messageHub, ICommandManager comman
         Print($"    》 {UiForeground("objtable",             Gold)} - Open the object table.");
         Print($"        》 {UiForeground("objtable refresh", Gold)} - Refresh the object table.");
 
+        Print($"    》 {UiForeground("rsv", Gold)} - Open the RSV viewer.");
+
         Print($"    》 {UiForeground("inspect", Gold)} - Open an object inspector.");
         Print(
             $"        》 {UiForeground("inspect", Gold)} {UiForeground("address", Blue)} {UiForeground("[class]", Purple)} - Inspect the object at the given address. If no class is specified, it will be automatically determined."
