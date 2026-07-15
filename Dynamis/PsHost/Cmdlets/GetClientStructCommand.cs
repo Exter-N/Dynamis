@@ -16,8 +16,10 @@ public sealed class GetClientStructCommand : Cmdlet
     public object? Address { get; set; }
 
     [Parameter(Mandatory = true, Position = 0, ParameterSetName = "ByType")]
+    [Parameter(ParameterSetName = "ByAddress")]
     public Type? Type { get; set; }
 
+    [Parameter(Position = 1, ParameterSetName = "ByAddress")]
     [Parameter(Position = 1, ParameterSetName = "ByType")]
     public string? Name { get; set; }
 
@@ -33,8 +35,13 @@ public sealed class GetClientStructCommand : Cmdlet
 
     private (nint Address, ClassIdentifier? ClassIdentifierHint) GetAddress()
     {
+        if (Address is not null) {
+            return (CastAddress(Address is PSObject psObject ? psObject.BaseObject : Address),
+                Type is not null ? ClassIdentifier.ManagedType(Type) : null);
+        }
+
         if (Type is null) {
-            return (CastAddress(Address is PSObject psObject ? psObject.BaseObject : Address), null);
+            return (0, null);
         }
 
         var getInstance = Type.GetMethod("Instance", BindingFlags.Static | BindingFlags.Public);
