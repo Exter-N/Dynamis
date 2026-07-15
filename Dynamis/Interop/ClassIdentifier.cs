@@ -19,7 +19,4 @@ public readonly record struct ClassIdentifier(ClassIdentifierKind Kind, nint Add
 
     public static ClassIdentifier ManagedType(Type type)
         => new(ClassIdentifierKind.ManagedType, 0, type, null);
-
-    public static ClassIdentifier TypeName(string name)
-        => new(ClassIdentifierKind.TypeName, 0, null, name);
 }

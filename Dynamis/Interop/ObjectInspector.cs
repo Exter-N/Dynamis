@@ -155,13 +155,6 @@ public sealed class ObjectInspector(
             return (classRegistry.FromManagedType(classId.Type!), 0);
         }
 
-        if (classId.Kind is ClassIdentifierKind.TypeName) {
-            var @class = classRegistry.FromTypeName(classId.Name!);
-            if (@class is not null) {
-                return (@class, 0);
-            }
-        }
-
         if (classId.Kind is ClassIdentifierKind.WellKnownObject or ClassIdentifierKind.WellKnownObjectByPointer) {
             return (classRegistry.GetClass(classId, vtbl, allowProbing ? objectAddress : null), 0);
         }
@@ -188,7 +181,7 @@ public sealed class ObjectInspector(
     {
         if (hint is
             {
-                Kind: not ClassIdentifierKind.ManagedType and not ClassIdentifierKind.TypeName,
+                Kind: not ClassIdentifierKind.ManagedType,
             } hintValue) {
             return hintValue;
         }

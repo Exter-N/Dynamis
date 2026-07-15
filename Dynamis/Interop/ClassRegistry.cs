@@ -637,8 +637,6 @@ public sealed partial class ClassRegistry(
             case ClassIdentifierKind.ManagedType:
                 TryGetClientStructsClassName(classId.Type!, out className);
                 return className ?? classId.Type!.ToString();
-            case ClassIdentifierKind.TypeName:
-                return classId.Name ?? string.Empty;
             default:
                 throw new ArgumentException($"Unsupported class identifier kind {classId.Kind}", nameof(classId));
         }

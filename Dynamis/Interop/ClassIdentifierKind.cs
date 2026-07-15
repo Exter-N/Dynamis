@@ -9,5 +9,4 @@ public enum ClassIdentifierKind
     VirtualTable,
     Function,
     ManagedType,
-    TypeName,
 }
