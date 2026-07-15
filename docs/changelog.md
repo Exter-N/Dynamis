@@ -8,10 +8,10 @@
 - Added manual class specification to Object Inspector.
 - Added a changelog. (You are currently reading it!)
 
-## IPC API
+## Inter-Plugin API
 
 - Added `InspectObject` v3, `ImGuiDrawPointer` v4 and equivalent `Get…Delegate` IPC functions.
-- The IPC API version is now 1.7.
+- The API version is now 1.7.
 
 ## Bug fixes and improvements
 
@@ -71,10 +71,10 @@
 
 # Version 0.1.3.7
 
-## IPC API
+## Inter-Plugin API
 
 - Added `ImGuiDrawPointer` v3 and equivalent `Get…Delegate` IPC functions.
-- The IPC API version is now 1.6.
+- The API version is now 1.6.
 
 # Version 0.1.3.6
 
@@ -97,10 +97,10 @@
 
 # Version 0.1.3.2
 
-## IPC API
+## Inter-Plugin API
 
 - Added `ImGuiDrawPointer` v2 and equivalent `Get…Delegate` IPC functions.
-- The IPC API version is now 1.5.
+- The API version is now 1.5.
 
 # Version 0.1.3.1
 
@@ -116,10 +116,10 @@
 - Added support for generic types from ClientStructs.
 - Added an option to pass a name to the `Show-Object` cmdlet.
 
-## IPC API
+## Inter-Plugin API
 
 - Added `InspectObject` v2 and `InspectRegion` v2 IPC functions.
-- The IPC API version is now 1.4.
+- The API version is now 1.4.
 
 ## Bug fixes and improvements
 
@@ -177,11 +177,11 @@
 - Various cmdlets, ad hoc types and other infrastructure are provided to the hosted PowerShell, to facilitate interacting with native objects and Dalamud services.
 - The Symbol Handler can now be turned off on Windows as well, and also has a Force Initialize mode, equivalent to how it operates on Wine.
 
-## IPC API
+## Inter-Plugin API
 
 - Added `GetApiVersion` IPC function.
 - Added `ApiInitialized` and `ApiDisposed` IPC events.
-- The IPC API version is now 1.3. (Previous versions could not be told apart except through feature detection.)
+- The API version is now 1.3. (Previous versions could not be told apart except through feature detection.)
 
 ## Bug fixes and improvements
 
@@ -195,7 +195,7 @@
 
 # Version 0.0.1.14
 
-## IPC API
+## Inter-Plugin API
 
 - Added `GetClass`, `IsInstanceOf` and `PreloadDataYaml` IPC functions.
 

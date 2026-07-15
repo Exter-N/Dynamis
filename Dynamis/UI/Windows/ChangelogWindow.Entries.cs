@@ -16,10 +16,10 @@ partial class ChangelogWindow
         BulletText("Added manual class specification to Object Inspector."u8);
         BulletText("Added a changelog. (You are currently reading it!)"u8);
 
-        ImGuiComponents.SeparatorText("IPC API"u8);
+        ImGuiComponents.SeparatorText("Inter-Plugin API"u8);
 
         BulletText("Added InspectObject v3, ImGuiDrawPointer v4 and equivalent Get...Delegate IPC functions."u8);
-        BulletText("The IPC API version is now 1.7."u8);
+        BulletText("The API version is now 1.7."u8);
 
         ImGuiComponents.SeparatorText("Bug fixes and improvements"u8);
 
@@ -119,10 +119,10 @@ partial class ChangelogWindow
             return;
         }
 
-        ImGuiComponents.SeparatorText("IPC API"u8);
+        ImGuiComponents.SeparatorText("Inter-Plugin API"u8);
 
         BulletText("Added ImGuiDrawPointer v3 and equivalent Get...Delegate IPC functions."u8);
-        BulletText("The IPC API version is now 1.6."u8);
+        BulletText("The API version is now 1.6."u8);
     }
 
     private void Draw0_1_3_6()
@@ -165,10 +165,10 @@ partial class ChangelogWindow
             return;
         }
 
-        ImGuiComponents.SeparatorText("IPC API"u8);
+        ImGuiComponents.SeparatorText("Inter-Plugin API"u8);
 
         BulletText("Added ImGuiDrawPointer v2 and equivalent Get...Delegate IPC functions."u8);
-        BulletText("The IPC API version is now 1.5."u8);
+        BulletText("The API version is now 1.5."u8);
     }
 
     private void Draw0_1_3_1()
@@ -194,10 +194,10 @@ partial class ChangelogWindow
         BulletText("Added support for generic types from ClientStructs."u8);
         BulletText("Added an option to pass a name to the Show-Object cmdlet."u8);
 
-        ImGuiComponents.SeparatorText("IPC API"u8);
+        ImGuiComponents.SeparatorText("Inter-Plugin API"u8);
 
         BulletText("Added InspectObject v2 and InspectRegion v2 IPC functions."u8);
-        BulletText("The IPC API version is now 1.4."u8);
+        BulletText("The API version is now 1.4."u8);
 
         ImGuiComponents.SeparatorText("Bug fixes and improvements"u8);
 
@@ -295,12 +295,12 @@ partial class ChangelogWindow
             "The Symbol Handler can now be turned off on Windows as well, and also has a Force Initialize mode, equivalent to how it operates on Wine."u8
         );
 
-        ImGuiComponents.SeparatorText("IPC API"u8);
+        ImGuiComponents.SeparatorText("Inter-Plugin API"u8);
 
         BulletText("Added GetApiVersion IPC function."u8);
         BulletText("Added ApiInitialized and ApiDisposed IPC events."u8);
         BulletText(
-            "The IPC API version is now 1.3. (Previous versions could not be told apart except through feature detection.)"u8
+            "The API version is now 1.3. (Previous versions could not be told apart except through feature detection.)"u8
         );
 
         ImGuiComponents.SeparatorText("Bug fixes and improvements"u8);
@@ -325,7 +325,7 @@ partial class ChangelogWindow
             return;
         }
 
-        ImGuiComponents.SeparatorText("IPC API"u8);
+        ImGuiComponents.SeparatorText("Inter-Plugin API"u8);
 
         BulletText("Added GetClass, IsInstanceOf and PreloadDataYaml IPC functions."u8);
 
