@@ -5,10 +5,18 @@ VisualStudioVersion = 16.0.29709.97
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dynamis", "Dynamis\Dynamis.csproj", "{13C812E9-0D42-4B95-8646-40EEBF30636F}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{FDCA1F68-123D-4A8E-817B-85202F913585}"
+	ProjectSection(SolutionItems) = preProject
+		docs\cmdlets.md = docs\cmdlets.md
+		docs\ipc-api.md = docs\ipc-api.md
+		docs\README.md = docs\README.md
+		docs\changelog.md = docs\changelog.md
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
-        DebugWithSMA|x64 = DebugWithSMA|x64
+								DebugWithSMA|x64 = DebugWithSMA|x64
 		Release|x64 = Release|x64
 		ReleaseWithSMA|x64 = ReleaseWithSMA|x64
 	EndGlobalSection

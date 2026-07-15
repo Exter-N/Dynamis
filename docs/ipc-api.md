@@ -18,7 +18,7 @@ For an example of a consumer implementation, see [DynamisIpc.cs from Ottermandia
 (uint MajorVersion, uint MinorVersion, ulong FeatureFlags) "Dynamis.GetApiVersion"();
 ```
 
-Returns the current API version. Dynamis' API versioning scheme is as follows:
+Returns the current API version. Dynamis's API versioning scheme is as follows:
 - `MajorVersion` will be incremented (and `MinorVersion` will return to 0) on any backwards-incompatible changes (for example removal of functions, addition of restrictions on functions/parameters) ;
 - `MinorVersion` will be incremented on backwards-compatible baseline changes (for example addition of functions, removal of restrictions on functions/parameters) ;
 - `FeatureFlags` is a bit field that indicates which optional features are available (compiled in and/or enabled by user).
@@ -37,7 +37,7 @@ Minimum API version: `(1, 3, 0)`.
 event "Dynamis.ApiInitialized"(uint apiMajorVersion, uint apiMinorVersion, ulong apiFeatureFlags, Version pluginVersion);
 ```
 
-This event will be dispatched when Dynamis' API is ready to use.
+This event will be dispatched when Dynamis's API is ready to use.
 
 - `apiMajorVersion`, `apiMinorVersion` and `apiFeatureFlags` have the same semantics as in `GetApiVersion` ;
 - `pluginVersion` is the plugin's version, that can otherwise be retrieved by inspecting Dalamud's plugin list.
@@ -50,7 +50,7 @@ Minimum API version: `(1, 3, 0)`.
 event "Dynamis.ApiDisposing"();
 ```
 
-This event will be dispatched just before Dynamis' API stops being available.
+This event will be dispatched just before Dynamis's API stops being available.
 
 Minimum API version: `(1, 3, 0)`.
 
@@ -62,6 +62,7 @@ Minimum API version: `(1, 3, 0)`.
 void "Dynamis.ImGuiDrawPointer.V1"(nint pointer);
 void "Dynamis.ImGuiDrawPointer.V2"(nint pointer, Func<string?>? name);
 void "Dynamis.ImGuiDrawPointer.V3"(nint pointer, Func<string?>? name, string? customText, ulong flags, Vector2 size);
+void "Dynamis.ImGuiDrawPointer.V4"(nint pointer, Func<object?>? @class, Func<string?>? name, string? customText, ulong flags, Vector2 size);
 ```
 
 Draws a pointer in hexadecimal in a monospace font (or "nullptr" in semitransparent text), or a custom textual representation of that pointer.
@@ -69,6 +70,8 @@ Draws a pointer in hexadecimal in a monospace font (or "nullptr" in semitranspar
 On hover, displays a tooltip with various info about the object behind that pointer, if possible - see `ImGuiDrawPointerTooltipDetails`.
 
 On click, offers several actions, such as copying the address to the clipboard, or inspecting the object - see `ImGuiOpenPointerContextMenu`.
+
+The class returned by `@class` may be in the form of a data.yml class name (`string`) or a FFXIVClientStructs type (`Type`). If omitted, it will be determined automatically.
 
 `name` will be shown in the object inspector if the user requests inspection.
 
@@ -80,21 +83,22 @@ The upper 32 bits of `flags` are defined by [`ImGuiComponents.DrawPointerFlags`]
 
 **MUST** be called from a valid ImGui context.
 
-If Dynamis' API is unavailable, a minimal fallback implementation **SHOULD** be used by the caller instead.
+If Dynamis's API is unavailable, a minimal fallback implementation **SHOULD** be used by the caller instead.
 
-Minimum API version: `(1, 0, 0)` for v1, `(1, 5, 0)` for v2, `(1, 6, 0)` for v3.
+Minimum API version: `(1, 0, 0)` for v1, `(1, 5, 0)` for v2, `(1, 6, 0)` for v3, `(1, 7, 0)` for v4.
 
 ```csharp
 Action<nint> "Dynamis.GetImGuiDrawPointerDelegate.V1"();
 Action<nint, Func<string?>?> "Dynamis.GetImGuiDrawPointerDelegate.V2"();
 Action<nint, Func<string?>?, string?, ulong, Vector2> "Dynamis.GetImGuiDrawPointerDelegate.V3"();
+Action<nint, Func<object?>?, Func<string?>?, string?, ulong, Vector2> "Dynamis.GetImGuiDrawPointerDelegate.V4"();
 ```
 
 Obtains a delegate for the `ImGuiDrawPointer` function, to avoid the IPC overhead if you want to draw a lot of pointers (in a list/table for example).
 
 The obtained delegate either **MUST NOT** be cached across frames, or **MUST** be discarded in response to the `ApiDisposing` event, in order not to cause plugin unloading issues.
 
-Minimum API version: `(1, 3, 0)` for v1, `(1, 5, 0)` for v2, `(1, 6, 0)` for v3.
+Minimum API version: `(1, 3, 0)` for v1, `(1, 5, 0)` for v2, `(1, 6, 0)` for v3, `(1, 7, 0)` for v4.
 
 ### `ImGuiDrawPointerTooltipDetails` function
 
@@ -129,11 +133,14 @@ Minimum API version: `(1, 6, 0)`.
 ```csharp
 void "Dynamis.InspectObject.V1"(nint address);
 void "Dynamis.InspectObject.V2"(nint address, string? name);
+void "Dynamis.InspectObject.V2"(nint address, object? @class, string? name);
 ```
 
 Opens an object inspector on the object at the given address, or, if there is already one, brings it to the front.
 
-Minimum API version: `(1, 0, 0)` for v1, `(1, 4, 0)` for v2.
+The class may be passed in the form of a data.yml class name (`string`) or a FFXIVClientStructs type (`Type`). If omitted, it will be determined automatically.
+
+Minimum API version: `(1, 0, 0)` for v1, `(1, 4, 0)` for v2, `(1, 7, 0)` for v3.
 
 ### `InspectRegion` function
 

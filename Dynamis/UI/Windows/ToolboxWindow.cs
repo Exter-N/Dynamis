@@ -32,7 +32,7 @@ public sealed class ToolboxWindow : Window, ISingletonWindow, IMessageObserver<C
         _toolbox = toolbox;
         _configuration = configuration;
 
-        Size = new Vector2(384, 216);
+        Size = new Vector2(384, 288);
         SizeCondition = ImGuiCond.Always;
 
         imGuiComponents.AddTitleBarButtons(this);

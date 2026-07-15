@@ -1,5 +1,6 @@
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility.Raii;
+using Dalamud.Utility;
 using Dynamis.Configuration;
 using Dynamis.Messaging;
 using Dynamis.UI.Windows;
@@ -54,6 +55,12 @@ public class Toolbox(ConfigurationContainer configuration, MessageHub messageHub
             using var _ = ImRaii.Tooltip();
             ImGui.TextUnformatted("The In-Process Faux Debugger is currently disabled."u8);
             ImGui.TextUnformatted("To use this, enable this functionality in Dynamis's settings."u8);
+        }
+
+        view.Separator();
+
+        if (view.Item("Documentation"u8)) {
+            Util.OpenLink("https://github.com/Exter-N/Dynamis/tree/main/docs");
         }
     }
 

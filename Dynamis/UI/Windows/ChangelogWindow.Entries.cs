@@ -2,6 +2,39 @@ namespace Dynamis.UI.Windows;
 
 partial class ChangelogWindow
 {
+    private void Draw0_1_4_0()
+    {
+        if (!DrawVersionHeader(0, 1, 4, 0, 1)) {
+            return;
+        }
+
+        ImGuiComponents.SeparatorText("New features"u8);
+
+        BulletText("Added an item in Dalamud's dev menu."u8);
+        BulletText("Improved the pointer/address inputs (ImGui fields and /command arguments) to accept foo.exe+0x1234 and sub_140001234 syntaxes."u8);
+        BulletText("Added Direct3D and DXGI interface identification, and object description display where applicable."u8);
+        BulletText("Added manual class specification to Object Inspector."u8);
+        BulletText("Added a changelog. (You are currently reading it!)"u8);
+
+        ImGuiComponents.SeparatorText("IPC API"u8);
+
+        BulletText("Added InspectObject v3, ImGuiDrawPointer v4 and equivalent Get...Delegate IPC functions."u8);
+        BulletText("The IPC API version is now 1.7."u8);
+
+        ImGuiComponents.SeparatorText("Bug fixes and improvements"u8);
+
+        BulletText("Changed the UI colors to use Dalamud's new semantic colors."u8);
+        BulletText("Sorted well-known objects by name in the Object Inspector's menu."u8);
+        BulletText("Added a button to copy Resource Handle file names to clipboard."u8);
+        BulletText("Added a right-click menu to ImGui pointer fields to copy the pointers to clipboard in various forms."u8);
+        BulletText("Added the ability to specify a class manually in the Get-ClientStruct cmdlet."u8);
+        BulletText("Exposed the RSV/RSF viewer in the menus."u8);
+        BulletText("Truncated functions larger than 4 kiB in the disassembler to avoid performance issues."u8);
+        BulletText("Improved string display in the annotated mode hex viewers."u8);
+        BulletText("Improved handling of objects of unknown size."u8);
+        BulletText("Improved support for pointer fields of type known to ClientStructs."u8);
+    }
+
     private void Draw0_1_3_14()
     {
         if (!DrawVersionHeader(0, 1, 3, 14, 0)) {

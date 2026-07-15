@@ -7,10 +7,10 @@
 Alias: `gs`.
 
 ```powershell
-Get-ClientStruct [-Address] <Object> [-Access <BoxAccess>]
+Get-ClientStruct [-Address] <Object> [[-Name] <String>] [-Type <Type>] [-Access <BoxAccess>]
 ```
 
-Obtains a view of the native object at the given address (usually an `IntPtr` but it can be passed in other forms). `-Access Constant` or `-Access ShallowConstant` can be used to make the returned view read-only.
+Obtains a view of the native object at the given address (usually an `IntPtr` but it can be passed in other forms). If the type is omitted, it will be determined automatically. `-Access Constant` or `-Access ShallowConstant` can be used to make the returned view read-only.
 
 ```powershell
 Get-ClientStruct -Type <Type> [[-Name] <String>] [-Access <BoxAccess>]

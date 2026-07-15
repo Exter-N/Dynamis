@@ -1,6 +1,5 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Text.Unicode;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
@@ -46,7 +45,9 @@ public sealed partial class ChangelogWindow : Window, ISingletonWindow, IMessage
     public override void Draw()
     {
         DrawMarkAsUnread();
+        using var child = ImRaii.Child("###entries"u8);
         using var twp = new ImRaiiTextWrapPos();
+        Draw0_1_4_0();
         Draw0_1_3_14();
         Draw0_1_3_13();
         Draw0_1_3_12();
