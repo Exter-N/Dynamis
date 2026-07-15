@@ -34,7 +34,7 @@ public class Toolbox(ConfigurationContainer configuration, MessageHub messageHub
         }
 #else
         using (ImRaii.Disabled()) {
-            frontEnd.Item("Hosted PowerShell"u8);
+            view.Item("Hosted PowerShell"u8);
         }
 
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled)) {
