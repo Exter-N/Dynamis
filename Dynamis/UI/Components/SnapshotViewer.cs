@@ -94,25 +94,31 @@ public sealed class SnapshotViewer(
     }
 
     private void OnSnapshotHover(int offset, ImGuiComponents.HexViewerPart part, bool clicked)
+        => OnSnapshotHover(offset, part, clicked, ValuePath.Default);
+
+    private void OnSnapshotHover(int offset, ImGuiComponents.HexViewerPart part, bool clicked, ValuePath path)
     {
         if (_vmSnapshot is null) {
             return;
         }
 
         offset += _vmOffset;
-        var path = GetValuePath(_vmSnapshot.Class, (uint)offset);
-        if (path.Path.Length == 0) {
+        if (path.IsEmpty) {
+            path = GetValuePath(_vmSnapshot.Class, (uint)offset);
+        }
+
+        if (path.IsEmpty) {
             var ptrOffset = offset & -nint.Size;
             if (ptrOffset + nint.Size <= _vmSnapshot.Data.Length) {
                 var pointer =
                     MemoryMarshal.Read<nint>(_vmSnapshot.Data.AsSpan(ptrOffset, nint.Size));
                 if (VirtualMemory.GetProtection(pointer).CanRead()) {
-                    path = new((uint)ptrOffset, (uint)nint.Size, $"Unk_{ptrOffset:X}", FieldType.Pointer, null, 0, null);
+                    path = ValuePath.ForUnknownPointer((uint)ptrOffset);
                 }
             }
         }
 
-        if (path.Path.Length == 0) {
+        if (path.IsEmpty) {
             return;
         }
 
@@ -160,7 +166,7 @@ public sealed class SnapshotViewer(
 
         var first = true;
         var palette = configuration.Configuration.GetHexViewerPalette();
-        var clicked = AnnotateSnapshotRow(offset, length, @class, 0u, palette, ref first);
+        var clicked = AnnotateSnapshotRow(offset, length, @class, string.Empty, 0u, palette, ref first);
 
         if (!first || _vmSnapshot?.HighlightColors is null) {
             return clicked;
@@ -188,7 +194,7 @@ public sealed class SnapshotViewer(
                 ImGui.TextUnformatted(ptrAnnotation);
             }
 
-            if (HandleAnnotationHover(offset)) {
+            if (HandleAnnotationHover(offset, ValuePath.Default)) {
                 clicked = offset;
             }
 
@@ -198,8 +204,8 @@ public sealed class SnapshotViewer(
         return clicked;
     }
 
-    private int? AnnotateSnapshotRow(int offset, int length, ClassInfo @class, uint classOffset, uint[] palette,
-        ref bool first)
+    private int? AnnotateSnapshotRow(int offset, int length, ClassInfo @class, string classPath, uint classOffset,
+        uint[] palette, ref bool first)
     {
         var fields = @class.Fields.Where(field
             => offset < field.Offset + field.Size && field.Offset < offset + length
@@ -216,10 +222,14 @@ public sealed class SnapshotViewer(
             var firstElement = true;
             for (var i = startElement; i < endElement; ++i) {
                 var elementOffset = field.Offset + i * field.ElementSize;
+                string elementPath;
                 if (field.ElementClass is not null) {
+                    elementPath = elementCount > 1
+                        ? $"{classPath}{field.Name}[{i}]."
+                        : $"{classPath}{field.Name}.";
                     var subClicked = AnnotateSnapshotRow(
-                        offset - unchecked((int)elementOffset), length, field.ElementClass, classOffset + elementOffset,
-                        palette,                                ref first
+                        offset - unchecked((int)elementOffset), length,  field.ElementClass, elementPath,
+                        classOffset + elementOffset,            palette, ref first
                     );
                     if (subClicked is not null) {
                         clicked = subClicked + unchecked((int)elementOffset);
@@ -268,7 +278,12 @@ public sealed class SnapshotViewer(
                     ImGui.TextUnformatted(annotation);
                 }
 
-                if (HandleAnnotationHover(unchecked((int)(elementOffset + classOffset)))) {
+                elementPath = elementCount > 1
+                    ? $"{classPath}{field.Name}[{i}]"
+                    : $"{classPath}{field.Name}";
+                var path = ValuePath.ForField(@class, field, elementOffset - field.Offset, elementPath, classOffset);
+
+                if (HandleAnnotationHover(unchecked((int)(elementOffset + classOffset)), path)) {
                     clicked = unchecked((int)elementOffset);
                 }
 
@@ -279,7 +294,7 @@ public sealed class SnapshotViewer(
         return clicked;
     }
 
-    private bool HandleAnnotationHover(int fieldOffset)
+    private bool HandleAnnotationHover(int fieldOffset, ValuePath path)
     {
         var min = ImGui.GetItemRectMin();
         var max = ImGui.GetItemRectMax();
@@ -291,7 +306,7 @@ public sealed class SnapshotViewer(
         ImGui.SetCursorScreenPos(min);
         var itemClicked = ImGui.InvisibleButton($"###A{fieldOffset:X}", max - min);
         if (ImGui.IsItemHovered()) {
-            OnSnapshotHover(fieldOffset, ImGuiComponents.HexViewerPart.Annotation, itemClicked);
+            OnSnapshotHover(fieldOffset, ImGuiComponents.HexViewerPart.Annotation, itemClicked, path);
         }
 
         return itemClicked;
@@ -397,40 +412,40 @@ public sealed class SnapshotViewer(
 
     private static ValuePath GetValuePath(ClassInfo? @class, uint offset)
     {
-        var field = @class?.Fields
-                           .LastOrDefault(field => offset >= field.Offset && offset < field.Offset + field.Size);
-        if (field is null) {
+        if (@class is null) {
             return ValuePath.Default;
         }
 
-        var elementSize = field.ElementSize;
-        if (field.Type is FieldType.ByteString or FieldType.CharString) {
-            elementSize = field.Size;
-        }
+        var field = @class.Fields
+                          .LastOrDefault(field => offset >= field.Offset && offset < field.Offset + field.Size);
 
-        var retOffset = field.Offset;
+        return field is null
+            ? ValuePath.Default
+            : GetValuePath(@class, field, offset - field.Offset);
+    }
+
+    private static ValuePath GetValuePath(ClassInfo? @class, FieldInfo field, uint offset)
+    {
+        var elementSize = field.ElementSize;
+
+        var elementOffset = 0u;
         var path = field.Name;
         if (field.Size > elementSize) {
-            var i = (offset - retOffset) / elementSize;
-            retOffset += i * elementSize;
+            var i = offset / elementSize;
+            elementOffset = i * elementSize;
             path = $"{path}[{i}]";
         }
 
         if (field.ElementClass is null) {
-            return new(retOffset, elementSize, path, field.Type, @class, 0, field);
+            return ValuePath.ForField(@class, field, elementOffset, path);
         }
 
-        var subPath = GetValuePath(field.ElementClass, offset - retOffset);
-        if (subPath.Path.Length == 0) {
+        var subPath = GetValuePath(field.ElementClass, offset - elementOffset);
+        if (subPath.IsEmpty) {
             return subPath;
         }
 
-        return subPath with
-        {
-            Offset = retOffset + subPath.Offset,
-            Path = $"{path}.{subPath.Path}",
-            OffsetToClass = retOffset + subPath.OffsetToClass,
-        };
+        return subPath.Within(path, field.Offset + elementOffset);
     }
 
     private static string ToString(object value, ValuePath path)
@@ -466,6 +481,9 @@ public sealed class SnapshotViewer(
     {
         public static readonly ValuePath Default = new(0, 0, string.Empty, FieldType.Byte, null, 0, null);
 
+        public bool IsEmpty
+            => Path.Length is 0;
+
         public object Read(ReadOnlySpan<byte> instance)
         {
             if (Class is not null && Field is not null) {
@@ -479,6 +497,24 @@ public sealed class SnapshotViewer(
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ClassIdentifier? GetManagedTypeHint()
             => Field?.GetManagedTypeHint();
+
+        public ValuePath Within(string path, uint offset)
+            => this with
+            {
+                Offset = offset + Offset,
+                Path = $"{path}.{Path}",
+                OffsetToClass = offset + OffsetToClass,
+            };
+
+        public static ValuePath ForField(ClassInfo? @class, FieldInfo field, uint elementOffset, string? path,
+            uint offsetToClass = 0)
+            => new(
+                field.Offset + elementOffset + offsetToClass, field.ElementSize, path ?? field.Name, field.Type, @class,
+                offsetToClass, field
+            );
+
+        public static ValuePath ForUnknownPointer(uint offset)
+            => new(offset, (uint)nint.Size, $"Unk_{offset:X}", FieldType.Pointer, null, 0, null);
     }
 
     private sealed class FieldContextMenu(
