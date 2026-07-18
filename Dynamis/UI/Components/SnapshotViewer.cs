@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -166,7 +167,15 @@ public sealed class SnapshotViewer(
 
         var first = true;
         var palette = configuration.Configuration.GetHexViewerPalette();
-        var clicked = AnnotateSnapshotRow(offset, length, @class, string.Empty, 0u, palette, ref first);
+        int? clicked;
+
+        var pathComponentsBuffer = ArrayPool<PathComponent>.Shared.Rent(512);
+        try {
+            var pathComponents = new SpanList<PathComponent>(pathComponentsBuffer);
+            clicked = AnnotateSnapshotRow(offset, length, @class, ref pathComponents, 0u, palette, ref first);
+        } finally {
+            ArrayPool<PathComponent>.Shared.Return(pathComponentsBuffer);
+        }
 
         if (!first || _vmSnapshot?.HighlightColors is null) {
             return clicked;
@@ -194,7 +203,7 @@ public sealed class SnapshotViewer(
                 ImGui.TextUnformatted(ptrAnnotation);
             }
 
-            if (HandleAnnotationHover(offset, ValuePath.Default)) {
+            if (HandleAnnotationHover(offset, in Unsafe.NullRef<SpanList<PathComponent>>(), ValuePath.Default)) {
                 clicked = offset;
             }
 
@@ -204,13 +213,14 @@ public sealed class SnapshotViewer(
         return clicked;
     }
 
-    private int? AnnotateSnapshotRow(int offset, int length, ClassInfo @class, string classPath, uint classOffset,
-        uint[] palette, ref bool first)
+    private int? AnnotateSnapshotRow(int offset, int length, ClassInfo @class,
+        ref SpanList<PathComponent> pathComponents, uint classOffset, uint[] palette, ref bool first)
     {
         var fields = @class.Fields.Where(field
             => offset < field.Offset + field.Size && field.Offset < offset + length
         );
 
+        using var pathComponent = SpanList<PathComponent>.AddSlot(ref pathComponents, default);
         int? clicked = null;
         foreach (var field in fields) {
             var elementCount = field.ElementCount;
@@ -222,15 +232,13 @@ public sealed class SnapshotViewer(
             var firstElement = true;
             for (var i = startElement; i < endElement; ++i) {
                 var elementOffset = field.Offset + i * field.ElementSize;
-                string elementPath;
+                pathComponent.Value = new(field.Name, elementCount > 1, i);
                 if (field.ElementClass is not null) {
-                    elementPath = elementCount > 1
-                        ? $"{classPath}{field.Name}[{i}]."
-                        : $"{classPath}{field.Name}.";
                     var subClicked = AnnotateSnapshotRow(
-                        offset - unchecked((int)elementOffset), length,  field.ElementClass, elementPath,
+                        offset - unchecked((int)elementOffset), length,  field.ElementClass, ref pathComponents,
                         classOffset + elementOffset,            palette, ref first
                     );
+
                     if (subClicked is not null) {
                         clicked = subClicked + unchecked((int)elementOffset);
                     }
@@ -278,12 +286,8 @@ public sealed class SnapshotViewer(
                     ImGui.TextUnformatted(annotation);
                 }
 
-                elementPath = elementCount > 1
-                    ? $"{classPath}{field.Name}[{i}]"
-                    : $"{classPath}{field.Name}";
-                var path = ValuePath.ForField(@class, field, elementOffset - field.Offset, elementPath, classOffset);
-
-                if (HandleAnnotationHover(unchecked((int)(elementOffset + classOffset)), path)) {
+                var path = ValuePath.ForField(@class, field, elementOffset - field.Offset, null, classOffset);
+                if (HandleAnnotationHover(unchecked((int)(elementOffset + classOffset)), in pathComponents, path)) {
                     clicked = unchecked((int)elementOffset);
                 }
 
@@ -294,7 +298,7 @@ public sealed class SnapshotViewer(
         return clicked;
     }
 
-    private bool HandleAnnotationHover(int fieldOffset, ValuePath path)
+    private bool HandleAnnotationHover(int fieldOffset, in SpanList<PathComponent> pathComponents, ValuePath path)
     {
         var min = ImGui.GetItemRectMin();
         var max = ImGui.GetItemRectMax();
@@ -306,6 +310,24 @@ public sealed class SnapshotViewer(
         ImGui.SetCursorScreenPos(min);
         var itemClicked = ImGui.InvisibleButton($"###A{fieldOffset:X}", max - min);
         if (ImGui.IsItemHovered()) {
+            if (!Unsafe.IsNullRef(in pathComponents)) {
+                var sb = new StringBuilder();
+                foreach (var component in pathComponents) {
+                    sb.Append(
+                        component.IsArray
+                            ? $"{component.Name}[{component.Index}]."
+                            : $"{component.Name}."
+                    );
+                }
+
+                if (sb.Length > 0) {
+                    path = path with
+                    {
+                        Path = sb.ToString(0, sb.Length - 1),
+                    };
+                }
+            }
+
             OnSnapshotHover(fieldOffset, ImGuiComponents.HexViewerPart.Annotation, itemClicked, path);
         }
 
@@ -469,6 +491,8 @@ public sealed class SnapshotViewer(
             ? $"{value} (0x{value:X})"
             : $"{value}";
     }
+
+    private readonly record struct PathComponent(string Name, bool IsArray, uint Index);
 
     private readonly record struct ValuePath(
         uint Offset,
