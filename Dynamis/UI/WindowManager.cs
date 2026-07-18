@@ -1,6 +1,7 @@
 using Dalamud.Interface;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
+using Dynamis.Configuration;
 using Dynamis.Interop;
 using Dynamis.Messaging;
 using Dynamis.UI.Windows;
@@ -12,6 +13,7 @@ namespace Dynamis.UI;
 public sealed class WindowManager(
     MessageHub messageHub,
     IUiBuilder uiBuilder,
+    ConfigurationContainer configuration,
     ImGuiComponents imGuiComponents,
     DevMenuItem devMenuItem,
     WindowSystem windowSystem,
@@ -22,10 +24,11 @@ public sealed class WindowManager(
     AddressIdentifier addressIdentifier,
     ShortLivedSingleCacheFactory shortLivedSingleCacheFactory,
     IEnumerable<Lazy<Window>> windows)
-    : IHostedService
+    : IHostedService, IMessageObserver<ConfigurationChangedMessage>
 {
     public Task StartAsync(CancellationToken cancellationToken)
     {
+        ApplyConfiguration();
         uiBuilder.Draw += Draw;
         uiBuilder.OpenMainUi += OpenMainUi;
         uiBuilder.OpenConfigUi += OpenConfigUi;
@@ -43,6 +46,7 @@ public sealed class WindowManager(
         foreach (var window in windowSystem.Windows) {
             (window as IDisposable)?.Dispose();
         }
+
         windowSystem.RemoveAllWindows();
         uiBuilder.DefaultStyleChanged -= DefaultStyleChanged;
         uiBuilder.OpenConfigUi -= OpenConfigUi;
@@ -71,4 +75,24 @@ public sealed class WindowManager(
 
     private void DefaultStyleChanged()
         => imGuiComponents.Update();
+
+    private void ApplyConfiguration()
+    {
+        var config = configuration.Configuration;
+
+        uiBuilder.DisableAutomaticUiHide = config.DisableAutomaticUiHide;
+        uiBuilder.DisableCutsceneUiHide = config.DisableCutsceneUiHide;
+        uiBuilder.DisableGposeUiHide = config.DisableGposeUiHide;
+        uiBuilder.DisableUserUiHide = config.DisableUserUiHide;
+    }
+
+    public void HandleMessage(ConfigurationChangedMessage message)
+    {
+        if (message.IsPropertyChanged(nameof(configuration.Configuration.DisableAutomaticUiHide))
+         || message.IsPropertyChanged(nameof(configuration.Configuration.DisableCutsceneUiHide))
+         || message.IsPropertyChanged(nameof(configuration.Configuration.DisableGposeUiHide))
+         || message.IsPropertyChanged(nameof(configuration.Configuration.DisableUserUiHide))) {
+            ApplyConfiguration();
+        }
+    }
 }

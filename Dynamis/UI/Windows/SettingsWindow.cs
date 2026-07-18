@@ -138,6 +138,11 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
             DrawInterface_MemorySnapshots();
         }
 
+        ImGuiComponents.SeparatorText("Visibility"u8);
+        using (ImRaii.PushId("###Interface_Visibility"u8)) {
+            DrawInterface_Visibility();
+        }
+
         ImGuiComponents.SeparatorText("Miscellaneous"u8);
         using (ImRaii.PushId("###Interface_Miscellaneous"u8)) {
             DrawInterface_Miscellaneous();
@@ -165,6 +170,35 @@ public sealed class SettingsWindow : Window, ISingletonWindow, IMessageObserver<
             false => "Compact",
             true  => "Annotated",
         };
+
+    private void DrawInterface_Visibility()
+    {
+        var configuration = _configuration.Configuration;
+
+        var automaticUiHide = !configuration.DisableAutomaticUiHide;
+        if (ImGui.Checkbox("Hide when the game's UI is hidden"u8, ref automaticUiHide)) {
+            configuration.DisableAutomaticUiHide = !automaticUiHide;
+            _configuration.Save(nameof(configuration.DisableAutomaticUiHide));
+        }
+
+        var cutsceneUiHide = !configuration.DisableCutsceneUiHide;
+        if (ImGui.Checkbox("Hide during cutscenes"u8, ref cutsceneUiHide)) {
+            configuration.DisableCutsceneUiHide = !cutsceneUiHide;
+            _configuration.Save(nameof(configuration.DisableCutsceneUiHide));
+        }
+
+        var gposeUiHide = !configuration.DisableGposeUiHide;
+        if (ImGui.Checkbox("Hide during group pose"u8, ref gposeUiHide)) {
+            configuration.DisableGposeUiHide = !gposeUiHide;
+            _configuration.Save(nameof(configuration.DisableGposeUiHide));
+        }
+
+        var userUiHide = !configuration.DisableUserUiHide;
+        if (ImGui.Checkbox("Hide when toggling the UI"u8, ref userUiHide)) {
+            configuration.DisableUserUiHide = !userUiHide;
+            _configuration.Save(nameof(configuration.DisableUserUiHide));
+        }
+    }
 
     private void DrawInterface_Miscellaneous()
     {

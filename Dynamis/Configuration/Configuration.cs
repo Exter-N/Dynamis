@@ -44,6 +44,14 @@ public sealed class Configuration : IPluginConfiguration
 
     public bool LastSnapshotAnnotated { get; set; } = false;
 
+    public bool DisableAutomaticUiHide { get; set; } = false;
+
+    public bool DisableCutsceneUiHide { get; set; } = true;
+
+    public bool DisableGposeUiHide { get; set; } = true;
+
+    public bool DisableUserUiHide { get; set; } = false;
+
     public bool ShowInDevMenu { get; set; } = true;
 
     public bool Serious { get; set; } = false;
