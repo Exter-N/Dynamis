@@ -84,7 +84,7 @@ public sealed class Ipfd : IMessageObserver<ConfigurationChangedMessage>, IDispo
         _messageHub.Publish(new BreakpointDisposedMessage(breakpoint));
     }
 
-    public unsafe T Read<T>(ReadOnlyMemory<T> source, int index) where T : unmanaged
+    public unsafe T Read<T>(ReadOnlyMemory<T> source, int index, bool userThread = true) where T : unmanaged
     {
         if (index < 0 || index >= source.Length) {
             throw new ArgumentOutOfRangeException(nameof(index));
@@ -92,18 +92,19 @@ public sealed class Ipfd : IMessageObserver<ConfigurationChangedMessage>, IDispo
 
         using var sourcePin = source.Pin();
         var destination = stackalloc T[1];
-        DoCopy((nint)sourcePin.Pointer + (nint)index * sizeof(T), (nint)destination, sizeof(T));
+        DoCopy((nint)sourcePin.Pointer + (nint)index * sizeof(T), (nint)destination, sizeof(T), userThread);
         return destination[0];
     }
 
-    public unsafe T Read<T>(nint source) where T : unmanaged
+    public unsafe T Read<T>(nint source, bool userThread = true) where T : unmanaged
     {
         var destination = stackalloc T[1];
-        DoCopy(source, (nint)destination, sizeof(T));
+        DoCopy(source, (nint)destination, sizeof(T), userThread);
         return destination[0];
     }
 
-    public unsafe void Copy<T>(ReadOnlyMemory<T> source, Memory<T> destination) where T : unmanaged
+    public unsafe void Copy<T>(ReadOnlyMemory<T> source, Memory<T> destination, bool userThread = true)
+        where T : unmanaged
     {
         if (source.Length > destination.Length) {
             throw new ArgumentOutOfRangeException(
@@ -113,10 +114,11 @@ public sealed class Ipfd : IMessageObserver<ConfigurationChangedMessage>, IDispo
 
         using var sourcePin = source.Pin();
         using var destinationPin = destination.Pin();
-        DoCopy((nint)sourcePin.Pointer, (nint)destinationPin.Pointer, (nint)source.Length * sizeof(T));
+        DoCopy((nint)sourcePin.Pointer, (nint)destinationPin.Pointer, (nint)source.Length * sizeof(T), userThread);
     }
 
-    public unsafe void Copy<T>(nint source, int count, Memory<T> destination) where T : unmanaged
+    public unsafe void Copy<T>(nint source, int count, Memory<T> destination, bool userThread = true)
+        where T : unmanaged
     {
         if (count > destination.Length) {
             throw new ArgumentOutOfRangeException(
@@ -125,10 +127,11 @@ public sealed class Ipfd : IMessageObserver<ConfigurationChangedMessage>, IDispo
         }
 
         using var destinationPin = destination.Pin();
-        DoCopy(source, (nint)destinationPin.Pointer, (nint)count * sizeof(T));
+        DoCopy(source, (nint)destinationPin.Pointer, (nint)count * sizeof(T), userThread);
     }
 
-    public unsafe void Copy<T>(ReadOnlyMemory<T> source, nint destination, int count) where T : unmanaged
+    public unsafe void Copy<T>(ReadOnlyMemory<T> source, nint destination, int count, bool userThread = true)
+        where T : unmanaged
     {
         if (source.Length > count) {
             throw new ArgumentOutOfRangeException(
@@ -137,18 +140,24 @@ public sealed class Ipfd : IMessageObserver<ConfigurationChangedMessage>, IDispo
         }
 
         using var sourcePin = source.Pin();
-        DoCopy((nint)sourcePin.Pointer, destination, (nint)count * sizeof(T));
+        DoCopy((nint)sourcePin.Pointer, destination, (nint)count * sizeof(T), userThread);
     }
 
-    public unsafe void Copy<T>(nint source, nint destination, int count) where T : unmanaged
-        => DoCopy(source, destination, (nint)count * sizeof(T));
+    public unsafe void Copy<T>(nint source, nint destination, int count, bool userThread = true) where T : unmanaged
+        => DoCopy(source, destination, (nint)count * sizeof(T), userThread);
 
-    private unsafe void DoCopy(nint source, nint destination, nint size)
+    private unsafe void DoCopy(nint source, nint destination, nint size, bool userThread)
     {
         lock (this) {
             if (_module is not null) {
-                _module.MemoryCopy(source, destination, size);
-                _module.Sync();
+                if (userThread) {
+                    _module.UserMemoryCopy(source, destination, size);
+                    _module.UserSync();
+                } else {
+                    _module.MemoryCopy(source, destination, size);
+                    _module.Sync();
+                }
+
                 return;
             }
         }

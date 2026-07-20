@@ -6,7 +6,7 @@ use std::{
 };
 
 use windows::{
-    core::{w, Error, Result},
+    core::{Error, Result},
     Win32::{
         Foundation::{EXCEPTION_BREAKPOINT, EXCEPTION_SINGLE_STEP},
         System::{
@@ -16,16 +16,17 @@ use windows::{
                 EXCEPTION_CONTINUE_EXECUTION, EXCEPTION_CONTINUE_SEARCH, EXCEPTION_POINTERS,
                 PVECTORED_EXCEPTION_HANDLER,
             },
-            Memory::{VirtualQuery, MEMORY_BASIC_INFORMATION, MEM_IMAGE},
-            Threading::{
-                GetCurrentThread, GetCurrentThreadId, SetThreadDescription, THREAD_GET_CONTEXT,
-                THREAD_SET_CONTEXT,
-            },
+            Threading::{GetCurrentThreadId, THREAD_GET_CONTEXT, THREAD_SET_CONTEXT},
         },
     },
 };
 
-use crate::thread_control::{map_threads, SuspendedThread};
+use crate::{
+    ipfd_user_sync,
+    ipfd_user_thread::IpfdUserMessage,
+    thread_control::{map_threads, SuspendedThread},
+    user_send,
+};
 
 pub static BREAKPOINT_CALLBACK: AtomicUsize = AtomicUsize::new(0);
 
@@ -68,20 +69,27 @@ fn context_set_breakpoints(context: &mut CONTEXT, breakpoints: [Option<Breakpoin
     context.Dr7 |= any_enable_flags << 8;
 }
 
-pub fn process_set_breakpoints(breakpoints: [Option<Breakpoint>; 4]) -> Result<()> {
+pub fn process_set_breakpoints(
+    breakpoints: [Option<Breakpoint>; 4],
+    exclude_threads: &[u32],
+) -> Result<()> {
     let mut context: CONTEXT = Default::default();
     context.ContextFlags = CONTEXT_DEBUG_REGISTERS_AMD64;
-    map_threads(|thread_id| {
-        if let Ok(thread) = SuspendedThread::new(thread_id, THREAD_GET_CONTEXT | THREAD_SET_CONTEXT)
-        {
-            if unsafe { GetThreadContext(*thread, &mut context) }.is_err() {
-                return Ok(());
+    map_threads(
+        |thread_id| {
+            if let Ok(thread) =
+                SuspendedThread::new(thread_id, THREAD_GET_CONTEXT | THREAD_SET_CONTEXT)
+            {
+                if unsafe { GetThreadContext(*thread, &mut context) }.is_err() {
+                    return Ok(());
+                }
+                context_set_breakpoints(&mut context, breakpoints);
+                let _ = unsafe { SetThreadContext(*thread, &context) };
             }
-            context_set_breakpoints(&mut context, breakpoints);
-            let _ = unsafe { SetThreadContext(*thread, &context) };
-        }
-        Ok(())
-    })?;
+            Ok(())
+        },
+        exclude_threads,
+    )?;
     Ok(())
 }
 
@@ -95,10 +103,6 @@ pub fn thread_set_breakpoints(thread_id: u32, breakpoints: [Option<Breakpoint>; 
     unsafe { GetThreadContext(*thread, &mut context)? };
     context_set_breakpoints(&mut context, breakpoints);
     unsafe { SetThreadContext(*thread, &context) }
-}
-
-pub fn current_thread_set_description() {
-    let _ = unsafe { SetThreadDescription(GetCurrentThread(), w!("Dynamis IPFD server thread")) };
 }
 
 pub struct Veh {
@@ -123,16 +127,6 @@ impl Drop for Veh {
     }
 }
 
-fn is_in_dynamic_code(exceptioninfo: *const EXCEPTION_POINTERS) -> Option<bool> {
-    let rip = unsafe { (*(*exceptioninfo).ContextRecord).Rip };
-    let mut buffer: MEMORY_BASIC_INFORMATION = Default::default();
-    let size = size_of::<MEMORY_BASIC_INFORMATION>();
-    if unsafe { VirtualQuery(Some(rip as *const c_void), &mut buffer, size) } < size {
-        return None;
-    }
-    Some(buffer.Type != MEM_IMAGE)
-}
-
 fn get_breakpoint_callback() -> PVECTORED_EXCEPTION_HANDLER {
     let raw_callback = BREAKPOINT_CALLBACK.load(Ordering::SeqCst);
     if raw_callback != 0 {
@@ -148,10 +142,17 @@ extern "system" fn handle_exception(exceptioninfo: *mut EXCEPTION_POINTERS) -> i
         return EXCEPTION_CONTINUE_SEARCH;
     }
 
-    let action = if is_in_dynamic_code(exceptioninfo).unwrap_or(true) {
-        EXCEPTION_CONTINUE_EXECUTION
-    } else if let Some(callback) = get_breakpoint_callback() {
-        unsafe { callback(exceptioninfo) }
+    let action = if let Some(callback) = get_breakpoint_callback() {
+        let mut ret = 0usize;
+        user_send(IpfdUserMessage::Invoke {
+            function: callback as usize,
+            arg0: exceptioninfo as usize,
+            arg1: 0,
+            return_ptr: &mut ret as *mut usize as usize,
+        })
+        .unwrap();
+        ipfd_user_sync().unwrap();
+        ret as i32
     } else {
         EXCEPTION_CONTINUE_EXECUTION
     };

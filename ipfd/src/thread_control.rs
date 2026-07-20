@@ -87,7 +87,10 @@ impl Drop for SuspendedThread {
     }
 }
 
-pub fn map_threads<T>(mut f: impl FnMut(u32) -> Result<T>) -> Result<HashMap<u32, T>> {
+pub fn map_threads<T>(
+    mut f: impl FnMut(u32) -> Result<T>,
+    exclude_threads: &[u32],
+) -> Result<HashMap<u32, T>> {
     let current_pid = unsafe { GetCurrentProcessId() };
     let current_tid = unsafe { GetCurrentThreadId() };
     let mut visited_threads: HashMap<u32, T> = HashMap::new();
@@ -96,7 +99,7 @@ pub fn map_threads<T>(mut f: impl FnMut(u32) -> Result<T>) -> Result<HashMap<u32
         let mut thread_iter = ThreadIter::new(current_pid)?;
         while thread_iter.next()? {
             let thread_id = thread_iter.current.th32ThreadID;
-            if thread_id == current_tid {
+            if thread_id == current_tid || exclude_threads.contains(&thread_id) {
                 continue;
             }
             if let Entry::Vacant(entry) = visited_threads.entry(thread_id) {
