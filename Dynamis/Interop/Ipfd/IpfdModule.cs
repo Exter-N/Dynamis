@@ -14,19 +14,19 @@ public sealed unsafe partial class IpfdModule : IDisposable
     private readonly SafeVehHandle.VectoredExceptionHandler _breakpointHandler;
     private readonly SafeLibraryHandle                      _ipfdLibrary;
 
-    private readonly delegate* unmanaged<int>                                     _terminateFn;
-    private readonly delegate* unmanaged<byte, nint, byte, int>                   _setBreakpointFn;
-    private readonly delegate* unmanaged<int>                                     _refreshAllBreakpointsFn;
-    private readonly delegate* unmanaged<int>                                     _clearAllBreakpointsFn;
-    private readonly delegate* unmanaged<nint, nint, nint, int>                   _memmoveFn;
-    private readonly delegate* unmanaged<nint, nint, nint, int>                   _userMemmoveFn;
-    private readonly delegate* unmanaged<nint, nint, nint, nint, nint, nint, int> _userInvokeFn;
-    private readonly delegate* unmanaged<nint, int>                               _setEventFn;
-    private readonly delegate* unmanaged<nint, int>                               _userSetEventFn;
-    private readonly delegate* unmanaged<nint, int, int>                          _releaseSemaphoreFn;
-    private readonly delegate* unmanaged<nint, int, int>                          _userReleaseSemaphoreFn;
-    private readonly delegate* unmanaged<int>                                     _syncFn;
-    private readonly delegate* unmanaged<int>                                     _userSyncFn;
+    private readonly delegate* unmanaged<int>                         _terminateFn;
+    private readonly delegate* unmanaged<byte, nint, byte, int>       _setBreakpointFn;
+    private readonly delegate* unmanaged<int>                         _refreshAllBreakpointsFn;
+    private readonly delegate* unmanaged<int>                         _clearAllBreakpointsFn;
+    private readonly delegate* unmanaged<nint, nint, nint, int>       _memmoveFn;
+    private readonly delegate* unmanaged<nint, nint, nint, int>       _userMemmoveFn;
+    private readonly delegate* unmanaged<nint, nint, nint, nint, int> _userInvokeFn;
+    private readonly delegate* unmanaged<nint, int>                   _setEventFn;
+    private readonly delegate* unmanaged<nint, int>                   _userSetEventFn;
+    private readonly delegate* unmanaged<nint, int, int>              _releaseSemaphoreFn;
+    private readonly delegate* unmanaged<nint, int, int>              _userReleaseSemaphoreFn;
+    private readonly delegate* unmanaged<int>                         _syncFn;
+    private readonly delegate* unmanaged<int>                         _userSyncFn;
 
     public event EventHandler<BreakpointEventArgs>? Breakpoint;
 
@@ -53,9 +53,7 @@ public sealed unsafe partial class IpfdModule : IDisposable
         _memmoveFn = (delegate* unmanaged<nint, nint, nint, int>)_ipfdLibrary.GetProcAddress("ipfd_memmove");
         _userMemmoveFn = (delegate* unmanaged<nint, nint, nint, int>)_ipfdLibrary.GetProcAddress("ipfd_user_memmove");
         _userInvokeFn =
-            (delegate* unmanaged<nint, nint, nint, nint, nint, nint, int>)_ipfdLibrary.GetProcAddress(
-                "ipfd_user_invoke"
-            );
+            (delegate* unmanaged<nint, nint, nint, nint, int>)_ipfdLibrary.GetProcAddress("ipfd_user_invoke");
         _setEventFn = (delegate* unmanaged<nint, int>)_ipfdLibrary.GetProcAddress("ipfd_set_event");
         _userSetEventFn = (delegate* unmanaged<nint, int>)_ipfdLibrary.GetProcAddress("ipfd_user_set_event");
         _releaseSemaphoreFn =
@@ -103,17 +101,17 @@ public sealed unsafe partial class IpfdModule : IDisposable
         Marshal.ThrowExceptionForHR(_userMemmoveFn(source, destination, size));
     }
 
-    public void UserInvoke(nint function, nint arg0, nint arg1, nint arg2, nint arg3, nint returnPtr)
+    public void UserInvoke(nint function, nint arg0, nint arg1, nint returnPtr)
     {
         ObjectDisposedException.ThrowIf(_ipfdLibrary.IsInvalid, this);
-        Marshal.ThrowExceptionForHR(_userInvokeFn(function, arg0, arg1, arg2, arg3, returnPtr));
+        Marshal.ThrowExceptionForHR(_userInvokeFn(function, arg0, arg1, returnPtr));
     }
 
     public void UserInvoke(Action action)
     {
         ObjectDisposedException.ThrowIf(_ipfdLibrary.IsInvalid, this);
         delegate* unmanaged<nint, void> invokeActionPtr = &InvokeAction;
-        Marshal.ThrowExceptionForHR(_userInvokeFn((nint)invokeActionPtr, (nint)GCHandle.Alloc(action), 0, 0, 0, 0));
+        Marshal.ThrowExceptionForHR(_userInvokeFn((nint)invokeActionPtr, (nint)GCHandle.Alloc(action), 0, 0));
     }
 
     public void SetEvent(SafeWaitHandle @event)
