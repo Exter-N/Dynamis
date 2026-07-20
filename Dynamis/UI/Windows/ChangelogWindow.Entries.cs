@@ -2,6 +2,19 @@ namespace Dynamis.UI.Windows;
 
 partial class ChangelogWindow
 {
+    private void Draw0_1_4_1()
+    {
+        if (!DrawVersionHeader(0, 1, 4, 1, 2)) {
+            return;
+        }
+
+        ImGuiComponents.SeparatorText("Bug fixes and improvements"u8);
+
+        BulletText("Added interface visibility (in cutscene, group pose, etc.) settings."u8);
+        BulletText("Fixed a bug with annotations of overlapping fields."u8);
+        BulletText("Tried to make IPFD less finicky."u8);
+    }
+
     private void Draw0_1_4_0()
     {
         if (!DrawVersionHeader(0, 1, 4, 0, 1)) {

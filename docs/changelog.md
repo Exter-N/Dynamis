@@ -1,3 +1,11 @@
+# Version 0.1.4.1
+
+## Bug fixes and improvements
+
+- Added interface visibility (in cutscene, group pose, etc.) settings.
+- Fixed a bug with annotations of overlapping fields.
+- Tried to make IPFD less finicky.
+
 # Version 0.1.4.0
 
 ## New features
