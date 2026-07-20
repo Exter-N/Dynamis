@@ -150,6 +150,10 @@ public sealed class NanoComProbe
 
         public unsafe bool IsInstance(IUnknown* obj)
         {
+            if (obj is null) {
+                return false;
+            }
+
             IUnknown* obj2;
             if (QueryInterface(obj, &obj2).FAILED) {
                 return false;
