@@ -2,6 +2,17 @@ namespace Dynamis.UI.Windows;
 
 partial class ChangelogWindow
 {
+    private void Draw0_1_4_2()
+    {
+        if (!DrawVersionHeader(0, 1, 4, 2, 3)) {
+            return;
+        }
+
+        ImGuiComponents.SeparatorText("Bug fixes and improvements"u8);
+
+        BulletText("Made the changelog window less eager to respond to /commands that aren't for it."u8);
+    }
+
     private void Draw0_1_4_1()
     {
         if (!DrawVersionHeader(0, 1, 4, 1, 2)) {

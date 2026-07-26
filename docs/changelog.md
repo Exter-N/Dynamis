@@ -1,3 +1,9 @@
+# Version 0.1.4.2
+
+## Bug fixes and improvements
+
+- Made the changelog window less eager to respond to /commands that aren't for it.
+
 # Version 0.1.4.1
 
 ## Bug fixes and improvements
