@@ -117,7 +117,7 @@ public sealed partial class ChangelogWindow : Window, ISingletonWindow, IMessage
 
     public void HandleMessage(CommandMessage message)
     {
-        if (!message.IsSubCommand(null, "changelog", "cl", "changes", "chg")) {
+        if (!message.IsSubCommand("changelog", "cl", "changes", "chg")) {
             return;
         }
 
